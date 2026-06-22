@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field, SecretStr, field_validator, model_validator
 from typing_extensions import Self
 
-from backend.schemas.user import validate_password
+from backend.app.schemas.user import validate_password
 
 
 class LoginRequest(BaseModel):

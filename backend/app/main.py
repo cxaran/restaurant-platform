@@ -1,16 +1,7 @@
-from contextlib import asynccontextmanager
+from fastapi import FastAPI
 
-from fastapi import APIRouter, FastAPI
-
-from backend.app.auth.bootstrap import bootstrap_superuser
+from backend.app.api.router import router as api_router
 from backend.app.core.settings import settings
-from backend.app.routes import admin_router, auth_router, pos_router
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    bootstrap_superuser()
-    yield
 
 
 app = FastAPI(
@@ -18,16 +9,6 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
-    lifespan=lifespan,
 )
 
-app.include_router(
-    APIRouter(
-        routes=[
-            *auth_router.routes,
-            *admin_router.routes,
-            *pos_router.routes,
-        ],
-    ),
-    prefix="/api/v1",
-)
+app.include_router(api_router)

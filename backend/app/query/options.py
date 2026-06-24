@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.sql.elements import ColumnElement
+
+if TYPE_CHECKING:
+    from backend.app.query.policies import QueryPolicy
 
 QueryColumn = ColumnElement[Any] | InstrumentedAttribute[Any]
 
@@ -25,3 +28,11 @@ class QueryOptions:
     max_sort_terms: int = 3
     max_sort_length: int = 200
     max_filter_text_length: int = 200
+
+    def to_policy(self, resource_schema: type[Any], orm_model: type[Any]) -> "QueryPolicy":
+        """Traduce esta ``QueryOptions`` (API operativa) a una ``QueryPolicy``
+        equivalente. Import diferido para evitar el ciclo con ``policies``/``factory``.
+        """
+        from backend.app.query.policies import policy_from_options
+
+        return policy_from_options(self, resource_schema, orm_model)

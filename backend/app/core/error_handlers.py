@@ -1,0 +1,52 @@
+"""Registra handlers globales que unifican el cuerpo de error de la API."""
+
+from typing import Any, Sequence
+
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+from backend.app.query.validation import QueryParameterError
+from backend.app.schemas.error import ErrorItem, ErrorResponse
+
+_IGNORED_LOC_PREFIXES = {"query", "body", "path", "header", "cookie"}
+
+
+def _error_response(
+    status_code: int,
+    code: str,
+    message: str,
+    errors: list[ErrorItem] | None = None,
+) -> JSONResponse:
+    body = ErrorResponse(code=code, message=message, errors=errors)
+    return JSONResponse(status_code=status_code, content=body.model_dump(exclude_none=True))
+
+
+def _field_from_loc(loc: Sequence[Any]) -> str | None:
+    parts = [str(part) for part in loc if part not in _IGNORED_LOC_PREFIXES]
+    return ".".join(parts) if parts else None
+
+
+async def _query_parameter_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, QueryParameterError)
+    errors = [ErrorItem(field=exc.field_name, message=exc.message)] if exc.field_name else None
+    return _error_response(status.HTTP_422_UNPROCESSABLE_CONTENT, exc.code, exc.message, errors)
+
+
+async def _validation_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, RequestValidationError)
+    errors = [
+        ErrorItem(field=_field_from_loc(error["loc"]), message=error["msg"])
+        for error in exc.errors()
+    ]
+    return _error_response(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        code="validation_error",
+        message="Parámetros inválidos",
+        errors=errors,
+    )
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(QueryParameterError, _query_parameter_error_handler)
+    app.add_exception_handler(RequestValidationError, _validation_error_handler)

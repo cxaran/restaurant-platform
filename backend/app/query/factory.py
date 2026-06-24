@@ -1,0 +1,434 @@
+from datetime import date, datetime
+from decimal import Decimal
+from enum import Enum
+from types import UnionType
+from typing import Annotated, Any,  NoReturn, Union, cast, get_args, get_origin
+from uuid import UUID
+
+from pydantic import BaseModel, EmailStr, Field, SecretStr, create_model
+from sqlalchemy import inspect
+from sqlalchemy.orm import Mapper
+from sqlalchemy.orm.attributes import InstrumentedAttribute
+from sqlalchemy.orm.properties import ColumnProperty
+from sqlalchemy.sql.elements import ColumnElement
+
+from backend.app.query.options import QueryOptions
+from backend.app.query.schema import OffsetQuerySchema
+from backend.app.query.validation import fail_config
+
+RESERVED_QUERY_FIELDS = frozenset({"limit", "offset", "sort", "q"})
+GENERATED_SUFFIXES = ("_gte", "_lte", "_in", "_isnull")
+RANGE_TYPES = (int, Decimal, date, datetime)
+EQUALITY_TYPES = (str, EmailStr, UUID, bool)
+
+
+def make_offset_query_schema(
+    *,
+    name: str,
+    resource_schema: type[BaseModel],
+    orm_model: type[Any],
+    options: QueryOptions | None = None,
+) -> type[OffsetQuerySchema]:
+    query_options = options or QueryOptions()
+    _validate_limits(query_options)
+    primary_keys = _primary_key_columns(orm_model)
+    field_definitions: dict[str, tuple[Any, Any]] = {}
+    all_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]] = {}
+    filter_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]] = {}
+    field_types: dict[str, type[Any]] = {}
+    range_fields: set[str] = set()
+    sort_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]] = {}
+
+    for field_name, field_info in resource_schema.model_fields.items():
+        _validate_field_name(field_name)
+
+    requested_fields = _requested_fields(query_options)
+    _validate_requested_fields(resource_schema, requested_fields)
+
+    for field_name in requested_fields:
+        field_info = resource_schema.model_fields[field_name]
+        field_type = _compatible_scalar_type(field_name, field_info.annotation)
+        all_columns[field_name] = _resolve_column(orm_model, field_name, query_options)
+        field_types[field_name] = field_type
+
+    for field_name in _default_sort_fields(query_options):
+        if field_name not in all_columns:
+            all_columns[field_name] = _resolve_column(orm_model, field_name, query_options)
+
+    for field_name in query_options.filter_fields:
+        field_type = field_types[field_name]
+        column = all_columns[field_name]
+
+        field_definitions[field_name] = _optional_filter_field(field_type, query_options)
+        filter_columns[field_name] = column
+
+        if _supports_range(field_type):
+            field_definitions[f"{field_name}_gte"] = (field_type | None, None)
+            field_definitions[f"{field_name}_lte"] = (field_type | None, None)
+            range_fields.add(field_name)
+
+    if query_options.sort_fields:
+        for field_name in query_options.sort_fields:
+            sort_columns[field_name] = all_columns[field_name]
+    else:
+        sort_columns.update(all_columns)
+
+    for pk_name in _primary_key_names(primary_keys):
+        if pk_name not in sort_columns and pk_name in resource_schema.model_fields:
+            sort_columns[pk_name] = getattr(orm_model, pk_name)
+
+    in_fields = _register_in_filters(field_definitions, all_columns, field_types, query_options)
+    null_filter_fields = _register_null_filters(field_definitions, all_columns, query_options)
+
+    search_columns = tuple(
+        _search_column(field_name, all_columns, field_types)
+        for field_name in query_options.search_fields
+    )
+    if search_columns:
+        field_definitions["q"] = (str | None, Field(default=None, min_length=2, max_length=100))
+
+    default_sort = _default_sort(query_options, sort_columns, primary_keys)
+    field_definitions["limit"] = (int, Field(default=20, ge=1, le=query_options.max_limit))
+    field_definitions["sort"] = (
+        str,
+        Field(
+            default=default_sort,
+            min_length=1,
+            max_length=query_options.max_sort_length,
+            description="Campos de orden separados por coma. Use '-' para orden descendente.",
+        ),
+    )
+
+    query_schema = create_model(
+        name,
+        __base__=OffsetQuerySchema,
+        __module__=resource_schema.__module__,
+        **cast(Any, field_definitions),
+    )
+
+    setattr(query_schema, "model", orm_model)
+    setattr(query_schema, "__query_columns__", filter_columns)
+    setattr(query_schema, "__query_all_columns__", all_columns)
+    setattr(query_schema, "__query_range_fields__", range_fields)
+    setattr(query_schema, "__query_in_fields__", in_fields)
+    setattr(query_schema, "__query_null_filter_fields__", null_filter_fields)
+    setattr(query_schema, "__query_sort_columns__", sort_columns)
+    setattr(query_schema, "__query_search_columns__", search_columns)
+    setattr(query_schema, "__query_primary_keys__", primary_keys)
+    setattr(query_schema, "__query_max_sort_terms__", query_options.max_sort_terms)
+    return query_schema
+
+
+def _register_in_filters(
+    field_definitions: dict[str, tuple[Any, Any]],
+    columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]],
+    field_types: dict[str, type[Any]],
+    options: QueryOptions,
+) -> set[str]:
+    in_fields: set[str] = set()
+    for field_name in options.in_fields:
+        _require_filterable_field(field_name, columns, "in")
+        generated = f"{field_name}_in"
+        _guard_generated_collision(generated, field_definitions)
+        field_definitions[generated] = (
+            list[field_types[field_name]] | None,
+            Field(default=None, min_length=1, max_length=options.max_in_values),
+        )
+        in_fields.add(field_name)
+    return in_fields
+
+
+def _register_null_filters(
+    field_definitions: dict[str, tuple[Any, Any]],
+    columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]],
+    options: QueryOptions,
+) -> set[str]:
+    null_filter_fields: set[str] = set()
+    for field_name in options.null_filter_fields:
+        _require_filterable_field(field_name, columns, "null")
+        generated = f"{field_name}_isnull"
+        _guard_generated_collision(generated, field_definitions)
+        field_definitions[generated] = (bool | None, None)
+        null_filter_fields.add(field_name)
+    return null_filter_fields
+
+
+def _require_filterable_field(
+    field_name: str,
+    columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]],
+    kind: str,
+) -> None:
+    if field_name not in columns:
+        _fail(
+            "invalid_schema_column_mapping",
+            f"El campo '{field_name}' del filtro '{kind}' no existe en el query schema generado.",
+        )
+
+
+def _validate_limits(options: QueryOptions) -> None:
+    for field_name, value in (
+        ("max_limit", options.max_limit),
+        ("max_in_values", options.max_in_values),
+        ("max_sort_terms", options.max_sort_terms),
+        ("max_sort_length", options.max_sort_length),
+        ("max_filter_text_length", options.max_filter_text_length),
+    ):
+        if value < 1:
+            _fail("invalid_query_options", f"{field_name} debe ser mayor o igual a 1.")
+
+
+def _requested_fields(options: QueryOptions) -> tuple[str, ...]:
+    fields: list[str] = []
+    for group in (
+        options.filter_fields,
+        options.sort_fields,
+        options.search_fields,
+        options.in_fields,
+        options.null_filter_fields,
+    ):
+        fields.extend(group)
+    return tuple(dict.fromkeys(fields))
+
+
+def _default_sort_fields(options: QueryOptions) -> tuple[str, ...]:
+    return _sort_field_names(options.default_sort) if options.default_sort else ()
+
+
+def _validate_requested_fields(resource_schema: type[BaseModel], field_names: tuple[str, ...]) -> None:
+    for field_name in field_names:
+        if field_name not in resource_schema.model_fields:
+            _fail(
+                "invalid_schema_column_mapping",
+                f"El campo '{field_name}' no existe en el schema público.",
+            )
+
+
+def _optional_filter_field(field_type: type[Any], options: QueryOptions) -> tuple[Any, Any]:
+    if _is_text_type(field_type):
+        return (field_type | None, Field(default=None, max_length=options.max_filter_text_length))
+    return (field_type | None, None)
+
+
+def _guard_generated_collision(
+    generated: str,
+    field_definitions: dict[str, tuple[Any, Any]],
+) -> None:
+    if generated in field_definitions:
+        _fail(
+            "reserved_query_field_collision",
+            f"El parámetro generado '{generated}' colisiona con un campo ya existente.",
+        )
+
+
+def _validate_field_name(field_name: str) -> None:
+    if field_name in RESERVED_QUERY_FIELDS:
+        _fail(
+            "reserved_query_field_collision",
+            f"El campo '{field_name}' usa un nombre reservado para query params.",
+        )
+    if field_name.endswith(GENERATED_SUFFIXES):
+        _fail(
+            "reserved_query_field_collision",
+            f"El campo '{field_name}' colisiona con sufijos generados por filtros de rango.",
+        )
+
+
+def _compatible_scalar_type(field_name: str, annotation: Any) -> type[Any]:
+    field_type = _unwrap_optional(_unwrap_annotated(annotation))
+    origin = get_origin(field_type)
+
+    if origin is not None:
+        _fail(
+            "unsupported_schema_field_type",
+            f"El campo '{field_name}' usa un tipo compuesto no soportado: {field_type}.",
+        )
+
+    if field_type is float or field_type is SecretStr:
+        _fail(
+            "unsupported_schema_field_type",
+            f"El campo '{field_name}' usa un tipo no soportado: {field_type}.",
+        )
+
+    if isinstance(field_type, type) and issubclass(field_type, BaseModel):
+        _fail(
+            "unsupported_schema_field_type",
+            f"El campo '{field_name}' usa un schema anidado no soportado.",
+        )
+
+    if _is_enum(field_type) or field_type in EQUALITY_TYPES or field_type in RANGE_TYPES:
+        return cast(type[Any], field_type)
+
+    _fail(
+        "unsupported_schema_field_type",
+        f"El campo '{field_name}' usa un tipo no soportado: {field_type}.",
+    )
+
+
+def _unwrap_annotated(annotation: Any) -> Any:
+    value = annotation
+    while get_origin(value) is Annotated:
+        value = get_args(value)[0]
+    return value
+
+
+def _unwrap_optional(annotation: Any) -> Any:
+    origin = get_origin(annotation)
+    if origin not in (Union, UnionType):
+        return annotation
+
+    args = tuple(_unwrap_annotated(arg) for arg in get_args(annotation) if arg is not type(None))
+    if len(args) == 1:
+        return args[0]
+    return annotation
+
+
+def _resolve_column(
+    orm_model: type[Any],
+    field_name: str,
+    options: QueryOptions,
+) -> ColumnElement[Any] | InstrumentedAttribute[Any]:
+    if field_name in options.column_bindings:
+        column = options.column_bindings[field_name]
+        if not _is_queryable_column(column):
+            _fail(
+                "invalid_column_binding",
+                f"El binding de '{field_name}' no es una columna o expresión SQLAlchemy válida.",
+            )
+        return column
+
+    if not hasattr(orm_model, field_name):
+        _fail(
+            "invalid_schema_column_mapping",
+            f"El campo '{field_name}' no mapea a una columna directa de {orm_model.__name__}.",
+        )
+
+    column = getattr(orm_model, field_name)
+    if not _is_direct_model_column(column):
+        _fail(
+            "invalid_schema_column_mapping",
+            f"El campo '{field_name}' no mapea a una columna directa de {orm_model.__name__}.",
+        )
+    return column
+
+
+def _search_column(
+    field_name: str,
+    columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]],
+    field_types: dict[str, type[Any]],
+) -> ColumnElement[Any] | InstrumentedAttribute[Any]:
+    if field_name not in columns:
+        _fail(
+            "invalid_schema_column_mapping",
+            f"El campo de búsqueda '{field_name}' no existe en el query schema generado.",
+        )
+    if not _is_text_type(field_types[field_name]):
+        _fail(
+            "unsupported_search_field_type",
+            f"El campo de búsqueda '{field_name}' no es de tipo texto; ilike no es aplicable.",
+        )
+    return columns[field_name]
+
+
+def _primary_key_columns(orm_model: type[Any]) -> tuple[ColumnElement[Any], ...]:
+    mapper = cast(Mapper[Any], inspect(orm_model))
+    primary_keys = tuple(mapper.primary_key)
+    if not primary_keys:
+        _fail(
+            "missing_primary_key_for_stable_sort",
+            f"El modelo {orm_model.__name__} no tiene primary key para orden estable.",
+        )
+    return cast(tuple[ColumnElement[Any], ...], primary_keys)
+
+
+def _default_sort(
+    options: QueryOptions,
+    sort_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]],
+    primary_keys: tuple[ColumnElement[Any], ...],
+) -> str:
+    if options.default_sort:
+        _validate_default_sort(options.default_sort, sort_columns, options.max_sort_terms)
+        return options.default_sort
+    if "created_at" in sort_columns:
+        return "-created_at"
+    primary_key_names = _primary_key_names(primary_keys)
+    missing_primary_keys = [field_name for field_name in primary_key_names if field_name not in sort_columns]
+    if missing_primary_keys:
+        _fail(
+            "missing_default_sort",
+            "La primary key no existe completa en los campos ordenables; configure default_sort.",
+        )
+    return ",".join(primary_key_names)
+
+
+def _validate_default_sort(
+    raw_sort: str,
+    sort_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]],
+    max_sort_terms: int,
+) -> None:
+    for field_name in _sort_field_names(raw_sort, error_code="invalid_default_sort", max_sort_terms=max_sort_terms):
+        if field_name not in sort_columns:
+            _fail("invalid_default_sort", f"No se permite ordenar por '{field_name}' en default_sort.")
+
+
+def _sort_field_names(
+    raw_sort: str,
+    *,
+    error_code: str = "invalid_default_sort",
+    max_sort_terms: int | None = None,
+) -> tuple[str, ...]:
+    names: list[str] = []
+    seen: set[str] = set()
+    for raw_term in raw_sort.split(","):
+        term = raw_term.strip()
+        if not term or term == "-":
+            _fail(error_code, "default_sort contiene un campo vacío.")
+
+        field_name = term[1:] if term.startswith("-") else term
+        if not field_name:
+            _fail(error_code, "default_sort contiene un campo vacío.")
+        if field_name in seen:
+            _fail(error_code, f"El campo '{field_name}' está duplicado en default_sort.")
+
+        seen.add(field_name)
+        names.append(field_name)
+
+    if max_sort_terms is not None and len(names) > max_sort_terms:
+        _fail(error_code, f"default_sort no puede incluir más de {max_sort_terms} campos.")
+    return tuple(names)
+
+
+def _primary_key_names(primary_keys: tuple[ColumnElement[Any], ...]) -> tuple[str, ...]:
+    names: list[str] = []
+    for primary_key in primary_keys:
+        primary_key_name = primary_key.key
+        if not isinstance(primary_key_name, str) or not primary_key_name:
+            _fail(
+                "missing_primary_key_for_stable_sort",
+                "La primary key no tiene nombre usable para orden estable.",
+            )
+        names.append(primary_key_name)
+    return tuple(names)
+
+
+def _supports_range(field_type: type[Any]) -> bool:
+    return field_type in RANGE_TYPES
+
+
+def _is_enum(field_type: Any) -> bool:
+    return isinstance(field_type, type) and issubclass(field_type, Enum)
+
+
+def _is_text_type(field_type: Any) -> bool:
+    return field_type is str or field_type is EmailStr
+
+
+def _is_direct_model_column(value: Any) -> bool:
+    return isinstance(value, InstrumentedAttribute) and isinstance(cast(Any, value).property, ColumnProperty)
+
+
+def _is_queryable_column(value: Any) -> bool:
+    return isinstance(value, (ColumnElement, InstrumentedAttribute))
+
+
+def _fail(code: str, message: str) -> NoReturn:
+    fail_config(code, message)

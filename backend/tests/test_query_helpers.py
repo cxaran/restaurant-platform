@@ -5,10 +5,11 @@ from decimal import Decimal
 from enum import Enum
 
 from pydantic import BaseModel
-from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String, select
+from sqlalchemy import Boolean, Date, DateTime, Integer, Numeric, String, create_engine, select
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
+from backend.app.query import OffsetPage, OffsetPagination, OffsetQuerySchema, QuerySchema, ResourceQuery, paginate
 from backend.app.query.compiler import apply_query_schema
 from backend.app.query.factory import make_offset_query_schema
 from backend.app.query.options import QueryOptions
@@ -16,6 +17,10 @@ from backend.app.query.validation import QueryParameterError, QuerySchemaConfigE
 
 
 class QueryTestBase(DeclarativeBase):
+    pass
+
+
+class PageTestBase(DeclarativeBase):
     pass
 
 
@@ -50,12 +55,52 @@ class QueryThingRead(BaseModel):
     updated_at: datetime
 
 
+class PageThing(PageTestBase):
+    __tablename__ = "page_thing"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class PageThingRead(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+
+
+class QuerySchemaTest(unittest.TestCase):
+    def test_offset_query_schema_extends_public_query_schema(self) -> None:
+        self.assertTrue(issubclass(OffsetQuerySchema, QuerySchema))
+
+    def test_offset_page_exposes_items_and_offset_metadata(self) -> None:
+        page = OffsetPage[QueryThingRead](
+            items=[],
+            pagination=OffsetPagination(
+                limit=10,
+                offset=20,
+                has_next=False,
+                total=0,
+            ),
+        )
+
+        self.assertEqual(page.items, [])
+        self.assertEqual(page.pagination.total, 0)
+        self.assertEqual(page.pagination.limit, 10)
+        self.assertEqual(page.pagination.offset, 20)
+        self.assertFalse(page.pagination.has_next)
+
+
 class QueryHelperFactoryTest(unittest.TestCase):
     def test_factory_generates_query_fields_from_schema(self) -> None:
         query_schema = make_offset_query_schema(
             name="QueryThingListQuery",
             resource_schema=QueryThingRead,
             orm_model=QueryThing,
+            options=QueryOptions(
+                filter_fields=("id", "name", "status", "is_active", "quantity", "price", "created_on", "created_at"),
+                sort_fields=("id", "created_at"),
+            ),
         )
 
         fields = query_schema.model_fields
@@ -73,7 +118,7 @@ class QueryHelperFactoryTest(unittest.TestCase):
         self.assertIn("created_on_lte", fields)
         self.assertIn("created_at_gte", fields)
         self.assertIn("created_at_lte", fields)
-        self.assertEqual(query_schema().sort, "-created_at")
+        self.assertEqual(query_schema().sort, "-created_at")  # pyright: ignore[reportCallIssue]
 
     def test_factory_does_not_include_orm_columns_absent_from_schema(self) -> None:
         class PublicThingRead(BaseModel):
@@ -84,6 +129,7 @@ class QueryHelperFactoryTest(unittest.TestCase):
             name="PublicThingListQuery",
             resource_schema=PublicThingRead,
             orm_model=QueryThing,
+            options=QueryOptions(filter_fields=("id", "name")),
         )
 
         self.assertIn("name", query_schema.model_fields)
@@ -91,7 +137,7 @@ class QueryHelperFactoryTest(unittest.TestCase):
         self.assertNotIn("is_active", query_schema.model_fields)
 
     def test_factory_rejects_unsupported_types(self) -> None:
-        unsupported_schemas: list[type[BaseModel]] = []
+        cases: list[tuple[type[BaseModel], QueryOptions]] = []
 
         class FloatRead(BaseModel):
             id: uuid.UUID
@@ -112,27 +158,43 @@ class QueryHelperFactoryTest(unittest.TestCase):
             id: uuid.UUID
             nested: NestedValue
 
-        unsupported_schemas.extend([FloatRead, ListRead, DictRead, NestedRead])
+        cases.append((FloatRead, QueryOptions(
+            filter_fields=("id", "score"),
+            column_bindings={"score": QueryThing.quantity},
+        )))
+        cases.append((ListRead, QueryOptions(
+            filter_fields=("id", "tags"),
+            column_bindings={"tags": QueryThing.name},
+        )))
+        cases.append((DictRead, QueryOptions(
+            filter_fields=("id", "metadata"),
+            column_bindings={"metadata": QueryThing.name},
+        )))
+        cases.append((NestedRead, QueryOptions(
+            filter_fields=("id", "nested"),
+            column_bindings={"nested": QueryThing.name},
+        )))
 
-        for schema in unsupported_schemas:
+        for schema, opts in cases:
             with self.subTest(schema=schema.__name__):
                 with self.assertRaisesRegex(QuerySchemaConfigError, "unsupported_schema_field_type"):
                     make_offset_query_schema(
                         name=f"{schema.__name__}Query",
                         resource_schema=schema,
                         orm_model=QueryThing,
+                        options=opts,
                     )
 
-    def test_factory_allows_excluding_unsupported_field(self) -> None:
+    def test_factory_skips_unsupported_field_type_when_not_in_allowlists(self) -> None:
         class ListRead(BaseModel):
             id: uuid.UUID
             tags: list[str]
 
         query_schema = make_offset_query_schema(
-            name="ExcludedListQuery",
+            name="UnsupportedFieldNotInAllowlistsQuery",
             resource_schema=ListRead,
             orm_model=QueryThing,
-            options=QueryOptions(excluded_fields={"tags"}),
+            options=QueryOptions(filter_fields=("id",)),
         )
 
         self.assertIn("id", query_schema.model_fields)
@@ -147,7 +209,10 @@ class QueryHelperFactoryTest(unittest.TestCase):
             name="BoundQuery",
             resource_schema=BoundRead,
             orm_model=QueryThing,
-            options=QueryOptions(column_bindings={"display_name": QueryThing.name}),
+            options=QueryOptions(
+                filter_fields=("id", "display_name"),
+                column_bindings={"display_name": QueryThing.name},
+            ),
         )
 
         self.assertIn("display_name", query_schema.model_fields)
@@ -163,6 +228,7 @@ class QueryHelperFactoryTest(unittest.TestCase):
                 name="MissingQuery",
                 resource_schema=MissingRead,
                 orm_model=QueryThing,
+                options=QueryOptions(filter_fields=("id", "missing")),
             )
 
     def test_factory_fails_for_reserved_or_generated_field_names(self) -> None:
@@ -198,8 +264,67 @@ class QueryHelperFactoryTest(unittest.TestCase):
             orm_model=QueryThing,
         )
 
-        self.assertEqual(configured().sort, "name")
-        self.assertEqual(fallback().sort, "id")
+        self.assertEqual(configured().sort, "name")  # pyright: ignore[reportCallIssue]
+        self.assertEqual(fallback().sort, "id")  # pyright: ignore[reportCallIssue]
+
+    def test_factory_rejects_invalid_configured_default_sort(self) -> None:
+        class PublicThingRead(BaseModel):
+            id: uuid.UUID
+            name: str
+
+        error_cases: list[tuple[str, str]] = [
+            ("missing", "invalid_schema_column_mapping"),
+            ("name,name", "invalid_default_sort"),
+            ("name,,id", "invalid_default_sort"),
+            ("-", "invalid_default_sort"),
+        ]
+        for default_sort, expected_error in error_cases:
+            with self.subTest(default_sort=default_sort):
+                with self.assertRaisesRegex(QuerySchemaConfigError, expected_error):
+                    make_offset_query_schema(
+                        name="InvalidDefaultSortQuery",
+                        resource_schema=PublicThingRead,
+                        orm_model=QueryThing,
+                        options=QueryOptions(default_sort=default_sort),
+                    )
+
+    def test_factory_requires_default_sort_when_primary_key_is_not_public(self) -> None:
+        class NoStableDefaultRead(BaseModel):
+            name: str
+
+        with self.assertRaisesRegex(QuerySchemaConfigError, "missing_default_sort"):
+            make_offset_query_schema(
+                name="NoStableDefaultQuery",
+                resource_schema=NoStableDefaultRead,
+                orm_model=QueryThing,
+            )
+
+    def test_factory_generates_in_and_isnull_filters(self) -> None:
+        query_schema = make_offset_query_schema(
+            name="ExtraFiltersQuery",
+            resource_schema=QueryThingRead,
+            orm_model=QueryThing,
+            options=QueryOptions(in_fields=("status",), null_filter_fields=("updated_at",)),
+        )
+
+        self.assertIn("status_in", query_schema.model_fields)
+        self.assertIn("updated_at_isnull", query_schema.model_fields)
+
+    def test_factory_rejects_unknown_extra_filter_fields(self) -> None:
+        options_by_filter = (
+            QueryOptions(in_fields=("missing",)),
+            QueryOptions(null_filter_fields=("missing",)),
+        )
+
+        for options in options_by_filter:
+            with self.subTest(options=options):
+                with self.assertRaisesRegex(QuerySchemaConfigError, "invalid_schema_column_mapping"):
+                    make_offset_query_schema(
+                        name="InvalidExtraFilterQuery",
+                        resource_schema=QueryThingRead,
+                        orm_model=QueryThing,
+                        options=options,
+                    )
 
 
 class QueryHelperCompilerTest(unittest.TestCase):
@@ -208,7 +333,11 @@ class QueryHelperCompilerTest(unittest.TestCase):
             name="CompilerThingListQuery",
             resource_schema=QueryThingRead,
             orm_model=QueryThing,
-            options=QueryOptions(search_fields=("name",) if search else ()),
+            options=QueryOptions(
+                filter_fields=("name", "is_active", "quantity", "price", "created_on", "status", "id"),
+                sort_fields=("name", "created_at", "updated_at", "id"),
+                search_fields=("name",) if search else (),
+            ),
         )
 
     def _sql(self, stmt) -> str:
@@ -284,6 +413,89 @@ class QueryHelperCompilerTest(unittest.TestCase):
         params = stmt.compile().params
 
         self.assertIn("%a\\%b\\_c\\\\d%", params.values())
+
+
+    def test_compiler_applies_in_filter(self) -> None:
+        query_schema = make_offset_query_schema(
+            name="CompilerInQuery",
+            resource_schema=QueryThingRead,
+            orm_model=QueryThing,
+            options=QueryOptions(in_fields=("name",)),
+        )
+
+        stmt = apply_query_schema(stmt=select(QueryThing), query=query_schema(name_in=["admin", "owner"]))  # pyright: ignore[reportCallIssue, reportArgumentType]
+        self.assertIn("query_thing.name IN", self._sql(stmt))
+
+    def test_compiler_applies_isnull_filters(self) -> None:
+        query_schema = make_offset_query_schema(
+            name="CompilerNullQuery",
+            resource_schema=QueryThingRead,
+            orm_model=QueryThing,
+            options=QueryOptions(null_filter_fields=("updated_at",)),
+        )
+
+        null_stmt = apply_query_schema(stmt=select(QueryThing), query=query_schema(updated_at_isnull=True))  # pyright: ignore[reportCallIssue, reportArgumentType]
+        not_null_stmt = apply_query_schema(stmt=select(QueryThing), query=query_schema(updated_at_isnull=False))  # pyright: ignore[reportCallIssue, reportArgumentType]
+
+        self.assertIn("query_thing.updated_at IS NULL", self._sql(null_stmt))
+        self.assertIn("query_thing.updated_at IS NOT NULL", self._sql(not_null_stmt))
+
+
+class QueryExecutorTest(unittest.TestCase):
+    def _session(self) -> Session:
+        engine = create_engine("sqlite+pysqlite:///:memory:")
+        PageTestBase.metadata.create_all(engine)
+        session = Session(engine)
+        self.addCleanup(engine.dispose)
+        self.addCleanup(session.close)
+        return session
+
+    def _seed(self, session: Session) -> None:
+        session.add_all(
+            [
+                PageThing(id=1, name="admin", created_at=datetime(2024, 1, 1)),
+                PageThing(id=2, name="owner", created_at=datetime(2024, 1, 2)),
+                PageThing(id=3, name="guest", created_at=datetime(2024, 1, 3)),
+            ]
+        )
+        session.commit()
+
+    def test_paginate_returns_items_and_pagination_metadata(self) -> None:
+        session = self._session()
+        self._seed(session)
+        query_schema = make_offset_query_schema(
+            name="PageThingQuery",
+            resource_schema=PageThingRead,
+            orm_model=PageThing,
+        )
+
+        page = paginate(
+            session,
+            stmt=select(PageThing),
+            query=query_schema(limit=2, offset=0, sort="id"),
+            item_schema=PageThingRead,
+        )
+
+        self.assertEqual([item.id for item in page.items], [1, 2])
+        self.assertEqual(page.pagination.total, 3)
+        self.assertEqual(page.pagination.limit, 2)
+        self.assertEqual(page.pagination.offset, 0)
+        self.assertTrue(page.pagination.has_next)
+
+    def test_resource_query_paginates_custom_statement(self) -> None:
+        session = self._session()
+        self._seed(session)
+        resource = ResourceQuery(name="PageThingResourceQuery", model=PageThing, schema=PageThingRead)
+
+        page = resource.paginate(
+            session,
+            resource.Query(limit=10, sort="id"),
+            stmt=select(PageThing).where(PageThing.name != "guest"),
+        )
+
+        self.assertEqual([item.name for item in page.items], ["admin", "owner"])
+        self.assertEqual(page.pagination.total, 2)
+        self.assertFalse(page.pagination.has_next)
 
 
 if __name__ == "__main__":

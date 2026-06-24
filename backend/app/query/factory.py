@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -13,8 +14,18 @@ from sqlalchemy.orm.properties import ColumnProperty
 from sqlalchemy.sql.elements import ColumnElement
 
 from backend.app.query.options import QueryOptions
+from backend.app.query.plans import CompiledQueryPlan
 from backend.app.query.schema import OffsetQuerySchema
 from backend.app.query.validation import fail_config
+
+
+@dataclass(frozen=True)
+class CompiledListQuery:
+    """Contenedor inmutable que une el contrato HTTP (``schema``) con su metadata
+    SQLAlchemy compilada (``plan``)."""
+
+    schema: type[OffsetQuerySchema]
+    plan: CompiledQueryPlan
 
 RESERVED_QUERY_FIELDS = frozenset({"limit", "offset", "sort", "q"})
 GENERATED_SUFFIXES = ("_gte", "_lte", "_in", "_isnull")
@@ -29,6 +40,26 @@ def make_offset_query_schema(
     orm_model: type[Any],
     options: QueryOptions | None = None,
 ) -> type[OffsetQuerySchema]:
+    """API heredada: devuelve únicamente la clase Pydantic del query schema.
+
+    Delega en :func:`compile_list_query` y conserva su retorno histórico
+    (``type[OffsetQuerySchema]``) para cualquier caller que espere solo el schema.
+    """
+    return compile_list_query(
+        name=name,
+        resource_schema=resource_schema,
+        orm_model=orm_model,
+        options=options,
+    ).schema
+
+
+def compile_list_query(
+    *,
+    name: str,
+    resource_schema: type[BaseModel],
+    orm_model: type[Any],
+    options: QueryOptions | None = None,
+) -> CompiledListQuery:
     query_options = options or QueryOptions()
     _validate_limits(query_options)
     primary_keys = _primary_key_columns(orm_model)
@@ -106,6 +137,7 @@ def make_offset_query_schema(
         **cast(Any, field_definitions),
     )
 
+    # Los atributos __query_*__ se conservan (ruta heredada / fallback del compiler).
     setattr(query_schema, "model", orm_model)
     setattr(query_schema, "__query_columns__", filter_columns)
     setattr(query_schema, "__query_all_columns__", all_columns)
@@ -116,7 +148,23 @@ def make_offset_query_schema(
     setattr(query_schema, "__query_search_columns__", search_columns)
     setattr(query_schema, "__query_primary_keys__", primary_keys)
     setattr(query_schema, "__query_max_sort_terms__", query_options.max_sort_terms)
-    return query_schema
+
+    # El plan describe exactamente la misma metadata, en forma tipada e inmutable.
+    plan = CompiledQueryPlan(
+        filter_columns=filter_columns,
+        all_columns=all_columns,
+        range_fields=frozenset(range_fields),
+        in_fields=frozenset(in_fields),
+        null_filter_fields=frozenset(null_filter_fields),
+        sort_columns=sort_columns,
+        search_columns=search_columns,
+        primary_keys=primary_keys,
+        max_sort_terms=query_options.max_sort_terms,
+        max_in_values=query_options.max_in_values,
+        max_sort_length=query_options.max_sort_length,
+        max_filter_text_length=query_options.max_filter_text_length,
+    )
+    return CompiledListQuery(schema=query_schema, plan=plan)
 
 
 def _register_in_filters(

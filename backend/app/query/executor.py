@@ -7,6 +7,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from backend.app.query.compiler import apply_query_schema
+from backend.app.query.plans import CompiledQueryPlan
 from backend.app.query.schema import OffsetQuerySchema
 from backend.app.schemas.pagination import OffsetPage, OffsetPagination
 
@@ -19,14 +20,16 @@ def paginate(
     stmt: Select[Any],
     query: OffsetQuerySchema,
     item_schema: type[TItem],
+    plan: CompiledQueryPlan | None = None,
 ) -> OffsetPage[TItem]:
     """Aplica filtros/orden del ``query``, cuenta el total y devuelve una página.
 
     El conteo reutiliza exactamente los mismos filtros que la consulta de datos
     (descartando el ``order_by``), de modo que ``total`` siempre es coherente con
-    ``items``.
+    ``items``. ``plan`` es opcional: si se omite, el compiler usa el fallback a
+    ``__query_*__``. No altera el contrato HTTP ni la paginación.
     """
-    filtered = apply_query_schema(stmt=stmt, query=query)
+    filtered = apply_query_schema(stmt=stmt, query=query, plan=plan)
 
     count_stmt = select(func.count()).select_from(filtered.order_by(None).subquery())
     total = session.scalar(count_stmt) or 0

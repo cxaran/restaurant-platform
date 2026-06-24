@@ -1,9 +1,10 @@
-from typing import Any, NoReturn, cast
+from typing import Any, NoReturn
 
 from sqlalchemy import Select, or_
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.sql.elements import ColumnElement
 
+from backend.app.query.plans import CompiledQueryPlan
 from backend.app.query.schema import OffsetQuerySchema
 from backend.app.query.validation import fail_query
 
@@ -14,14 +15,16 @@ def apply_query_schema(
     *,
     stmt: Select[Any],
     query: OffsetQuerySchema,
+    plan: CompiledQueryPlan | None = None,
 ) -> Select[Any]:
-    query_type = type(query)
-    filter_columns = cast("dict[str, QueryableColumn]", query_type.__query_columns__)
-    all_columns = cast("dict[str, QueryableColumn]", query_type.__query_all_columns__)
-    range_fields = query_type.__query_range_fields__
-    in_fields = query_type.__query_in_fields__
-    null_filter_fields = query_type.__query_null_filter_fields__
-    search_columns = cast("tuple[QueryableColumn, ...]", query_type.__query_search_columns__)
+    # Plan explícito si se proporciona; si no, fallback completo a __query_*__.
+    resolved = plan if plan is not None else CompiledQueryPlan.from_schema(type(query))
+    filter_columns = resolved.filter_columns
+    all_columns = resolved.all_columns
+    range_fields = resolved.range_fields
+    in_fields = resolved.in_fields
+    null_filter_fields = resolved.null_filter_fields
+    search_columns = resolved.search_columns
 
     for field_name, column in filter_columns.items():
         value = getattr(query, field_name)
@@ -54,7 +57,7 @@ def apply_query_schema(
 
     if not query.sort:
         _fail("invalid_sort", "El parámetro sort no puede estar vacío.", field_name="sort")
-    stmt = _apply_sort(stmt, query.sort, query_type)
+    stmt = _apply_sort(stmt, query.sort, resolved)
 
     return stmt
 
@@ -81,11 +84,11 @@ def _apply_search(
 def _apply_sort(
     stmt: Select[Any],
     raw_sort: str,
-    query_type: type[OffsetQuerySchema],
+    plan: CompiledQueryPlan,
 ) -> Select[Any]:
-    sort_columns = cast("dict[str, QueryableColumn]", query_type.__query_sort_columns__)
-    primary_keys = cast("tuple[ColumnElement[Any], ...]", query_type.__query_primary_keys__)
-    terms = _parse_sort(raw_sort, query_type.__query_max_sort_terms__)
+    sort_columns = plan.sort_columns
+    primary_keys = plan.primary_keys
+    terms = _parse_sort(raw_sort, plan.max_sort_terms)
     requested_fields = {field_name for field_name, _ in terms}
 
     expressions: list[Any] = []

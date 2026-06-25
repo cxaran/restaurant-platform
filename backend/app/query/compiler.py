@@ -86,14 +86,18 @@ def _apply_sort(
     raw_sort: str,
     plan: CompiledQueryPlan,
 ) -> Select[Any]:
-    sort_columns = plan.sort_columns
-    primary_keys = plan.primary_keys
+    # El sort del cliente se valida contra el conjunto público; el default del
+    # servidor (orden fijo) se resuelve contra orderable, que puede incluir campos
+    # internos no solicitables. Ya fue validado en compile-time.
+    is_server_default = raw_sort == plan.default_order
+    allowed_columns = plan.orderable_columns if is_server_default else plan.public_sort_columns
+    tie_breakers = plan.tie_breakers
     terms = _parse_sort(raw_sort, plan.max_sort_terms)
     requested_fields = {field_name for field_name, _ in terms}
 
     expressions: list[Any] = []
     for field_name, descending in terms:
-        maybe_column = sort_columns.get(field_name)
+        maybe_column = allowed_columns.get(field_name)
         if maybe_column is None:
             _fail(
                 "unsupported_sort_field",
@@ -103,15 +107,17 @@ def _apply_sort(
         column = maybe_column
         expressions.append(column.desc().nulls_last() if descending else column.asc().nulls_last())
 
-    # Desempate determinista: añade todas las columnas de la primary key que el
-    # cliente no haya pedido ya, para que LIMIT/OFFSET no devuelva subconjuntos
-    # arbitrarios (incluye claves compuestas).
+    # Desempate determinista por clave lógica (no por identidad de objeto): añade
+    # los tie-breakers (default: primary key, incl. compuesta) que el cliente no
+    # haya pedido ya, para que LIMIT/OFFSET no devuelva subconjuntos arbitrarios.
     last_descending = terms[-1][1]
-    for primary_key in primary_keys:
-        if primary_key.key not in requested_fields:
-            expressions.append(primary_key.desc() if last_descending else primary_key.asc())
+    for logical_key, column in tie_breakers:
+        if logical_key not in requested_fields:
+            expressions.append(column.desc() if last_descending else column.asc())
 
-    return stmt.order_by(*expressions)
+    # La policy reemplaza cualquier ORDER BY previo del stmt base (la ruta conserva
+    # JOIN/WHERE/HAVING/scopes; el orden lo gobierna la policy).
+    return stmt.order_by(None).order_by(*expressions)
 
 
 def _parse_sort(raw_sort: str, max_sort_terms: int) -> list[tuple[str, bool]]:

@@ -25,6 +25,9 @@ _DEFAULT_LIMIT = 20
 class SortConfig:
     public_sort_fields: tuple[str, ...]
     default_order: str | None
+    # Superconjunto interno que ``default_order`` puede usar (incluye campos no
+    # públicos). ``None`` = derivar de todos los campos del recurso + la PK.
+    orderable_fields: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)

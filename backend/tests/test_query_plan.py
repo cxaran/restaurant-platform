@@ -100,7 +100,7 @@ class CompileListQueryTest(unittest.TestCase):
         # Igualdad estructural (no identidad): el plan es un snapshot.
         self.assertEqual(_cols(plan.filter_columns), _cols(schema.__query_columns__))
         self.assertEqual(_cols(plan.all_columns), _cols(schema.__query_all_columns__))
-        self.assertEqual(_cols(plan.sort_columns), _cols(schema.__query_sort_columns__))
+        self.assertEqual(_cols(plan.public_sort_columns), _cols(schema.__query_sort_columns__))
         self.assertEqual(_seq(plan.search_columns), _seq(schema.__query_search_columns__))
         self.assertEqual(_seq(plan.primary_keys), _seq(schema.__query_primary_keys__))
         self.assertEqual(plan.range_fields, frozenset(schema.__query_range_fields__))
@@ -113,7 +113,7 @@ class CompileListQueryTest(unittest.TestCase):
         rebuilt = CompiledQueryPlan.from_schema(clq.schema)
 
         self.assertEqual(_cols(rebuilt.filter_columns), _cols(clq.plan.filter_columns))
-        self.assertEqual(_cols(rebuilt.sort_columns), _cols(clq.plan.sort_columns))
+        self.assertEqual(_cols(rebuilt.public_sort_columns), _cols(clq.plan.public_sort_columns))
         self.assertEqual(rebuilt.in_fields, clq.plan.in_fields)
         self.assertEqual(_seq(rebuilt.primary_keys), _seq(clq.plan.primary_keys))
         self.assertEqual(rebuilt.max_sort_terms, clq.plan.max_sort_terms)

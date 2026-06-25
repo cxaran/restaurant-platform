@@ -132,6 +132,8 @@ def compile_list_query(
         ),
     )
 
+    # Legacy: el conjunto público y el orderable coinciden con sort_columns (que ya
+    # incluye la PK si su nombre está en el schema). Preserva la PK solicitable.
     return _build_compiled(
         name=name,
         module=resource_schema.__module__,
@@ -142,7 +144,8 @@ def compile_list_query(
         range_fields=range_fields,
         in_fields=in_fields,
         null_filter_fields=null_filter_fields,
-        sort_columns=sort_columns,
+        public_sort_columns=sort_columns,
+        orderable_columns=sort_columns,
         search_columns=search_columns,
         primary_keys=primary_keys,
         max_sort_terms=query_options.max_sort_terms,
@@ -166,7 +169,6 @@ def compile_list_query_from_policy(
     field_definitions: dict[str, tuple[Any, Any]] = {}
     all_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]] = {}
     filter_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]] = {}
-    sort_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]] = {}
     range_fields: set[str] = set()
     in_fields: set[str] = set()
     null_filter_fields: set[str] = set()
@@ -200,16 +202,23 @@ def compile_list_query_from_policy(
     search_columns = tuple(search_columns_list)
     primary_keys = _primary_key_columns(orm_model)
 
-    if policy.sort.public_sort_fields:
-        for field_name in policy.sort.public_sort_fields:
-            sort_columns[field_name] = all_columns[field_name]
-    else:
-        sort_columns.update(all_columns)
+    # Sort público nativo: SOLO los campos declarados en public_sort_fields. La PK
+    # queda interna (tie-breaker) salvo que se declare explícitamente como pública.
+    public_sort_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]] = {
+        field_name: all_columns[field_name] for field_name in policy.sort.public_sort_fields
+    }
 
-    field_names = {spec.name for spec in policy.fields}
+    # Orderable: superconjunto que default_order puede usar (orderable_fields
+    # explícito, o todos los campos del recurso) más la primary key.
+    if policy.sort.orderable_fields is not None:
+        orderable_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]] = {
+            field_name: all_columns[field_name] for field_name in policy.sort.orderable_fields
+        }
+    else:
+        orderable_columns = dict(all_columns)
     for pk_name in _primary_key_names(primary_keys):
-        if pk_name not in sort_columns and pk_name in field_names:
-            sort_columns[pk_name] = getattr(orm_model, pk_name)
+        if pk_name not in orderable_columns:
+            orderable_columns[pk_name] = getattr(orm_model, pk_name)
 
     if search_columns:
         field_definitions["q"] = (
@@ -218,7 +227,7 @@ def compile_list_query_from_policy(
         )
 
     default_sort = _default_sort_value(
-        policy.sort.default_order, sort_columns, primary_keys, policy.limits.max_sort_terms
+        policy.sort.default_order, orderable_columns, primary_keys, policy.limits.max_sort_terms
     )
     field_definitions["limit"] = (
         int,
@@ -244,7 +253,8 @@ def compile_list_query_from_policy(
         range_fields=range_fields,
         in_fields=in_fields,
         null_filter_fields=null_filter_fields,
-        sort_columns=sort_columns,
+        public_sort_columns=public_sort_columns,
+        orderable_columns=orderable_columns,
         search_columns=search_columns,
         primary_keys=primary_keys,
         max_sort_terms=policy.limits.max_sort_terms,
@@ -265,7 +275,8 @@ def _build_compiled(
     range_fields: set[str],
     in_fields: set[str],
     null_filter_fields: set[str],
-    sort_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]],
+    public_sort_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]],
+    orderable_columns: dict[str, ColumnElement[Any] | InstrumentedAttribute[Any]],
     search_columns: tuple[ColumnElement[Any] | InstrumentedAttribute[Any], ...],
     primary_keys: tuple[ColumnElement[Any], ...],
     max_sort_terms: int,
@@ -282,13 +293,18 @@ def _build_compiled(
         **cast(Any, field_definitions),
     )
 
+    # Tie-breakers para estabilidad: la primary key, con su clave de columna como
+    # clave lógica de desempate (las claves ya fueron validadas como str usables).
+    tie_breakers = tuple((cast(str, primary_key.key), primary_key) for primary_key in primary_keys)
+
     setattr(query_schema, "model", model)
     setattr(query_schema, "__query_columns__", filter_columns)
     setattr(query_schema, "__query_all_columns__", all_columns)
     setattr(query_schema, "__query_range_fields__", range_fields)
     setattr(query_schema, "__query_in_fields__", in_fields)
     setattr(query_schema, "__query_null_filter_fields__", null_filter_fields)
-    setattr(query_schema, "__query_sort_columns__", sort_columns)
+    # El dunder heredado refleja el conjunto público (lo que el cliente puede pedir).
+    setattr(query_schema, "__query_sort_columns__", public_sort_columns)
     setattr(query_schema, "__query_search_columns__", search_columns)
     setattr(query_schema, "__query_primary_keys__", primary_keys)
     setattr(query_schema, "__query_max_sort_terms__", max_sort_terms)
@@ -299,7 +315,10 @@ def _build_compiled(
         range_fields=frozenset(range_fields),
         in_fields=frozenset(in_fields),
         null_filter_fields=frozenset(null_filter_fields),
-        sort_columns=sort_columns,
+        public_sort_columns=public_sort_columns,
+        orderable_columns=orderable_columns,
+        tie_breakers=tie_breakers,
+        default_order=query_schema.model_fields["sort"].default,
         search_columns=search_columns,
         primary_keys=primary_keys,
         max_sort_terms=max_sort_terms,

@@ -1,11 +1,13 @@
-import { EmptyState } from "@/components/ui/EmptyState";
-import { SessionUser } from "@/core/auth/types";
+import type { ResourceCatalog as ResourceCatalogType } from "@/core/api/contracts";
+import type { SessionUser } from "@/core/auth/types";
 
 export function PlatformShell({
   session,
+  resources,
   children,
 }: Readonly<{
   session: SessionUser;
+  resources: ResourceCatalogType;
   children: React.ReactNode;
 }>) {
   return (
@@ -23,12 +25,10 @@ export function PlatformShell({
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-6 py-8">
-        <nav className="mb-6">
-          <EmptyState
-            title="Sin módulos disponibles"
-            description="La navegación se alimentará desde capabilities cuando el backend exponga el catálogo de recursos."
-          />
-        </nav>
+        <div className="mb-6 flex items-baseline justify-between">
+          <h2 className="text-xl font-semibold text-slate-900">Módulos disponibles</h2>
+          <span className="text-sm text-slate-500">{resources.length}</span>
+        </div>
         {children}
       </main>
     </div>

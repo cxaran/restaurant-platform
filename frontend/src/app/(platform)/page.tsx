@@ -1,10 +1,8 @@
-import { EmptyState } from "@/components/ui/EmptyState";
+import { ResourceCatalog } from "@/components/dashboard/ResourceCatalog";
+import { getResourceCatalog } from "@/core/resources/capabilities-client";
 
-export default function DashboardPage() {
-  return (
-    <EmptyState
-      title="Plataforma lista"
-      description="El shell autenticado está preparado. Los módulos se incorporarán cuando el backend exponga capabilities."
-    />
-  );
+export default async function DashboardPage() {
+  const resources = await getResourceCatalog();
+
+  return <ResourceCatalog resources={resources} />;
 }

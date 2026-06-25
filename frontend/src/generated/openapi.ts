@@ -171,6 +171,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Resources */
+        get: operations["list_resources_api_v1_resources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/resources/{resource_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Resource Capability */
+        get: operations["get_resource_capability_api_v1_resources__resource_name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -336,6 +370,21 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ActionScope
+         * @enum {string}
+         */
+        ActionScope: "resource" | "item";
+        /**
+         * FieldValueType
+         * @enum {string}
+         */
+        FieldValueType: "string" | "email" | "uuid" | "integer" | "decimal" | "boolean" | "date" | "datetime" | "enum" | "array";
+        /**
+         * FilterOperator
+         * @enum {string}
+         */
+        FilterOperator: "eq" | "gte" | "lte" | "in" | "isnull";
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
             /**
@@ -357,6 +406,11 @@ export interface components {
              */
             status: "ok";
         };
+        /**
+         * HttpMethod
+         * @enum {string}
+         */
+        HttpMethod: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -409,6 +463,13 @@ export interface components {
             has_next: boolean;
             /** Total */
             total: number;
+        };
+        /** PaginationCapability */
+        PaginationCapability: {
+            /** Default Limit */
+            default_limit: number;
+            /** Max Limit */
+            max_limit: number;
         };
         /** PermissionGroupRead */
         PermissionGroupRead: {
@@ -488,11 +549,100 @@ export interface components {
              */
             confirm_password: string;
         };
-        /** RoleCreate */
-        RoleCreate: {
+        /** ResourceActionCapability */
+        ResourceActionCapability: {
             /** Name */
             name: string;
+            /** Label */
+            label: string;
+            method: components["schemas"]["HttpMethod"];
+            /** Url Template */
+            url_template: string;
+            scope: components["schemas"]["ActionScope"];
+            /** Danger */
+            danger: boolean;
+        };
+        /** ResourceCapability */
+        ResourceCapability: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Api Path */
+            api_path: string;
+            view: components["schemas"]["ResourceView"];
+            list?: components["schemas"]["ResourceListCapability"] | null;
+            forms?: components["schemas"]["ResourceFormsCapability"] | null;
+            /**
+             * Actions
+             * @default []
+             */
+            actions: components["schemas"]["ResourceActionCapability"][];
+        };
+        /** ResourceFieldCapability */
+        ResourceFieldCapability: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
             /** Description */
+            description?: string | null;
+            type: components["schemas"]["FieldValueType"];
+            /** Visible In List */
+            visible_in_list: boolean;
+            /** Visible As Filter */
+            visible_as_filter: boolean;
+            /** Sortable */
+            sortable: boolean;
+            /** Searchable */
+            searchable: boolean;
+            /** Filter Operators */
+            filter_operators: components["schemas"]["FilterOperator"][];
+        };
+        /** ResourceFormCapability */
+        ResourceFormCapability: {
+            method: components["schemas"]["HttpMethod"];
+            /** Url Template */
+            url_template: string;
+            /** Fields */
+            fields: components["schemas"]["ResourceFormFieldCapability"][];
+        };
+        /** ResourceFormFieldCapability */
+        ResourceFormFieldCapability: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description?: string | null;
+            type: components["schemas"]["FieldValueType"];
+            /** Required */
+            required: boolean;
+            widget?: components["schemas"]["WidgetType"] | null;
+        };
+        /** ResourceFormsCapability */
+        ResourceFormsCapability: {
+            create?: components["schemas"]["ResourceFormCapability"] | null;
+            update?: components["schemas"]["ResourceFormCapability"] | null;
+        };
+        /** ResourceListCapability */
+        ResourceListCapability: {
+            /** Fields */
+            fields: components["schemas"]["ResourceFieldCapability"][];
+            pagination: components["schemas"]["PaginationCapability"];
+            search: components["schemas"]["SearchCapability"];
+            sort: components["schemas"]["SortCapability"];
+        };
+        /**
+         * ResourceView
+         * @enum {string}
+         */
+        ResourceView: "table" | "grouped_catalog";
+        /** RoleCreate */
+        RoleCreate: {
+            /** Nombre */
+            name: string;
+            /** Descripción */
             description?: string | null;
             /** Permissions */
             permissions?: string[];
@@ -526,6 +676,9 @@ export interface components {
         /**
          * RoleListItem
          * @description Versión de listado compatible con ``ResourceQuery``.
+         *
+         *     Redeclara los campos visibles en lista con metadata UI explícita. ``id`` se
+         *     hereda sin ``ui`` y por tanto no se proyecta como columna por defecto.
          */
         RoleListItem: {
             /**
@@ -533,18 +686,18 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Name */
+            /** Nombre */
             name: string;
-            /** Description */
+            /** Descripción */
             description?: string | null;
-            /** Is Active */
+            /** Activo */
             is_active: boolean;
             /**
-             * Created At
+             * Creado
              * Format: date-time
              */
             created_at: string;
-            /** Updated At */
+            /** Actualizado */
             updated_at?: string | null;
         };
         /**
@@ -578,12 +731,21 @@ export interface components {
         };
         /** RoleUpdate */
         RoleUpdate: {
-            /** Name */
+            /** Nombre */
             name?: string | null;
-            /** Description */
+            /** Descripción */
             description?: string | null;
-            /** Is Active */
+            /** Activo */
             is_active?: boolean | null;
+        };
+        /** SearchCapability */
+        SearchCapability: {
+            /** Enabled */
+            enabled: boolean;
+            /** Min Length */
+            min_length?: number | null;
+            /** Max Length */
+            max_length?: number | null;
         };
         /** SessionUser */
         SessionUser: {
@@ -604,6 +766,17 @@ export interface components {
             /** Permissions */
             permissions?: string[];
         };
+        /** SortCapability */
+        SortCapability: {
+            /** Default Sort */
+            default_sort?: string | null;
+            /** Fixed Server Order */
+            fixed_server_order: boolean;
+            /** Max Terms */
+            max_terms: number;
+            /** Max Length */
+            max_length: number;
+        };
         /** UnlockAccountRequest */
         UnlockAccountRequest: {
             /** Token */
@@ -614,27 +787,27 @@ export interface components {
          * @description Creación administrativa de un usuario.
          */
         UserAdminCreate: {
-            /** Name */
+            /** Nombre */
             name: string;
-            /** Last Name */
+            /** Apellido */
             last_name: string;
             /**
-             * Email
+             * Correo
              * Format: email
              */
             email: string;
             /**
-             * Password
+             * Contraseña
              * Format: password
              */
             password: string;
             /**
-             * Confirm Password
+             * Confirmar contraseña
              * Format: password
              */
             confirm_password: string;
             /**
-             * Is Active
+             * Activo
              * @default true
              */
             is_active: boolean;
@@ -649,19 +822,19 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Name */
+            /** Nombre */
             name: string;
-            /** Last Name */
+            /** Apellido */
             last_name: string;
             /**
-             * Email
+             * Correo
              * Format: email
              */
             email: string;
-            /** Is Active */
+            /** Activo */
             is_active: boolean;
             /**
-             * Created At
+             * Creado
              * Format: date-time
              */
             created_at: string;
@@ -700,13 +873,13 @@ export interface components {
          * @description Actualización parcial administrativa de un usuario (PATCH).
          */
         UserAdminUpdate: {
-            /** Name */
+            /** Nombre */
             name?: string | null;
-            /** Last Name */
+            /** Apellido */
             last_name?: string | null;
-            /** Email */
+            /** Correo */
             email?: string | null;
-            /** Is Active */
+            /** Activo */
             is_active?: boolean | null;
         };
         /**
@@ -790,6 +963,11 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * WidgetType
+         * @enum {string}
+         */
+        WidgetType: "text" | "email" | "password" | "switch" | "textarea" | "multiselect";
     };
     responses: never;
     parameters: never;
@@ -1086,6 +1264,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PermissionGroupRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_resources_api_v1_resources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResourceCapability"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resource_capability_api_v1_resources__resource_name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_name: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResourceCapability"];
                 };
             };
             /** @description Validation Error */

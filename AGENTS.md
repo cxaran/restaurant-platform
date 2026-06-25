@@ -37,9 +37,9 @@ List the modules explicitly. Run from repo root.
 python -m unittest backend.tests.test_query backend.tests.test_query_helpers `
   backend.tests.test_query_integration backend.tests.test_query_policy `
   backend.tests.test_query_plan backend.tests.test_query_contract `
-  backend.tests.test_query_sort_roles backend.tests.test_error_contract `
-  backend.tests.test_query_postgres backend.tests.test_security_catalog `
-  backend.tests.test_auth_routes
+  backend.tests.test_query_sort_roles backend.tests.test_query_strategies `
+  backend.tests.test_error_contract backend.tests.test_query_postgres `
+  backend.tests.test_security_catalog backend.tests.test_auth_routes
 
 # Single module / single test
 python -m unittest backend.tests.test_security_catalog

@@ -1,6 +1,6 @@
 from typing import Any, NoReturn
 
-from sqlalchemy import Select, or_
+from sqlalchemy import Select
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -53,7 +53,7 @@ def apply_query_schema(
 
     q = getattr(query, "q", None)
     if q is not None and search_columns:
-        stmt = _apply_search(stmt, search_columns, q)
+        stmt = stmt.where(resolved.search_strategy.predicate(search_columns, q))
 
     if not query.sort:
         _fail("invalid_sort", "El parámetro sort no puede estar vacío.", field_name="sort")
@@ -70,15 +70,6 @@ def _apply_equality_filter(
     if isinstance(value, bool):
         return stmt.where(column.is_(value))
     return stmt.where(column == value)
-
-
-def _apply_search(
-    stmt: Select[Any],
-    columns: tuple[QueryableColumn, ...],
-    value: str,
-) -> Select[Any]:
-    pattern = f"%{_escape_like(value)}%"
-    return stmt.where(or_(*(column.ilike(pattern, escape="\\") for column in columns)))
 
 
 def _apply_sort(
@@ -143,10 +134,6 @@ def _parse_sort(raw_sort: str, max_sort_terms: int) -> list[tuple[str, bool]]:
         _fail("too_many_sort_fields", f"sort no puede incluir más de {max_sort_terms} campos.", field_name="sort")
 
     return terms
-
-
-def _escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _fail(code: str, message: str, field_name: str | None = None) -> NoReturn:

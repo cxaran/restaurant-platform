@@ -26,6 +26,9 @@ from typing import Any, Mapping
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.sql.elements import ColumnElement
 
+from backend.app.query.identity import IdentitySpec
+from backend.app.query.search import IlikeSearch, SearchStrategy
+
 QueryColumn = ColumnElement[Any] | InstrumentedAttribute[Any]
 
 
@@ -40,6 +43,8 @@ class CompiledQueryPlan:
     orderable_columns: Mapping[str, QueryColumn]
     tie_breakers: tuple[tuple[str, QueryColumn], ...]
     default_order: str
+    identity: IdentitySpec
+    search_strategy: SearchStrategy
     search_columns: tuple[QueryColumn, ...]
     primary_keys: tuple[ColumnElement[Any], ...]
     max_sort_terms: int
@@ -84,6 +89,8 @@ class CompiledQueryPlan:
             orderable_columns=sort_columns,
             tie_breakers=tuple((primary_key.key, primary_key) for primary_key in primary_keys),
             default_order=query_type.model_fields["sort"].default,
+            identity=IdentitySpec(columns=primary_keys),
+            search_strategy=IlikeSearch(),
             search_columns=tuple(query_type.__query_search_columns__),
             primary_keys=primary_keys,
             max_sort_terms=query_type.__query_max_sort_terms__,

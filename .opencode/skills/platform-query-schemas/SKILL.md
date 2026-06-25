@@ -173,6 +173,29 @@ page type, import from `app.schemas.pagination`. Constants `DEFAULT_LIMIT=20`,
 `MAX_LIMIT=100`. `total` is computed by reusing the exact filtered statement
 without `order_by`, so `total` is always coherent with `items`.
 
+## Count / serialize / search strategies (Fase 2, Paso 5)
+
+Opt-in pieces on `ListQueryContract`; defaults reproduce current behavior.
+
+- **CountStrategy** (`query/count_strategies.py`): `AutomaticCount` (default,
+  `COUNT(*)` over the filtered subquery) · `DistinctIdentityCount` (`COUNT` over
+  `SELECT DISTINCT <identity>` — for joins that duplicate rows; composite-safe) ·
+  `CustomCountStatement(build_count)` (receives the filtered stmt, no
+  order/offset/limit). Pass via `ListQueryContract(..., count_strategy=...)`.
+- **RowSerializer** (`query/serializers.py`): `EntitySerializer` (default,
+  `scalars` + `model_validate(from_attributes)`) · `ProjectionSerializer`
+  (`execute` + `model_validate(row._mapping)` for `select(columns)`) ·
+  `CustomSerializer(fn, use_scalars=...)`. Pass via `row_serializer=...`.
+- **SearchStrategy** (`query/search.py`): `IlikeSearch` (default; the only impl —
+  trigram/full-text are Fase 8). Pass a custom one via `search_strategy=...`; it
+  is baked into the plan (compile-time).
+- **IdentitySpec** (`query/identity.py`): `from_model` derives the PK; lives in
+  `plan.identity` and powers `DistinctIdentityCount`. For a projection/aggregate
+  without an accessible PK, declare it explicitly via `identity=...`.
+
+For 1:N data (not just count), prefer an `EXISTS`/`any()` base stmt over a
+multiplying join, or add `distinct()` to the base stmt.
+
 ## Schema standards (summary; see platform-api-conventions for full policy)
 
 Bases in `schemas/base.py`:
@@ -207,10 +230,11 @@ Hard rules:
 - Phase 2 migration status (see `docs/phase-2-query-policy-design.md`): Paso 1
   (`FieldSpec`/`QueryPolicy`/`to_policy`), Paso 2 (`CompiledQueryPlan`/
   `compile_list_query`/`plan=` path), Paso 3 (`ListQueryContract` +
-  `ResourceQuery` facade) and Paso 4 (public-sort / orderable / tie-breaker
-  separation + `default_order`, legacy PK requestable only via the options
-  adapter) are **done**. Pending (Paso 5): `IdentitySpec`, `DistinctIdentityCount`,
-  serializers, `SearchStrategy`, `QueryExtension`. Do not pre-implement these.
+  `ResourceQuery` facade), Paso 4 (public-sort / orderable / tie-breaker
+  separation + `default_order`) and Paso 5 (`IdentitySpec`, count strategies,
+  serializers, `SearchStrategy`) are **done**. Pending: `QueryExtension` and the
+  advanced Fase 8 items (cursor, full-text/trigram, JSONB, exports). Do not
+  pre-implement these.
 - Routers are **implemented** and consume the engine: `api/v1/roles.py` and
   `api/v1/users_admin.py` define module-level `ResourceQuery` and call
   `paginate_resource(...)`; `api/v1/users.py` is the self-service profile router.

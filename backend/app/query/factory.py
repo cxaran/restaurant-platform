@@ -13,10 +13,12 @@ from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.orm.properties import ColumnProperty
 from sqlalchemy.sql.elements import ColumnElement
 
+from backend.app.query.identity import IdentitySpec
 from backend.app.query.operators import Operator
 from backend.app.query.options import QueryOptions
 from backend.app.query.plans import CompiledQueryPlan
 from backend.app.query.policies import QueryPolicy
+from backend.app.query.search import IlikeSearch
 from backend.app.query.schema import OffsetQuerySchema
 from backend.app.query.validation import fail_config
 
@@ -319,6 +321,8 @@ def _build_compiled(
         orderable_columns=orderable_columns,
         tie_breakers=tie_breakers,
         default_order=query_schema.model_fields["sort"].default,
+        identity=IdentitySpec(columns=primary_keys),
+        search_strategy=IlikeSearch(),
         search_columns=search_columns,
         primary_keys=primary_keys,
         max_sort_terms=max_sort_terms,

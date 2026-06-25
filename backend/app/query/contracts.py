@@ -10,18 +10,23 @@ dependencias, permisos, tenant/scopes, joins y ``stmt`` base. ``paginate`` usa
 ``select(model)`` solo como default.
 """
 
+from dataclasses import replace
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
+from backend.app.query.count_strategies import CountStrategy
 from backend.app.query.executor import paginate
 from backend.app.query.factory import compile_list_query, compile_list_query_from_policy
+from backend.app.query.identity import IdentitySpec
 from backend.app.query.options import QueryOptions
 from backend.app.query.plans import CompiledQueryPlan
 from backend.app.query.policies import QueryPolicy
 from backend.app.query.schema import OffsetQuerySchema
+from backend.app.query.search import SearchStrategy
+from backend.app.query.serializers import RowSerializer
 from backend.app.query.validation import fail_config
 from backend.app.schemas.pagination import OffsetPage
 
@@ -37,6 +42,10 @@ class ListQueryContract(Generic[TItem]):
         schema: type[TItem],
         options: QueryOptions | None = None,
         policy: QueryPolicy | None = None,
+        count_strategy: CountStrategy | None = None,
+        row_serializer: RowSerializer | None = None,
+        search_strategy: SearchStrategy | None = None,
+        identity: IdentitySpec | None = None,
     ) -> None:
         if (options is None) == (policy is None):
             fail_config(
@@ -52,10 +61,22 @@ class ListQueryContract(Generic[TItem]):
             assert policy is not None  # garantizado por el guard de fuente única
             compiled = compile_list_query_from_policy(name=name, orm_model=model, policy=policy)
 
+        plan = compiled.plan
+        # search_strategy/identity son compile-time: se incrustan en el plan.
+        if search_strategy is not None or identity is not None:
+            plan = replace(
+                plan,
+                search_strategy=search_strategy if search_strategy is not None else plan.search_strategy,
+                identity=identity if identity is not None else plan.identity,
+            )
+
         self.model = model
         self.schema = schema
         self.Query: type[OffsetQuerySchema] = compiled.schema
-        self.plan: CompiledQueryPlan = compiled.plan
+        self.plan: CompiledQueryPlan = plan
+        # count_strategy/row_serializer son de ejecución: se pasan a paginate.
+        self.count_strategy = count_strategy
+        self.row_serializer = row_serializer
 
     def paginate(
         self,
@@ -66,5 +87,11 @@ class ListQueryContract(Generic[TItem]):
     ) -> OffsetPage[TItem]:
         statement = stmt if stmt is not None else select(self.model)
         return paginate(
-            session, stmt=statement, query=query, item_schema=self.schema, plan=self.plan
+            session,
+            stmt=statement,
+            query=query,
+            item_schema=self.schema,
+            plan=self.plan,
+            count_strategy=self.count_strategy,
+            row_serializer=self.row_serializer,
         )

@@ -29,7 +29,9 @@ class RoleUpdate(ApiPatchSchema):
     is_active: Optional[bool] = None
 
 
-class RolePermissionUpdate(ApiWriteSchema):
+class RolePermissionsReplace(ApiWriteSchema):
+    """Reemplazo completo de permisos asignados a un rol (PUT)."""
+
     permissions: list[str]
 
 
@@ -43,6 +45,10 @@ class RoleRead(ApiReadSchema):
 
 
 class RoleListItem(RoleRead):
-    users_count: int
-    permissions_count: int
+    """Versión de listado compatible con ``ResourceQuery``."""
+
+
+class RoleDetailRead(RoleRead):
+    """Detalle de rol incluyendo los permisos asignados."""
+
     permissions: list[str]

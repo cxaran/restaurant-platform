@@ -8,10 +8,11 @@ from backend.app.core.database import SessionDep
 from backend.app.schemas.auth import (
     LoginRequest,
     MessageResponse,
+    RegisterCompleteRequest,
     RegisterRequest,
     UnlockAccountRequest,
 )
-from backend.app.schemas.user import SessionUser, UserCreate
+from backend.app.schemas.user import SessionUser
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -49,7 +50,7 @@ async def request_registration(
 
 @router.post("/register/complete", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 def complete_registration(
-    payload: UserCreate,
+    payload: RegisterCompleteRequest,
     session: SessionDep,
 ) -> MessageResponse:
     user = create_user(session, payload)

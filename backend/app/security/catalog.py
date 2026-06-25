@@ -9,3 +9,12 @@ SECURITY_GROUPS: list[type[SecurityGroup]] = [
     RolePermissions,
     PermissionPermissions,
 ]
+
+
+def declared_permissions() -> set[str]:
+    """Conjunto de todos los permisos declarados en código.
+
+    Fuente única para validar que un permiso solicitado exista; evita recomputar
+    la derivación del catálogo en cada router.
+    """
+    return {permission.permission for group in SECURITY_GROUPS for permission in group}

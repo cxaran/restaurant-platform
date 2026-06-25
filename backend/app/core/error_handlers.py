@@ -2,7 +2,7 @@
 
 from typing import Any, Sequence
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -47,6 +47,22 @@ async def _validation_error_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def _http_exception_handler(_: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, HTTPException)
+    if isinstance(exc.detail, dict) and "code" in exc.detail and "message" in exc.detail:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=exc.detail,
+            headers=exc.headers,
+        )
+    return _error_response(
+        exc.status_code,
+        code=f"http_{exc.status_code}",
+        message=str(exc.detail),
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(HTTPException, _http_exception_handler)
     app.add_exception_handler(QueryParameterError, _query_parameter_error_handler)
     app.add_exception_handler(RequestValidationError, _validation_error_handler)

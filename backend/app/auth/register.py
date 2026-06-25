@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.app.core.database import SessionDep
 from backend.app.core.settings import settings
 from backend.app.models.user import User
-from backend.app.schemas.user import UserCreate
+from backend.app.schemas.auth import RegisterCompleteRequest
 from backend.app.utils.email import send_email
 
 from .security import generate_token, get_password_hash, get_user_by_email, save_user
@@ -39,7 +39,7 @@ def get_registration_email(token: str) -> str | None:
 
 def create_user(
     session: SessionDep,
-    user_data: UserCreate,
+    user_data: RegisterCompleteRequest,
 ) -> User | None:
     try:
         email = get_registration_email(user_data.token)

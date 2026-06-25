@@ -54,6 +54,7 @@ class SecurityCatalogTest(unittest.TestCase):
                 "users:update",
                 "users:delete",
                 "users:manage_roles",
+                "users:revoke_sessions",
                 "roles:read",
                 "roles:create",
                 "roles:update",

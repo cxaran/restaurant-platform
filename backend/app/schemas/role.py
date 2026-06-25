@@ -18,15 +18,41 @@ class PermissionGroupRead(ApiReadSchema):
 
 
 class RoleCreate(ApiWriteSchema):
-    name: str = Field(min_length=1, max_length=100)
-    description: Optional[str] = None
+    name: str = Field(
+        min_length=1,
+        max_length=100,
+        title="Nombre",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    description: Optional[str] = Field(
+        default=None,
+        title="Descripción",
+        json_schema_extra={"ui": {"form": True, "widget": "textarea"}},
+    )
+    # ``permissions`` se acepta opcionalmente pero NO se proyecta en el formulario
+    # de capabilities de Commit 3: el catálogo de permisos es agrupado y aún no hay
+    # contrato de opciones/relaciones. La asignación se resolverá en un commit posterior.
     permissions: list[str] = Field(default_factory=list)
 
 
 class RoleUpdate(ApiPatchSchema):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
+    name: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        title="Nombre",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    description: Optional[str] = Field(
+        default=None,
+        title="Descripción",
+        json_schema_extra={"ui": {"form": True, "widget": "textarea"}},
+    )
+    is_active: Optional[bool] = Field(
+        default=None,
+        title="Activo",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
 
 
 class RolePermissionsReplace(ApiWriteSchema):
@@ -45,7 +71,21 @@ class RoleRead(ApiReadSchema):
 
 
 class RoleListItem(RoleRead):
-    """Versión de listado compatible con ``ResourceQuery``."""
+    """Versión de listado compatible con ``ResourceQuery``.
+
+    Redeclara los campos visibles en lista con metadata UI explícita. ``id`` se
+    hereda sin ``ui`` y por tanto no se proyecta como columna por defecto.
+    """
+
+    name: str = Field(title="Nombre", json_schema_extra={"ui": {"list": True}})
+    description: Optional[str] = Field(
+        default=None, title="Descripción", json_schema_extra={"ui": {"list": True}}
+    )
+    is_active: bool = Field(title="Activo", json_schema_extra={"ui": {"list": True}})
+    created_at: datetime = Field(title="Creado", json_schema_extra={"ui": {"list": True}})
+    updated_at: Optional[datetime] = Field(
+        default=None, title="Actualizado", json_schema_extra={"ui": {"list": True}}
+    )
 
 
 class RoleDetailRead(RoleRead):

@@ -20,7 +20,7 @@ from backend.app.api.resource_actions import (
 from backend.app.auth.auth_dependencies import CurrentUser
 from backend.app.core.database import SessionDep
 from backend.app.models.user import Role, RoleAccess
-from backend.app.query import QueryOptions, ResourceQuery
+from backend.app.resources.registry import ROLES
 from backend.app.schemas.pagination import OffsetPage
 from backend.app.schemas.role import (
     RoleCreate,
@@ -36,19 +36,6 @@ from backend.app.security.groups.roles import RolePermissions
 router = APIRouter(prefix="/roles", tags=["roles"])
 
 DECLARED_PERMISSIONS = declared_permissions()
-
-ROLES = ResourceQuery(
-    name="RoleQuery",
-    model=Role,
-    schema=RoleListItem,
-    options=QueryOptions(
-        filter_fields=("is_active", "name"),
-        sort_fields=("created_at", "name"),
-        search_fields=("name",),
-        in_fields=("id",),
-        default_sort="name",
-    ),
-)
 
 
 @router.get("", response_model=OffsetPage[RoleListItem])

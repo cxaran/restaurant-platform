@@ -1,0 +1,327 @@
+"""Proyección de ``ResourceDefinition`` → ``ResourceCapability`` filtrada por usuario.
+
+Metadata UI (label/widget/visibilidad/tipo) viene de los schemas Pydantic; las
+capacidades técnicas (sortable/searchable/operadores/orden/límites) vienen del
+``CompiledQueryPlan`` expuesto por ``ResourceQuery.plan``. La autorización usa
+``SecurityControl.check(current_user)``; nunca se serializan permisos ni internals.
+"""
+
+from datetime import date, datetime
+from decimal import Decimal
+from enum import Enum
+from types import UnionType
+from typing import Annotated, Any, Optional, Union, get_args, get_origin
+from uuid import UUID
+
+import annotated_types as at
+from pydantic import BaseModel, EmailStr, SecretStr
+from pydantic.fields import FieldInfo
+
+from backend.app.query.plans import CompiledQueryPlan
+from backend.app.resources.registry import (
+    ActionDef,
+    ResourceDefinition,
+    get_resource,
+    RESOURCE_REGISTRY,
+)
+from backend.app.schemas.capabilities import (
+    FieldValueType,
+    FilterOperator,
+    HttpMethod,
+    PaginationCapability,
+    ResourceActionCapability,
+    ResourceCapability,
+    ResourceFieldCapability,
+    ResourceFormCapability,
+    ResourceFormFieldCapability,
+    ResourceFormsCapability,
+    ResourceListCapability,
+    ResourceView,
+    SearchCapability,
+    SortCapability,
+    WidgetType,
+)
+from backend.app.schemas.user import SessionUser
+
+_FILTER_OPERATOR_ORDER = (
+    FilterOperator.EQ,
+    FilterOperator.GTE,
+    FilterOperator.LTE,
+    FilterOperator.IN,
+    FilterOperator.ISNULL,
+)
+
+
+class CapabilityConfigError(ValueError):
+    """Un campo declarado para lista/formulario carece de metadata obligatoria."""
+
+
+# --- Resolución de metadata UI desde el schema ---
+
+
+def _ui(field_info: FieldInfo) -> dict[str, Any]:
+    extra = field_info.json_schema_extra
+    if isinstance(extra, dict):
+        ui = extra.get("ui")
+        if isinstance(ui, dict):
+            return ui
+    return {}
+
+
+def _require_label(field_info: FieldInfo, field_name: str) -> str:
+    ui = _ui(field_info)
+    label = ui.get("label") or field_info.title
+    if not label:
+        raise CapabilityConfigError(
+            f"El campo '{field_name}' debe declarar un label explícito (title o ui.label)."
+        )
+    return label
+
+
+def _unwrap_annotated(annotation: Any) -> Any:
+    value = annotation
+    while get_origin(value) is Annotated:
+        value = get_args(value)[0]
+    return value
+
+
+def _unwrap(annotation: Any) -> Any:
+    value = _unwrap_annotated(annotation)
+    if get_origin(value) in (Union, UnionType):
+        args = [_unwrap_annotated(arg) for arg in get_args(value) if arg is not type(None)]
+        if len(args) == 1:
+            return args[0]
+    return value
+
+
+def _value_type(annotation: Any) -> FieldValueType:
+    inner = _unwrap(annotation)
+    if get_origin(inner) in (list, tuple, set, frozenset):
+        return FieldValueType.ARRAY
+    if inner is EmailStr:
+        return FieldValueType.EMAIL
+    if inner is SecretStr or inner is str:
+        return FieldValueType.STRING
+    if inner is UUID:
+        return FieldValueType.UUID
+    if inner is bool:
+        return FieldValueType.BOOLEAN
+    if inner is int:
+        return FieldValueType.INTEGER
+    if inner is Decimal:
+        return FieldValueType.DECIMAL
+    if inner is datetime:
+        return FieldValueType.DATETIME
+    if inner is date:
+        return FieldValueType.DATE
+    if isinstance(inner, type) and issubclass(inner, Enum):
+        return FieldValueType.ENUM
+    raise CapabilityConfigError(f"Tipo no mapeable a capability: {inner!r}")
+
+
+def _constraint(field_info: FieldInfo, kind: str) -> Optional[int]:
+    for meta in field_info.metadata:
+        if kind == "le" and isinstance(meta, at.Le):
+            return int(meta.le)  # type: ignore[arg-type]
+        if kind == "min_length" and isinstance(meta, at.MinLen):
+            return meta.min_length
+        if kind == "max_length" and isinstance(meta, at.MaxLen):
+            return meta.max_length
+    return None
+
+
+# --- Capacidades técnicas desde el plan ---
+
+
+def _searchable_field_names(plan: CompiledQueryPlan) -> set[str]:
+    search_ids = {id(column) for column in plan.search_columns}
+    return {name for name, column in plan.all_columns.items() if id(column) in search_ids}
+
+
+def _filter_operators(plan: CompiledQueryPlan, name: str) -> list[FilterOperator]:
+    present: set[FilterOperator] = set()
+    if name in plan.filter_columns:
+        present.add(FilterOperator.EQ)
+    if name in plan.range_fields:
+        present.add(FilterOperator.GTE)
+        present.add(FilterOperator.LTE)
+    if name in plan.in_fields:
+        present.add(FilterOperator.IN)
+    if name in plan.null_filter_fields:
+        present.add(FilterOperator.ISNULL)
+    return [operator for operator in _FILTER_OPERATOR_ORDER if operator in present]
+
+
+def _sort_capability(plan: CompiledQueryPlan, sort_max_length: Optional[int]) -> SortCapability:
+    public = set(plan.public_sort_columns.keys())
+    terms = [
+        term[1:] if term.startswith("-") else term
+        for term in (raw.strip() for raw in plan.default_order.split(","))
+        if term
+    ]
+    all_public = bool(terms) and all(term in public for term in terms)
+    max_length = plan.max_sort_length if plan.max_sort_length is not None else sort_max_length
+    return SortCapability(
+        default_sort=plan.default_order if all_public else None,
+        fixed_server_order=not all_public,
+        max_terms=plan.max_sort_terms,
+        max_length=int(max_length) if max_length is not None else plan.max_sort_terms,
+    )
+
+
+# --- Construcción de capabilities ---
+
+
+def _list_capability(definition: ResourceDefinition) -> ResourceListCapability:
+    assert definition.list_query is not None and definition.list_schema is not None
+    plan = definition.list_query.plan
+    query_schema = definition.list_query.Query
+    searchable = _searchable_field_names(plan)
+
+    fields: list[ResourceFieldCapability] = []
+    for name, field_info in definition.list_schema.model_fields.items():
+        ui = _ui(field_info)
+        visible_in_list = bool(ui.get("list", False))
+        visible_as_filter = bool(ui.get("filter", False))
+        if not (visible_in_list or visible_as_filter):
+            continue
+        fields.append(
+            ResourceFieldCapability(
+                name=name,
+                label=_require_label(field_info, name),
+                description=field_info.description,
+                type=_value_type(field_info.annotation),
+                visible_in_list=visible_in_list,
+                visible_as_filter=visible_as_filter,
+                sortable=name in plan.public_sort_columns,
+                searchable=name in searchable,
+                filter_operators=_filter_operators(plan, name),
+            )
+        )
+
+    limit_field = query_schema.model_fields["limit"]
+    pagination = PaginationCapability(
+        default_limit=int(limit_field.default),
+        max_limit=int(_constraint(limit_field, "le") or limit_field.default),
+    )
+
+    if "q" in query_schema.model_fields:
+        q_field = query_schema.model_fields["q"]
+        search = SearchCapability(
+            enabled=True,
+            min_length=_constraint(q_field, "min_length"),
+            max_length=_constraint(q_field, "max_length"),
+        )
+    else:
+        search = SearchCapability(enabled=False)
+
+    sort = _sort_capability(plan, _constraint(query_schema.model_fields["sort"], "max_length"))
+    return ResourceListCapability(fields=fields, pagination=pagination, search=search, sort=sort)
+
+
+def _form_fields(write_schema: type[BaseModel]) -> list[ResourceFormFieldCapability]:
+    fields: list[ResourceFormFieldCapability] = []
+    for name, field_info in write_schema.model_fields.items():
+        ui = _ui(field_info)
+        if not ui.get("form", False):
+            continue
+        widget_raw = ui.get("widget")
+        fields.append(
+            ResourceFormFieldCapability(
+                name=name,
+                label=_require_label(field_info, name),
+                description=field_info.description,
+                type=_value_type(field_info.annotation),
+                required=field_info.is_required(),
+                widget=WidgetType(widget_raw) if widget_raw is not None else None,
+            )
+        )
+    return fields
+
+
+def _forms_capability(
+    definition: ResourceDefinition, user: SessionUser
+) -> Optional[ResourceFormsCapability]:
+    create: Optional[ResourceFormCapability] = None
+    update: Optional[ResourceFormCapability] = None
+
+    if (
+        definition.create_schema is not None
+        and definition.create_permission is not None
+        and definition.create_permission.check(user)
+    ):
+        create = ResourceFormCapability(
+            method=HttpMethod.POST,
+            url_template=definition.api_path,
+            fields=_form_fields(definition.create_schema),
+        )
+
+    if (
+        definition.update_schema is not None
+        and definition.update_permission is not None
+        and definition.update_permission.check(user)
+    ):
+        update = ResourceFormCapability(
+            method=HttpMethod.PATCH,
+            url_template=f"{definition.api_path}/{{id}}",
+            fields=_form_fields(definition.update_schema),
+        )
+
+    if create is None and update is None:
+        return None
+    return ResourceFormsCapability(create=create, update=update)
+
+
+def _action_capability(action: ActionDef) -> ResourceActionCapability:
+    return ResourceActionCapability(
+        name=action.name,
+        label=action.label,
+        method=action.method,
+        url_template=action.url_template,
+        scope=action.scope,
+        danger=action.danger,
+    )
+
+
+def _build_capability(definition: ResourceDefinition, user: SessionUser) -> ResourceCapability:
+    list_cap: Optional[ResourceListCapability] = None
+    forms_cap: Optional[ResourceFormsCapability] = None
+
+    if definition.view == ResourceView.TABLE and definition.list_query is not None:
+        list_cap = _list_capability(definition)
+        forms_cap = _forms_capability(definition, user)
+
+    actions = [
+        _action_capability(action)
+        for action in definition.actions
+        if action.permission.check(user)
+    ]
+
+    return ResourceCapability(
+        name=definition.name,
+        label=definition.label,
+        api_path=definition.api_path,
+        view=definition.view,
+        list=list_cap,
+        forms=forms_cap,
+        actions=actions,
+    )
+
+
+def build_visible_capabilities(user: SessionUser) -> list[ResourceCapability]:
+    """Capabilities de todos los recursos cuyo permiso de lectura pasa para el usuario."""
+    return [
+        _build_capability(definition, user)
+        for definition in RESOURCE_REGISTRY
+        if definition.read_permission.check(user)
+    ]
+
+
+def build_capability_if_visible(
+    name: str, user: SessionUser
+) -> Optional[ResourceCapability]:
+    """Capability de un recurso, o ``None`` si no existe o no es visible (mismo 404)."""
+    definition = get_resource(name)
+    if definition is None or not definition.read_permission.check(user):
+        return None
+    return _build_capability(definition, user)

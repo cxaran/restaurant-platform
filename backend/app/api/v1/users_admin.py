@@ -21,7 +21,7 @@ from backend.app.auth.auth_dependencies import CurrentUser
 from backend.app.auth.security import generate_token, get_password_hash
 from backend.app.core.database import SessionDep
 from backend.app.models.user import Role, User, UserRole
-from backend.app.query import QueryOptions, ResourceQuery
+from backend.app.resources.registry import USER_ROLES, USERS
 from backend.app.schemas.pagination import OffsetPage
 from backend.app.schemas.role import RoleRead
 from backend.app.schemas.user_admin import (
@@ -34,32 +34,6 @@ from backend.app.schemas.user_admin import (
 from backend.app.security.groups.users import UserPermissions
 
 router = APIRouter(prefix="/users", tags=["users-admin"])
-
-USERS = ResourceQuery(
-    name="UserAdminQuery",
-    model=User,
-    schema=UserAdminListItem,
-    options=QueryOptions(
-        filter_fields=("is_active", "email"),
-        sort_fields=("created_at", "name", "email"),
-        search_fields=("name", "email"),
-        in_fields=("id",),
-        default_sort="-created_at",
-    ),
-)
-
-USER_ROLES = ResourceQuery(
-    name="UserRoleQuery",
-    model=Role,
-    schema=RoleRead,
-    options=QueryOptions(
-        filter_fields=("is_active", "name"),
-        sort_fields=("name", "created_at"),
-        search_fields=("name",),
-        in_fields=("id",),
-        default_sort="name",
-    ),
-)
 
 
 @router.get("", response_model=OffsetPage[UserAdminListItem])
@@ -185,7 +159,7 @@ def revoke_user_sessions(
     user_id: UUID,
     session: SessionDep,
     current_user: CurrentUser,
-    _: UserPermissions.UPDATE.requiere,
+    _: UserPermissions.REVOKE_SESSIONS.requiere,
 ) -> UserAdminRead:
     user = get_or_404(session, User, user_id, "Usuario no encontrado")
     user = update_entity_values(

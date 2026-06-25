@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.query.contracts import ListQueryContract
 from backend.app.query.options import QueryOptions
+from backend.app.query.plans import CompiledQueryPlan
 from backend.app.query.schema import OffsetQuerySchema
 from backend.app.schemas.pagination import OffsetPage
 
@@ -60,6 +61,15 @@ class ResourceQuery(Generic[TItem]):
         self.model = model
         self.schema = schema
         self.Query: type[OffsetQuerySchema] = self._contract.Query
+
+    @property
+    def plan(self) -> CompiledQueryPlan:
+        """Metadata técnica compilada (delegada al ``ListQueryContract`` interno).
+
+        Fuente única de capacidades de listado (sortable/searchable/filtros/orden)
+        para la proyección de capabilities. No reabre el motor ni usa ``__query_*__``.
+        """
+        return self._contract.plan
 
     def paginate(
         self,

@@ -89,18 +89,59 @@ Preferred schema names:
 - `XCreate`
 - `XUpdate`
 - `XRead`
-- `XListParams`
-- action-specific names like `PasswordChangeRequest`
+- `XListItem`
+- `XReplace` (full replacement, PUT)
+- `XAction`Request / `XAction`Result for non-CRUD actions (e.g. `PasswordChangeRequest`)
+
+## Reusable route helpers (`api/resource_actions.py`)
+
+Routes should read as business logic only; the repetitive parts use **general,
+multi-use** helpers (not single-use functions). Reuse these instead of inlining
+SQL/serialization/CRUD in a router:
+
+- Reads: `get_or_404`, `serialize` / `serialize_many` / `serialize_with`,
+  `list_child_values` (scalar children, e.g. a role's permission strings),
+  `related_stmt` (base stmt to list entities via an association table),
+  `paginate_resource` (wraps `ResourceQuery.paginate`).
+- Writes: `create_entity`, `patch_entity` (PATCH = `exclude_unset` + optional
+  token rotation on sensitive fields), `update_entity_values`, `deactivate_entity`
+  (soft delete via `is_active`), `replace_to_many` (M2M, e.g. user↔roles),
+  `replace_child_values` (scalar children with allowlist, e.g. role permissions),
+  `ensure_allowed_values`.
+- Infra: `api_error`, `commit_or_conflict` (maps `IntegrityError`→409),
+  `touch_entity` (audit `updated_at`/`updated_by`), `assign_values`, `dedupe`.
+
+Rule: if a piece of route logic is generic enough to recur, it belongs in
+`resource_actions.py` as a general helper — never as a one-off function in the
+router. Permission catalog derivation uses `security/catalog.declared_permissions()`
+(single source), not inline comprehensions.
+
+The `/users` prefix is served by two routers: `api/v1/users.py` (self-service:
+`/me`, `/me/password`) included **before** `api/v1/users_admin.py` (admin CRUD +
+`/{user_id}/roles`, `/{user_id}/revoke-sessions`), so the literal `/me` wins over
+`/{user_id}`.
 
 ## Authentication
 
-Browser authentication currently uses the `session_token` cookie.
+The app supports both a browser cookie and a bearer JWT, read from the same
+request. Either token path is valid.
 
-- `/auth/login` uses `backend.app.auth.auth.authenticate` and `set_session_cookie`.
-- `/auth/me` reads either `session_token` cookie or `Authorization: Bearer` through `auth_dependencies.py`.
-- Public auth routes do not require a logged-in user: `/login`, `/register/request`, `/register/complete`, `/unlock`.
+- `/auth/login` uses `backend.app.auth.auth.authenticate` and `set_session_cookie`
+  (cookie key `session_token`, see `auth/auth.py`).
+- `/auth/me` and protected routes read either the `session_token` cookie or
+  `Authorization: Bearer` via `auth/auth_dependencies.py` (`get_current_user`).
+- The token is a JWT whose `jti` is a **token version**, not a token id: it holds
+  `User.token`. Any password/email change or forced logout rotates `User.token`,
+  invalidating all previously issued JWTs. Do not treat `jti` as unique per token.
+- Public auth routes do not require a logged-in user: `/login`,
+  `/register/request`, `/register/complete`, `/unlock`.
 
-Future production hardening may include `Secure` cookies, CSRF protection for browser mutating requests, and additional JWT claims such as `iss` and `aud`. Do not add those unless requested.
+Do not add `/refresh` or `/logout` unless explicitly requested; `test_auth_routes.py`
+asserts they are absent from the OpenAPI schema.
+
+Future production hardening may include `Secure` cookies, CSRF protection for
+browser mutating requests, and additional JWT claims such as `iss` and `aud`. Do
+not add those unless requested.
 
 ## RBAC And Permissions
 
@@ -216,6 +257,26 @@ Use stable HTTP status codes:
 - `409` uniqueness or state conflict.
 - `422` validation error.
 
+### Unified error envelope (already in place)
+
+`core/error_handlers.py` (registered in `main.py` via `register_exception_handlers`)
+normalizes every error to the `ErrorResponse` envelope `{code, message, errors?}`
+(`schemas/error.py`). There is **no per-route error helper requirement** — just
+raise FastAPI's native `HTTPException`:
+
+- `raise HTTPException(status_code=401, detail="Credenciales inválidas")` →
+  `{"code": "http_401", "message": "Credenciales inválidas"}` (generic code, via
+  `_http_exception_handler`). This is the preferred, shortest form for simple
+  route errors.
+- `QueryParameterError`/`RequestValidationError` → `422` with `errors[].field`.
+
+When a **semantic code** or **field-level errors** are useful, the route or a
+helper raises `HTTPException(detail={"code": ..., "message": ..., "errors": [...]})`
+and the handler passes it through unchanged. `resource_actions.api_error(status,
+code, message, errors=)` is the convenience wrapper for that (used by the CRUD
+helpers, e.g. `get_or_404` → `resource_not_found`, `ensure_allowed_values` →
+field errors). Do not catch these in the router; let the handler build the body.
+
 Future target: RFC 9457 Problem Details using `application/problem+json`. Do not introduce a partial error framework without an explicit task.
 
 Never expose stack traces, SQL strings, secrets, internal hostnames, or infrastructure details in API responses.
@@ -227,8 +288,13 @@ For API changes:
 - Add or update route contract tests.
 - Assert OpenAPI contains expected public routes.
 - Assert unimplemented routes are not exposed when that matters.
-- Add catalog tests when adding permissions.
-- Run `python -m unittest discover -s backend/tests -t .` from the repo root.
+  (`test_auth_routes.py` asserts `/auth/refresh` and `/auth/logout` are absent.)
+- Add catalog tests when adding permissions
+  (`test_security_catalog.py` asserts the exact ordered permission list).
+- Tests are stdlib `unittest`. `backend/tests/` has **no `__init__.py`**, so
+  `unittest discover` does **not** work. Run modules explicitly from the repo
+  root (see `AGENTS.md` for the full module list), e.g.:
+  `python -m unittest backend.tests.test_auth_routes`
 
 For auth routes, keep tests aligned with the current contract:
 

@@ -81,7 +81,23 @@ class RoleListItem(RoleRead):
     description: Optional[str] = Field(
         default=None, title="Descripción", json_schema_extra={"ui": {"list": True}}
     )
-    is_active: bool = Field(title="Activo", json_schema_extra={"ui": {"list": True}})
+    is_active: bool = Field(
+        title="Activo",
+        json_schema_extra={
+            "ui": {
+                "list": True,
+                "filter": {
+                    "operator": "eq",
+                    "label": "Estado",
+                    "widget": "select",
+                    "options": [
+                        {"value": "true", "label": "Activos"},
+                        {"value": "false", "label": "Inactivos"},
+                    ],
+                },
+            }
+        },
+    )
     created_at: datetime = Field(title="Creado", json_schema_extra={"ui": {"list": True}})
     updated_at: Optional[datetime] = Field(
         default=None, title="Actualizado", json_schema_extra={"ui": {"list": True}}

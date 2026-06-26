@@ -113,6 +113,15 @@ class PolicyContractTest(unittest.TestCase):
             set(self.options_contract.Query.model_fields),
         )
 
+    def test_policy_filter_parameters_match_options(self) -> None:
+        def params(contract: ListQueryContract[WidgetRead]) -> list[tuple[str, str, str]]:
+            return [
+                (p.field_name, p.operator.value, p.parameter_name)
+                for p in contract.plan.filter_parameters
+            ]
+
+        self.assertEqual(params(self.options_contract), params(self.policy_contract))
+
     def test_policy_paginates_same_as_options(self) -> None:
         params = dict(price_gte=20, sort="price", limit=10)
         with Session(self.engine) as session:

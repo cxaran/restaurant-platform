@@ -41,6 +41,7 @@ class WidgetType(str, Enum):
     SWITCH = "switch"
     TEXTAREA = "textarea"
     MULTISELECT = "multiselect"
+    SELECT = "select"
 
 
 class FilterOperator(str, Enum):
@@ -75,10 +76,27 @@ class ResourceFieldCapability(ApiReadSchema):
     description: Optional[str] = None
     type: FieldValueType
     visible_in_list: bool
-    visible_as_filter: bool
     sortable: bool
     searchable: bool
+    # Capacidad técnica de lectura (qué operadores admite el campo en el plan). Los
+    # controles de filtro *visibles* se declaran en ``ResourceListCapability.filters``.
     filter_operators: list[FilterOperator]
+
+
+class ResourceFilterOption(ApiReadSchema):
+    value: str
+    label: str
+
+
+class ResourceFilterCapability(ApiReadSchema):
+    field: str
+    parameter: str
+    operator: FilterOperator
+    label: str
+    description: Optional[str] = None
+    type: FieldValueType
+    widget: WidgetType
+    options: Optional[list[ResourceFilterOption]] = None
 
 
 class PaginationCapability(ApiReadSchema):
@@ -101,6 +119,7 @@ class SortCapability(ApiReadSchema):
 
 class ResourceListCapability(ApiReadSchema):
     fields: list[ResourceFieldCapability]
+    filters: list[ResourceFilterCapability] = []
     pagination: PaginationCapability
     search: SearchCapability
     sort: SortCapability

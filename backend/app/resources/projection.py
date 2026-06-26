@@ -17,6 +17,7 @@ import annotated_types as at
 from pydantic import BaseModel, EmailStr, SecretStr
 from pydantic.fields import FieldInfo
 
+from backend.app.query.operators import Operator
 from backend.app.query.plans import CompiledQueryPlan
 from backend.app.resources.registry import (
     ActionDef,
@@ -32,6 +33,8 @@ from backend.app.schemas.capabilities import (
     ResourceActionCapability,
     ResourceCapability,
     ResourceFieldCapability,
+    ResourceFilterCapability,
+    ResourceFilterOption,
     ResourceFormCapability,
     ResourceFormFieldCapability,
     ResourceFormsCapability,
@@ -172,32 +175,150 @@ def _sort_capability(plan: CompiledQueryPlan, sort_max_length: Optional[int]) ->
 # --- Construcción de capabilities ---
 
 
+def _filter_options(
+    field_name: str, widget: WidgetType, raw: Any
+) -> Optional[list[ResourceFilterOption]]:
+    if widget != WidgetType.SELECT:
+        # Los widgets sin opciones (futuros) no las llevan en este alcance.
+        return None
+    if not isinstance(raw, list) or len(raw) == 0:
+        raise CapabilityConfigError(
+            f"El filtro '{field_name}' (select) requiere al menos una opción."
+        )
+    options: list[ResourceFilterOption] = []
+    seen: set[str] = set()
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise CapabilityConfigError(f"El filtro '{field_name}' tiene una opción inválida.")
+        value = entry.get("value")
+        label = entry.get("label")
+        if not isinstance(value, str) or value == "":
+            raise CapabilityConfigError(
+                f"El filtro '{field_name}' tiene una opción con value vacío o no string."
+            )
+        if not isinstance(label, str) or label.strip() == "":
+            raise CapabilityConfigError(
+                f"El filtro '{field_name}' tiene una opción sin label explícito."
+            )
+        if value in seen:
+            raise CapabilityConfigError(
+                f"El filtro '{field_name}' tiene el value de opción duplicado: {value}."
+            )
+        seen.add(value)
+        options.append(ResourceFilterOption(value=value, label=label))
+    return options
+
+
+def _filter_capabilities(
+    plan: CompiledQueryPlan,
+    query_schema: type[Any],
+    list_schema: type[BaseModel],
+    field_caps: dict[str, ResourceFieldCapability],
+) -> list[ResourceFilterCapability]:
+    param_index = {
+        (parameter.field_name, parameter.operator): parameter.parameter_name
+        for parameter in plan.filter_parameters
+    }
+    filters: list[ResourceFilterCapability] = []
+    seen_parameters: set[str] = set()
+
+    for name, field_info in list_schema.model_fields.items():
+        declaration = _ui(field_info).get("filter")
+        if not isinstance(declaration, dict):
+            continue
+
+        field_cap = field_caps.get(name)
+        if field_cap is None:
+            raise CapabilityConfigError(
+                f"El filtro '{name}' no referencia un campo emitido en list.fields."
+            )
+
+        try:
+            operator = Operator(declaration.get("operator"))
+        except ValueError as error:
+            raise CapabilityConfigError(
+                f"El filtro '{name}' declara un operador inválido: {declaration.get('operator')!r}."
+            ) from error
+
+        parameter = param_index.get((name, operator))
+        if parameter is None:
+            raise CapabilityConfigError(
+                f"El filtro '{name}' usa el operador '{operator.value}' ausente en el plan del campo."
+            )
+        if parameter not in query_schema.model_fields:
+            raise CapabilityConfigError(
+                f"El parámetro '{parameter}' del filtro '{name}' no existe en el query schema."
+            )
+        if parameter in seen_parameters:
+            raise CapabilityConfigError(
+                f"El parámetro de filtro '{parameter}' está duplicado entre filtros visibles."
+            )
+        seen_parameters.add(parameter)
+
+        public_operator = FilterOperator(operator.value)
+        if public_operator not in field_cap.filter_operators:
+            raise CapabilityConfigError(
+                f"El operador '{operator.value}' no está en filter_operators de '{name}'."
+            )
+
+        label = declaration.get("label")
+        if not isinstance(label, str) or label.strip() == "":
+            raise CapabilityConfigError(f"El filtro '{name}' requiere un label explícito.")
+
+        try:
+            widget = WidgetType(declaration.get("widget"))
+        except ValueError as error:
+            raise CapabilityConfigError(
+                f"El filtro '{name}' declara un widget inválido: {declaration.get('widget')!r}."
+            ) from error
+
+        filters.append(
+            ResourceFilterCapability(
+                field=name,
+                parameter=parameter,
+                operator=public_operator,
+                label=label,
+                description=field_info.description,
+                type=field_cap.type,
+                widget=widget,
+                options=_filter_options(name, widget, declaration.get("options")),
+            )
+        )
+
+    return filters
+
+
 def _list_capability(definition: ResourceDefinition) -> ResourceListCapability:
     assert definition.list_query is not None and definition.list_schema is not None
     plan = definition.list_query.plan
     query_schema = definition.list_query.Query
+    list_schema = definition.list_schema
     searchable = _searchable_field_names(plan)
 
     fields: list[ResourceFieldCapability] = []
-    for name, field_info in definition.list_schema.model_fields.items():
+    field_caps: dict[str, ResourceFieldCapability] = {}
+    for name, field_info in list_schema.model_fields.items():
         ui = _ui(field_info)
         visible_in_list = bool(ui.get("list", False))
-        visible_as_filter = bool(ui.get("filter", False))
-        if not (visible_in_list or visible_as_filter):
+        has_filter = isinstance(ui.get("filter"), dict)
+        # Se emite metadata pública del campo si está declarado para lista o para filtro,
+        # aunque no sea columna visible (visible_in_list=False).
+        if not (visible_in_list or has_filter):
             continue
-        fields.append(
-            ResourceFieldCapability(
-                name=name,
-                label=_require_label(field_info, name),
-                description=field_info.description,
-                type=_value_type(field_info.annotation),
-                visible_in_list=visible_in_list,
-                visible_as_filter=visible_as_filter,
-                sortable=name in plan.public_sort_columns,
-                searchable=name in searchable,
-                filter_operators=_filter_operators(plan, name),
-            )
+        cap = ResourceFieldCapability(
+            name=name,
+            label=_require_label(field_info, name),
+            description=field_info.description,
+            type=_value_type(field_info.annotation),
+            visible_in_list=visible_in_list,
+            sortable=name in plan.public_sort_columns,
+            searchable=name in searchable,
+            filter_operators=_filter_operators(plan, name),
         )
+        fields.append(cap)
+        field_caps[name] = cap
+
+    filters = _filter_capabilities(plan, query_schema, list_schema, field_caps)
 
     limit_field = query_schema.model_fields["limit"]
     pagination = PaginationCapability(
@@ -216,7 +337,9 @@ def _list_capability(definition: ResourceDefinition) -> ResourceListCapability:
         search = SearchCapability(enabled=False)
 
     sort = _sort_capability(plan, _constraint(query_schema.model_fields["sort"], "max_length"))
-    return ResourceListCapability(fields=fields, pagination=pagination, search=search, sort=sort)
+    return ResourceListCapability(
+        fields=fields, filters=filters, pagination=pagination, search=search, sort=sort
+    )
 
 
 def _form_fields(write_schema: type[BaseModel]) -> list[ResourceFormFieldCapability]:

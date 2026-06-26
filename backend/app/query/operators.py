@@ -43,6 +43,24 @@ _PARAM_SUFFIX: dict[Operator, str] = {
     Operator.LTE: "_lte",
 }
 
+# Orden canónico de operadores para metadata determinista.
+OPERATOR_ORDER: tuple[Operator, ...] = (
+    Operator.EQ,
+    Operator.GTE,
+    Operator.LTE,
+    Operator.IN,
+    Operator.ISNULL,
+)
+
+
+def parameter_name_for(field_name: str, operator: Operator) -> str:
+    """Nombre HTTP público del parámetro de un ``(campo, operador)``.
+
+    Única abstracción fuera de la factory que conoce ``_PARAM_SUFFIX``. ``eq`` usa el
+    nombre base; el resto añade su sufijo canónico.
+    """
+    return f"{field_name}{_PARAM_SUFFIX.get(operator, '')}"
+
 _TEXT_TYPES = (str, EmailStr)
 
 

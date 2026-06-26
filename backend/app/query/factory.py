@@ -16,7 +16,11 @@ from sqlalchemy.sql.elements import ColumnElement
 from backend.app.query.identity import IdentitySpec
 from backend.app.query.operators import Operator
 from backend.app.query.options import QueryOptions
-from backend.app.query.plans import CompiledQueryPlan
+from backend.app.query.plans import (
+    CompiledQueryPlan,
+    _operators_by_field,
+    build_filter_parameters,
+)
 from backend.app.query.policies import QueryPolicy
 from backend.app.query.search import IlikeSearch
 from backend.app.query.schema import OffsetQuerySchema
@@ -311,6 +315,19 @@ def _build_compiled(
     setattr(query_schema, "__query_primary_keys__", primary_keys)
     setattr(query_schema, "__query_max_sort_terms__", max_sort_terms)
 
+    # Mapeo público de parámetros: orden por campos de all_columns + orden canónico de
+    # operadores, validado contra las model_fields reales del schema generado.
+    filter_parameters = build_filter_parameters(
+        tuple(all_columns.keys()),
+        _operators_by_field(
+            eq_fields=filter_columns,
+            range_fields=range_fields,
+            in_fields=in_fields,
+            null_filter_fields=null_filter_fields,
+        ),
+        valid_parameters=frozenset(query_schema.model_fields),
+    )
+
     plan = CompiledQueryPlan(
         filter_columns=filter_columns,
         all_columns=all_columns,
@@ -329,6 +346,7 @@ def _build_compiled(
         max_in_values=max_in_values,
         max_sort_length=max_sort_length,
         max_filter_text_length=max_filter_text_length,
+        filter_parameters=filter_parameters,
     )
     return CompiledListQuery(schema=query_schema, plan=plan)
 

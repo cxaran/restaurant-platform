@@ -210,5 +210,32 @@ class PaginateEquivalenceTest(unittest.TestCase):
         self.assertEqual(page.pagination.total, 4)
 
 
+class FilterParametersTest(unittest.TestCase):
+    def _params(self, plan: CompiledQueryPlan) -> list[tuple[str, str, str]]:
+        return [(p.field_name, p.operator.value, p.parameter_name) for p in plan.filter_parameters]
+
+    def test_filter_parameters_deterministic_unique_and_real(self) -> None:
+        clq = _compile()
+        params = self._params(clq.plan)
+        names = [name for _, _, name in params]
+        # Únicos.
+        self.assertEqual(len(names), len(set(names)))
+        # Cada parámetro existe de verdad en el query schema.
+        for name in names:
+            self.assertIn(name, clq.schema.model_fields)
+        # Determinista: recompilar produce el mismo orden.
+        self.assertEqual(params, self._params(_compile().plan))
+        # Orden esperado: campos en orden, operadores eq,gte,lte,in,isnull.
+        self.assertEqual(
+            names,
+            ["name", "price", "price_gte", "price_lte", "price_in", "category", "category_isnull"],
+        )
+
+    def test_from_schema_reconstructs_filter_parameters(self) -> None:
+        clq = _compile()
+        rebuilt = CompiledQueryPlan.from_schema(clq.schema)
+        self.assertEqual(self._params(rebuilt), self._params(clq.plan))
+
+
 if __name__ == "__main__":
     unittest.main()

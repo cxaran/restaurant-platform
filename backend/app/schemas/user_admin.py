@@ -90,7 +90,23 @@ class UserAdminListItem(ApiReadSchema):
     name: str = Field(title="Nombre", json_schema_extra={"ui": {"list": True}})
     last_name: str = Field(title="Apellido", json_schema_extra={"ui": {"list": True}})
     email: EmailStr = Field(title="Correo", json_schema_extra={"ui": {"list": True}})
-    is_active: bool = Field(title="Activo", json_schema_extra={"ui": {"list": True}})
+    is_active: bool = Field(
+        title="Activo",
+        json_schema_extra={
+            "ui": {
+                "list": True,
+                "filter": {
+                    "operator": "eq",
+                    "label": "Estado",
+                    "widget": "select",
+                    "options": [
+                        {"value": "true", "label": "Activos"},
+                        {"value": "false", "label": "Inactivos"},
+                    ],
+                },
+            }
+        },
+    )
     created_at: datetime = Field(title="Creado", json_schema_extra={"ui": {"list": True}})
 
 

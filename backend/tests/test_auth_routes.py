@@ -46,6 +46,7 @@ class AuthRoutesTest(unittest.TestCase):
         paths = response.json()["paths"]
 
         self.assertIn("/api/v1/auth/login", paths)
+        self.assertIn("/api/v1/auth/logout", paths)
         self.assertIn("/api/v1/auth/me", paths)
         self.assertIn("/api/v1/auth/register/request", paths)
         self.assertIn("/api/v1/auth/register/complete", paths)
@@ -61,11 +62,15 @@ class AuthRoutesTest(unittest.TestCase):
         paths = response.json()["paths"]
 
         self.assertNotIn("/api/v1/auth/refresh", paths)
-        self.assertNotIn("/api/v1/auth/logout", paths)
         self.assertFalse(any("/auth/auth/" in path for path in paths))
 
     def test_me_requires_authentication(self) -> None:
         response = client.get("/api/v1/auth/me")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_logout_requires_authentication(self) -> None:
+        response = client.post("/api/v1/auth/logout")
 
         self.assertEqual(response.status_code, 401)
 

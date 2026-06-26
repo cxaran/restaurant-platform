@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Response, status
 
-from backend.app.auth.auth import authenticate, set_session_cookie
+from backend.app.auth.auth import authenticate, delete_session_cookie, set_session_cookie
 from backend.app.auth.auth_dependencies import CurrentUser
 from backend.app.auth.account_lock import unlock_user_by_token
 from backend.app.auth.forgot_password import reset_password, send_password_reset_token
@@ -40,6 +40,16 @@ async def login(
 
     set_session_cookie(response, token)
     return MessageResponse(message="Sesión iniciada correctamente")
+
+
+@router.post("/logout", response_model=MessageResponse)
+def logout(response: Response, _: CurrentUser) -> MessageResponse:
+    """Cierra la sesión actual borrando la cookie httponly.
+
+    Requiere sesión válida; no rota ``User.token`` (no es un cierre de sesión en
+    todos los dispositivos, solo el actual)."""
+    delete_session_cookie(response)
+    return MessageResponse(message="Sesión cerrada correctamente")
 
 
 @router.post("/register/request", response_model=MessageResponse, status_code=status.HTTP_202_ACCEPTED)

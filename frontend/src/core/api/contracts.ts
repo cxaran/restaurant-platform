@@ -2,6 +2,11 @@ import type { components, operations } from "@/generated/openapi";
 
 export type SessionUser = components["schemas"]["SessionUser"];
 
+// Cuenta del usuario autenticado (flujo dedicado, no editor genérico de users).
+export type UserProfileRead = components["schemas"]["UserProfileRead"];
+export type UserProfileUpdate = components["schemas"]["UserProfileUpdate"];
+export type UserPasswordChangeRequest = components["schemas"]["UserPasswordChangeRequest"];
+
 // Capabilities de recursos (Commit 3 backend). Aliases type-only sobre los schemas
 // generados; nunca interfaces escritas a mano.
 export type ResourceCapability = components["schemas"]["ResourceCapability"];

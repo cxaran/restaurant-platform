@@ -1,3 +1,4 @@
+import { AccountMenu } from "@/components/layout/AccountMenu";
 import type { ResourceCatalog as ResourceCatalogType } from "@/core/api/contracts";
 import type { SessionUser } from "@/core/auth/types";
 
@@ -18,9 +19,12 @@ export function PlatformShell({
             <p className="text-sm text-slate-500">Platform Core</p>
             <h1 className="text-lg font-semibold">Panel</h1>
           </div>
-          <div className="text-right text-sm">
-            <p className="font-medium">{session.name}</p>
-            <p className="text-slate-500">{session.email}</p>
+          <div className="flex items-center gap-5">
+            <div className="text-right text-sm">
+              <p className="font-medium">{session.name}</p>
+              <p className="text-slate-500">{session.email}</p>
+            </div>
+            <AccountMenu />
           </div>
         </div>
       </header>

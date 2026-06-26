@@ -127,6 +127,7 @@ class SettingsOriginsValidationTest(unittest.TestCase):
         settings = Settings(
             environment="production",
             trusted_browser_origins="https://app.example.com",
+            bootstrap_setup_token="valid-bootstrap-token-123",
             **BASE_SETTINGS,
         )
         self.assertEqual(settings.trusted_origins, frozenset({"https://app.example.com:443"}))

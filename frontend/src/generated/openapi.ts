@@ -154,6 +154,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bootstrap/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Bootstrap Status */
+        get: operations["read_bootstrap_status_api_v1_bootstrap_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bootstrap/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Bootstrap Catalog */
+        get: operations["read_bootstrap_catalog_api_v1_bootstrap_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bootstrap/initialize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Initialize Bootstrap */
+        post: operations["initialize_bootstrap_api_v1_bootstrap_initialize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/permissions": {
         parameters: {
             query?: never;
@@ -375,6 +426,103 @@ export interface components {
          * @enum {string}
          */
         ActionScope: "resource" | "item";
+        /** BootstrapAdditionalRole */
+        BootstrapAdditionalRole: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Permissions */
+            permissions?: string[];
+            /**
+             * Assign To Initial User
+             * @default false
+             */
+            assign_to_initial_user: boolean;
+        };
+        /** BootstrapCatalogRead */
+        BootstrapCatalogRead: {
+            /** Permission Groups */
+            permission_groups: components["schemas"]["BootstrapPermissionGroupRead"][];
+            limits: components["schemas"]["BootstrapLimitsRead"];
+        };
+        /** BootstrapInitialUser */
+        BootstrapInitialUser: {
+            /** Name */
+            name: string;
+            /** Last Name */
+            last_name: string;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
+            /**
+             * Confirm Password
+             * Format: password
+             */
+            confirm_password: string;
+        };
+        /** BootstrapInitializeRead */
+        BootstrapInitializeRead: {
+            /** Setup Complete */
+            setup_complete: boolean;
+        };
+        /** BootstrapInitializeRequest */
+        BootstrapInitializeRequest: {
+            user: components["schemas"]["BootstrapInitialUser"];
+            system_admin_role?: components["schemas"]["BootstrapSystemAdminRole"];
+            /** Additional Roles */
+            additional_roles?: components["schemas"]["BootstrapAdditionalRole"][];
+        };
+        /** BootstrapLimitsRead */
+        BootstrapLimitsRead: {
+            /** Max Additional Roles */
+            max_additional_roles: number;
+        };
+        /** BootstrapPermissionGroupRead */
+        BootstrapPermissionGroupRead: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Permissions */
+            permissions: components["schemas"]["BootstrapPermissionRead"][];
+        };
+        /** BootstrapPermissionRead */
+        BootstrapPermissionRead: {
+            /** Access */
+            access: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** BootstrapStatusRead */
+        BootstrapStatusRead: {
+            /** Setup Required */
+            setup_required: boolean;
+            /** Token Required */
+            token_required: boolean;
+        };
+        /** BootstrapSystemAdminRole */
+        BootstrapSystemAdminRole: {
+            /**
+             * Label
+             * @default Administrador de plataforma
+             */
+            label: string;
+            /**
+             * Description
+             * @default Administración inicial de la plataforma
+             */
+            description: string | null;
+        };
         /**
          * FieldValueType
          * @enum {string}
@@ -1259,6 +1407,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_bootstrap_status_api_v1_bootstrap_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BootstrapStatusRead"];
+                };
+            };
+        };
+    };
+    read_bootstrap_catalog_api_v1_bootstrap_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Bootstrap-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BootstrapCatalogRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    initialize_bootstrap_api_v1_bootstrap_initialize_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Bootstrap-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BootstrapInitializeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BootstrapInitializeRead"];
                 };
             };
             /** @description Validation Error */

@@ -1,0 +1,84 @@
+from pydantic import EmailStr, Field, SecretStr, field_validator, model_validator
+from typing_extensions import Self
+
+from backend.app.bootstrap.service import MAX_ADDITIONAL_ROLES
+from backend.app.schemas.base import ApiReadSchema, ApiWriteSchema
+from backend.app.schemas.user import validate_password
+
+
+class BootstrapStatusRead(ApiReadSchema):
+    setup_required: bool
+    token_required: bool
+
+
+class BootstrapPermissionRead(ApiReadSchema):
+    access: str
+    label: str
+    description: str | None = None
+
+
+class BootstrapPermissionGroupRead(ApiReadSchema):
+    name: str
+    label: str
+    permissions: list[BootstrapPermissionRead]
+
+
+class BootstrapLimitsRead(ApiReadSchema):
+    max_additional_roles: int
+
+
+class BootstrapCatalogRead(ApiReadSchema):
+    permission_groups: list[BootstrapPermissionGroupRead]
+    limits: BootstrapLimitsRead
+
+
+class BootstrapInitialUser(ApiWriteSchema):
+    name: str = Field(min_length=4, max_length=50)
+    last_name: str = Field(min_length=4, max_length=50)
+    email: EmailStr
+    password: SecretStr = Field(..., min_length=8, max_length=128)
+    confirm_password: SecretStr = Field(..., min_length=8, max_length=128)
+
+    @field_validator("name", "last_name")
+    def names_not_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("El nombre y apellido no pueden estar vacíos")
+        return value
+
+    @field_validator("password")
+    def password_validator(cls, value: SecretStr) -> SecretStr:
+        return validate_password(value)
+
+    @model_validator(mode="after")
+    def check_passwords_match(self) -> Self:
+        if self.password != self.confirm_password:
+            raise ValueError("Las contraseñas no coinciden")
+        return self
+
+
+class BootstrapSystemAdminRole(ApiWriteSchema):
+    label: str = Field(default="Administrador de plataforma", min_length=1, max_length=100)
+    description: str | None = Field(
+        default="Administración inicial de la plataforma",
+        max_length=500,
+    )
+
+
+class BootstrapAdditionalRole(ApiWriteSchema):
+    name: str = Field(min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=500)
+    permissions: list[str] = Field(default_factory=list)
+    assign_to_initial_user: bool = False
+
+
+class BootstrapInitializeRequest(ApiWriteSchema):
+    user: BootstrapInitialUser
+    system_admin_role: BootstrapSystemAdminRole = Field(default_factory=BootstrapSystemAdminRole)
+    additional_roles: list[BootstrapAdditionalRole] = Field(
+        default_factory=list,
+        max_length=MAX_ADDITIONAL_ROLES,
+    )
+
+
+class BootstrapInitializeRead(ApiReadSchema):
+    setup_complete: bool

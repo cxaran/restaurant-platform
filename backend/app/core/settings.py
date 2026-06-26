@@ -89,6 +89,16 @@ class Settings(BaseSettings):
     bootstrap_admin_last_name: str = "Platform"
     bootstrap_admin_role_name: str = "Administrador"
     bootstrap_user_role_name: str = "Usuario"
+    bootstrap_setup_token: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _require_bootstrap_setup_token_in_production(self) -> Self:
+        token = self.bootstrap_setup_token.get_secret_value().strip() if self.bootstrap_setup_token else ""
+        if token and len(token) < 16:
+            raise ValueError("bootstrap_setup_token debe tener al menos 16 caracteres.")
+        if self.environment == "production" and not token:
+            raise ValueError("bootstrap_setup_token es obligatorio en producción.")
+        return self
 
     @computed_field
     @property

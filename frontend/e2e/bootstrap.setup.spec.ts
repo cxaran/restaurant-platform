@@ -65,6 +65,28 @@ async function directSecondInitializeAttempt(request: APIRequestContext) {
   });
 }
 
+// Fecha de hoy en UTC (YYYY-MM-DD). El backend E2E usa APPLICATION_TIMEZONE=UTC, así
+// que los límites de día de calendario coinciden con esta fecha. El input de fecha
+// emite este literal sin construir Date en el navegador.
+function todayUtcDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function tomorrowUtcDate(): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+async function gotoUsersList(page: Page) {
+  await page.goto("/resources/users");
+  await expect(page.getByRole("heading", { name: "Usuarios" })).toBeVisible();
+}
+
+function userRow(page: Page, email: string) {
+  return page.getByRole("row", { name: new RegExp(email) });
+}
+
 async function login(page: Page, email: string, password: string) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
@@ -494,6 +516,81 @@ test.describe.serial("fresh install bootstrap and admin relations", () => {
       await clickDialogButton(page, "Cancelar");
       await page.goto("/resources/users");
       await expect(page.getByRole("heading", { name: "Usuarios" })).toBeVisible();
+    });
+
+    await test.step("Filtro de texto: contains case-insensitive por nombre", async () => {
+      await gotoUsersList(page);
+      await page.getByLabel("Nombre · Contiene", { exact: true }).fill("acci");
+      await page.getByRole("button", { name: "Aplicar" }).click();
+      await expect(userRow(page, actionUserEmail)).toHaveCount(1);
+      await expect(userRow(page, adminEmail)).toHaveCount(0);
+      await expect(userRow(page, updatedEmail)).toHaveCount(0);
+      // El parámetro real del backend viaja en la URL (sin inferencia de sufijos).
+      await expect(page).toHaveURL(/name_contains=acci/);
+    });
+
+    await test.step("Filtro de texto: contains por correo (sin colisión con el sort)", async () => {
+      await gotoUsersList(page);
+      await page.getByLabel("Correo · Contiene", { exact: true }).fill("actualizado");
+      await page.getByRole("button", { name: "Aplicar" }).click();
+      await expect(userRow(page, updatedEmail)).toHaveCount(1);
+      await expect(userRow(page, actionUserEmail)).toHaveCount(0);
+    });
+
+    await test.step("Filtro de fecha de calendario: on hoy incluye, after hoy excluye", async () => {
+      await gotoUsersList(page);
+      await page.getByLabel("Creado · En la fecha", { exact: true }).fill(todayUtcDate());
+      await page.getByRole("button", { name: "Aplicar" }).click();
+      await expect(userRow(page, adminEmail)).toHaveCount(1);
+      await expect(userRow(page, actionUserEmail)).toHaveCount(1);
+
+      await gotoUsersList(page);
+      await page.getByLabel("Creado · Después de", { exact: true }).fill(todayUtcDate());
+      await page.getByRole("button", { name: "Aplicar" }).click();
+      await expect(userRow(page, adminEmail)).toHaveCount(0);
+      await expect(userRow(page, actionUserEmail)).toHaveCount(0);
+      await expect(userRow(page, updatedEmail)).toHaveCount(0);
+    });
+
+    await test.step("Filtro de rango de fechas: between con dos extremos inclusivos", async () => {
+      await gotoUsersList(page);
+      await page.getByLabel("Creado · Entre (desde)", { exact: true }).fill(todayUtcDate());
+      await page.getByLabel("Creado · Entre (hasta)", { exact: true }).fill(tomorrowUtcDate());
+      await page.getByRole("button", { name: "Aplicar" }).click();
+      await expect(userRow(page, adminEmail)).toHaveCount(1);
+      await expect(userRow(page, actionUserEmail)).toHaveCount(1);
+      await expect(page).toHaveURL(/created_at_from=/);
+      await expect(page).toHaveURL(/created_at_to=/);
+    });
+
+    await test.step("Filtro select tri-estado: Inactivos no lista cuentas activas", async () => {
+      await gotoUsersList(page);
+      await page.getByLabel("Activo", { exact: true }).selectOption("false");
+      await page.getByRole("button", { name: "Aplicar" }).click();
+      await expect(userRow(page, adminEmail)).toHaveCount(0);
+      await expect(userRow(page, actionUserEmail)).toHaveCount(0);
+    });
+
+    await test.step("Allowlist: un parámetro forjado no declarado se ignora", async () => {
+      // last_name no es filtrable: forzar last_name_contains no debe filtrar nada.
+      await page.goto("/resources/users?last_name_contains=Acciones");
+      await expect(page.getByRole("heading", { name: "Usuarios" })).toBeVisible();
+      await expect(userRow(page, adminEmail)).toHaveCount(1);
+      await expect(userRow(page, actionUserEmail)).toHaveCount(1);
+      await expect(userRow(page, updatedEmail)).toHaveCount(1);
+    });
+
+    await test.step("El filtro activo se preserva al reordenar la tabla", async () => {
+      await gotoUsersList(page);
+      await page.getByLabel("Nombre · Contiene", { exact: true }).fill("acci");
+      await page.getByRole("button", { name: "Aplicar" }).click();
+      await expect(userRow(page, actionUserEmail)).toHaveCount(1);
+
+      // Reordenar por una columna preserva el filtro (href construido por allowlist).
+      await page.getByRole("link", { name: /Ordenar por Creado/ }).click();
+      await expect(page).toHaveURL(/name_contains=acci/);
+      await expect(userRow(page, actionUserEmail)).toHaveCount(1);
+      await expect(userRow(page, adminEmail)).toHaveCount(0);
     });
 
     await test.step("Eliminar rol normal con confirmación", async () => {

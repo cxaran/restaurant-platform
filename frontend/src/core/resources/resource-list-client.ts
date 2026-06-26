@@ -6,7 +6,11 @@ import { redirect } from "next/navigation";
 import { ApiRequestError } from "@/core/api/api-error";
 import type { ResourceCapability } from "@/core/api/contracts";
 import { serverApi } from "@/core/api/server-client";
-import { buildListSearchParams, type ResourceListQuery } from "@/core/resources/list-query";
+import {
+  buildFilterControls,
+  buildListSearchParams,
+  type ResourceListQuery,
+} from "@/core/resources/list-query";
 import type { ResourceListPage, ResourceRow } from "@/core/resources/list-types";
 
 class InvalidListResponseError extends Error {
@@ -94,7 +98,10 @@ export async function getResourceListPage(
   }
 
   assertInternalApiPath(capability.api_path);
-  const url = `${capability.api_path}?${buildListSearchParams(query).toString()}`;
+  // Reconstruye los controles desde la capability para serializar con una allowlist
+  // ordenada (nunca itera query.filters directamente).
+  const controls = buildFilterControls(capability.list);
+  const url = `${capability.api_path}?${buildListSearchParams(query, controls).toString()}`;
   const cookie = (await cookies()).toString();
 
   let raw: unknown;

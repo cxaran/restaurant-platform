@@ -590,14 +590,35 @@ export interface components {
             type: components["schemas"]["FieldValueType"];
             /** Visible In List */
             visible_in_list: boolean;
-            /** Visible As Filter */
-            visible_as_filter: boolean;
             /** Sortable */
             sortable: boolean;
             /** Searchable */
             searchable: boolean;
             /** Filter Operators */
             filter_operators: components["schemas"]["FilterOperator"][];
+        };
+        /** ResourceFilterCapability */
+        ResourceFilterCapability: {
+            /** Field */
+            field: string;
+            /** Parameter */
+            parameter: string;
+            operator: components["schemas"]["FilterOperator"];
+            /** Label */
+            label: string;
+            /** Description */
+            description?: string | null;
+            type: components["schemas"]["FieldValueType"];
+            widget: components["schemas"]["WidgetType"];
+            /** Options */
+            options?: components["schemas"]["ResourceFilterOption"][] | null;
+        };
+        /** ResourceFilterOption */
+        ResourceFilterOption: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
         };
         /** ResourceFormCapability */
         ResourceFormCapability: {
@@ -629,6 +650,11 @@ export interface components {
         ResourceListCapability: {
             /** Fields */
             fields: components["schemas"]["ResourceFieldCapability"][];
+            /**
+             * Filters
+             * @default []
+             */
+            filters: components["schemas"]["ResourceFilterCapability"][];
             pagination: components["schemas"]["PaginationCapability"];
             search: components["schemas"]["SearchCapability"];
             sort: components["schemas"]["SortCapability"];
@@ -967,7 +993,7 @@ export interface components {
          * WidgetType
          * @enum {string}
          */
-        WidgetType: "text" | "email" | "password" | "switch" | "textarea" | "multiselect";
+        WidgetType: "text" | "email" | "password" | "switch" | "textarea" | "multiselect" | "select";
     };
     responses: never;
     parameters: never;

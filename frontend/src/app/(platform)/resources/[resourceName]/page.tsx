@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 
+import { ResourceListControls } from "@/components/resources/ResourceListControls";
 import { ResourcePagination } from "@/components/resources/ResourcePagination";
-import { ResourceSearchForm } from "@/components/resources/ResourceSearchForm";
 import { ResourceTable } from "@/components/resources/ResourceTable";
 import { requireSession } from "@/core/auth/session";
 import { getResourceCapability } from "@/core/resources/capabilities-client";
 import {
+  buildFilterControls,
   buildPageHref,
   buildSortHref,
   parseListQuery,
@@ -29,7 +30,9 @@ export default async function ResourcePage({ params, searchParams }: PageProps) 
   }
   const list = capability.list;
 
-  const query = parseListQuery(rawSearchParams, list);
+  // Capability inválida → FilterContractError → error boundary (no notFound).
+  const controls = buildFilterControls(list);
+  const query = parseListQuery(rawSearchParams, list, controls);
   const page = await getResourceListPage(capability, query);
   if (!page) {
     notFound();
@@ -44,19 +47,21 @@ export default async function ResourcePage({ params, searchParams }: PageProps) 
   const { pagination } = page;
   const prevHref =
     pagination.offset > 0
-      ? buildPageHref(basePath, query, pagination.offset - pagination.limit)
+      ? buildPageHref(basePath, query, controls, pagination.offset - pagination.limit)
       : undefined;
   const nextHref = pagination.has_next
-    ? buildPageHref(basePath, query, pagination.offset + pagination.limit)
+    ? buildPageHref(basePath, query, controls, pagination.offset + pagination.limit)
     : undefined;
 
   return (
     <div className="space-y-4">
-      <ResourceSearchForm
-        action={basePath}
+      <ResourceListControls
+        resourceName={resourceName}
         search={list.search}
-        value={search.value}
-        tooShort={search.tooShort}
+        controls={controls}
+        filters={query.filters}
+        searchValue={search.value}
+        searchTooShort={search.tooShort}
         sortParam={sortParam}
         limit={query.limit}
       />
@@ -65,7 +70,7 @@ export default async function ResourcePage({ params, searchParams }: PageProps) 
         list={list}
         page={page}
         explicitSort={query.sort}
-        buildSortHref={(fieldName) => buildSortHref(basePath, query, fieldName)}
+        buildSortHref={(fieldName) => buildSortHref(basePath, query, controls, fieldName)}
       />
       <ResourcePagination prevHref={prevHref} nextHref={nextHref} pagination={pagination} />
     </div>

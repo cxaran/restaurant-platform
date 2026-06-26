@@ -563,6 +563,21 @@ export interface components {
          * @enum {string}
          */
         HttpMethod: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+        /**
+         * ItemReference
+         * @description Referencia pública y estable de un item de listado.
+         *
+         *     No se llama ``primary_key`` ni expone bindings ORM: declara qué campo de cada
+         *     item identifica el recurso (``field``), qué token usan las plantillas de URL
+         *     (``placeholder``, p. ej. ``{id}``) y su tipo. El frontend nunca asume ``id``.
+         */
+        ItemReference: {
+            /** Field */
+            field: string;
+            /** Placeholder */
+            placeholder: string;
+            type: components["schemas"]["FieldValueType"];
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -750,6 +765,8 @@ export interface components {
             /** Api Path */
             api_path: string;
             view: components["schemas"]["ResourceView"];
+            item_reference?: components["schemas"]["ItemReference"] | null;
+            detail?: components["schemas"]["ResourceDetailCapability"] | null;
             list?: components["schemas"]["ResourceListCapability"] | null;
             forms?: components["schemas"]["ResourceFormsCapability"] | null;
             /**
@@ -762,6 +779,15 @@ export interface components {
              * @default []
              */
             relations: components["schemas"]["ResourceRelationCapability"][];
+        };
+        /**
+         * ResourceDetailCapability
+         * @description Lectura individual declarada de un recurso (precarga de formularios).
+         */
+        ResourceDetailCapability: {
+            method: components["schemas"]["HttpMethod"];
+            /** Url Template */
+            url_template: string;
         };
         /** ResourceFieldCapability */
         ResourceFieldCapability: {
@@ -823,6 +849,11 @@ export interface components {
             type: components["schemas"]["FieldValueType"];
             /** Required */
             required: boolean;
+            /**
+             * Editable
+             * @default true
+             */
+            editable: boolean;
             widget?: components["schemas"]["WidgetType"] | null;
         };
         /** ResourceFormsCapability */

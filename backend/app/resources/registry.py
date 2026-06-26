@@ -132,6 +132,11 @@ class ResourceDefinition:
     update_schema: Optional[type[BaseModel]] = None
     create_permission: Optional[SecurityGroup] = None
     update_permission: Optional[SecurityGroup] = None
+    # Lectura individual: si está declarada, el recurso publica ``item_reference`` y
+    # ``detail``. El campo identificador (``item_id_field``) coincide con el token
+    # ``{id}`` de las plantillas de URL (detail, update, acciones).
+    detail_url_template: Optional[str] = None
+    item_id_field: str = "id"
     actions: tuple[ActionDef, ...] = ()
     relations: tuple[RelationDef, ...] = ()
 
@@ -149,6 +154,7 @@ RESOURCE_REGISTRY: tuple[ResourceDefinition, ...] = (
         update_schema=UserAdminUpdate,
         create_permission=UserPermissions.CREATE,
         update_permission=UserPermissions.UPDATE,
+        detail_url_template="/api/v1/users/{id}",
         actions=(
             ActionDef(
                 name="revoke_sessions",
@@ -201,6 +207,7 @@ RESOURCE_REGISTRY: tuple[ResourceDefinition, ...] = (
         update_schema=RoleUpdate,
         create_permission=RolePermissions.CREATE,
         update_permission=RolePermissions.UPDATE,
+        detail_url_template="/api/v1/roles/{id}",
         actions=(
             ActionDef(
                 name="delete",

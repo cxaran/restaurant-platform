@@ -14,6 +14,8 @@ export type ResourceFormCapability = components["schemas"]["ResourceFormCapabili
 export type ResourceFormFieldCapability =
   components["schemas"]["ResourceFormFieldCapability"];
 export type ResourceActionCapability = components["schemas"]["ResourceActionCapability"];
+export type ItemReference = components["schemas"]["ItemReference"];
+export type ResourceDetailCapability = components["schemas"]["ResourceDetailCapability"];
 export type ResourceRelationCapability = components["schemas"]["ResourceRelationCapability"];
 export type RelationOptionsSource = components["schemas"]["RelationOptionsSource"];
 export type RelationCardinality = components["schemas"]["RelationCardinality"];

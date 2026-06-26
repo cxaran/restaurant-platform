@@ -30,8 +30,10 @@ from backend.app.schemas.capabilities import (
     FieldValueType,
     FilterOperator,
     HttpMethod,
+    ItemReference,
     PaginationCapability,
     RelationOptionsSource,
+    ResourceDetailCapability,
     ResourceActionCapability,
     ResourceCapability,
     ResourceFieldCapability,
@@ -359,6 +361,7 @@ def _form_fields(write_schema: type[BaseModel]) -> list[ResourceFormFieldCapabil
                 description=field_info.description,
                 type=_value_type(field_info.annotation),
                 required=field_info.is_required(),
+                editable=True,
                 widget=WidgetType(widget_raw) if widget_raw is not None else None,
             )
         )
@@ -453,11 +456,29 @@ def _build_capability(definition: ResourceDefinition, user: SessionUser) -> Reso
         if relation.permission.check(user)
     ]
 
+    # ``item_reference`` y ``detail`` se publican juntos cuando el recurso declara
+    # lectura individual. El permiso de detalle es el de lectura del recurso, ya
+    # garantizado al construir un recurso visible.
+    item_reference: Optional[ItemReference] = None
+    detail: Optional[ResourceDetailCapability] = None
+    if definition.detail_url_template is not None:
+        item_reference = ItemReference(
+            field=definition.item_id_field,
+            placeholder="id",
+            type=FieldValueType.UUID,
+        )
+        detail = ResourceDetailCapability(
+            method=HttpMethod.GET,
+            url_template=definition.detail_url_template,
+        )
+
     return ResourceCapability(
         name=definition.name,
         label=definition.label,
         api_path=definition.api_path,
         view=definition.view,
+        item_reference=item_reference,
+        detail=detail,
         list=list_cap,
         forms=forms_cap,
         actions=actions,

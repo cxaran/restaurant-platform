@@ -245,6 +245,42 @@ class ResourceRelationsTest(unittest.TestCase):
         self.assertEqual(roles.get("relations", []), [])
 
 
+class ItemReferenceAndDetailTest(unittest.TestCase):
+    def test_users_publish_item_reference_and_detail(self) -> None:
+        with _As("users:read"):
+            users = client.get("/api/v1/resources/users").json()
+        self.assertEqual(
+            users["item_reference"],
+            {"field": "id", "placeholder": "id", "type": "uuid"},
+        )
+        self.assertEqual(users["detail"]["method"], "GET")
+        self.assertEqual(users["detail"]["url_template"], "/api/v1/users/{id}")
+
+    def test_roles_detail_url(self) -> None:
+        with _As("roles:read"):
+            roles = client.get("/api/v1/resources/roles").json()
+        self.assertEqual(roles["detail"]["url_template"], "/api/v1/roles/{id}")
+
+    def test_grouped_catalog_has_no_item_reference_or_detail(self) -> None:
+        with _As("permissions:read"):
+            permissions = client.get("/api/v1/resources/permissions").json()
+        self.assertNotIn("item_reference", permissions)
+        self.assertNotIn("detail", permissions)
+
+    def test_update_form_fields_are_editable(self) -> None:
+        with _As("users:read", "users:update"):
+            users = client.get("/api/v1/resources/users").json()
+        update_fields = users["forms"]["update"]["fields"]
+        self.assertTrue(update_fields)
+        for field in update_fields:
+            self.assertTrue(field["editable"])
+        names = [field["name"] for field in update_fields]
+        # El generic update no expone relaciones ni secretos.
+        self.assertNotIn("roles", names)
+        self.assertNotIn("password", names)
+        self.assertNotIn("token", names)
+
+
 class PermissionsCatalogTest(unittest.TestCase):
     def test_requires_permissions_read(self) -> None:
         with _As("users:read"):
@@ -280,6 +316,8 @@ class ResourcesOpenApiTest(unittest.TestCase):
             "ResourceActionCapability",
             "ResourceFormCapability",
             "ResourceFormFieldCapability",
+            "ItemReference",
+            "ResourceDetailCapability",
             "ResourceRelationCapability",
             "RelationOptionsSource",
             "RelationCardinality",

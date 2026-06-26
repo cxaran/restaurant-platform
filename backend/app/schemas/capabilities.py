@@ -142,6 +142,10 @@ class ResourceFormFieldCapability(ApiReadSchema):
     description: Optional[str] = None
     type: FieldValueType
     required: bool
+    # ``editable=False`` describe un campo presente en el formulario pero no
+    # modificable (se omite del payload). Hoy todos los campos declarados son
+    # editables; el indicador deja el contrato preparado para campos de solo lectura.
+    editable: bool = True
     widget: Optional[WidgetType] = None
 
 
@@ -199,11 +203,32 @@ class ResourceRelationCapability(ApiReadSchema):
     options: RelationOptionsSource
 
 
+class ItemReference(ApiReadSchema):
+    """Referencia pública y estable de un item de listado.
+
+    No se llama ``primary_key`` ni expone bindings ORM: declara qué campo de cada
+    item identifica el recurso (``field``), qué token usan las plantillas de URL
+    (``placeholder``, p. ej. ``{id}``) y su tipo. El frontend nunca asume ``id``."""
+
+    field: str
+    placeholder: str
+    type: FieldValueType
+
+
+class ResourceDetailCapability(ApiReadSchema):
+    """Lectura individual declarada de un recurso (precarga de formularios)."""
+
+    method: HttpMethod
+    url_template: str
+
+
 class ResourceCapability(ApiReadSchema):
     name: str
     label: str
     api_path: str
     view: ResourceView
+    item_reference: Optional[ItemReference] = None
+    detail: Optional[ResourceDetailCapability] = None
     # El atributo se llama ``list_`` para no sombrear el builtin ``list`` dentro del
     # cuerpo de la clase; se serializa/valida como ``list`` vía alias.
     list_: Optional[ResourceListCapability] = Field(default=None, alias="list")

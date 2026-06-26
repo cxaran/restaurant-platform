@@ -537,5 +537,40 @@ test.describe.serial("fresh install bootstrap and admin relations", () => {
       await page.goto("/account");
       await expect(page).toHaveURL(/\/login$/);
     });
+
+    await test.step("Registro deshabilitado: sin enlace y ruta forzada rechazada", async () => {
+      await page.goto("/login");
+      // Política: registro deshabilitado → el frontend no muestra "Crear cuenta".
+      await expect(page.getByRole("link", { name: "Crear cuenta" })).toHaveCount(0);
+      // El backend rechaza aunque se fuerce la ruta.
+      const forced = await request.post("/api/v1/auth/register/request", {
+        data: { email: "forzado@example.com" },
+      });
+      expect(forced.status()).toBe(403);
+      expect((await forced.json()).code).toBe("registration_disabled");
+    });
+
+    await test.step("Forgot password: respuesta indistinguible y rate limit", async () => {
+      // Respuesta idéntica exista o no la cuenta (anti-enumeración).
+      const existing = await request.post("/api/v1/auth/password/forgot", {
+        data: { email: adminEmail },
+      });
+      const missing = await request.post("/api/v1/auth/password/forgot", {
+        data: { email: "nadie@example.com" },
+      });
+      expect(existing.status()).toBe(202);
+      expect(missing.status()).toBe(existing.status());
+
+      // Tercer intento desde la misma IP supera el bucket forgot (2/900) → 429.
+      const limited = await request.post("/api/v1/auth/password/forgot", {
+        data: { email: "tercero@example.com" },
+      });
+      expect(limited.status()).toBe(429);
+      const body = await limited.json();
+      expect(body.code).toBe("rate_limited");
+      expect(limited.headers()["retry-after"]).toBeTruthy();
+      // No revela qué bucket bloqueó.
+      expect(body.message.toLowerCase()).not.toContain("ip");
+    });
   });
 });

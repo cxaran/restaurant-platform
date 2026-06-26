@@ -24,6 +24,13 @@ x-backend-environment: &backend-environment
   POSTGRES_SERVER: postgres
   POSTGRES_PORT: "5432"
   POSTGRES_DB: platform_core_e2e_test
+  # Rate limiting: límites generosos para no interferir con los flujos del E2E,
+  # salvo un bucket de forgot-password bajo para probar el bloqueo determinista.
+  RATE_LIMIT_LOGIN_IP: "100/900"
+  RATE_LIMIT_LOGIN_IDENTITY: "100/900"
+  RATE_LIMIT_BOOTSTRAP_IP: "100/900"
+  RATE_LIMIT_FORGOT_IP: "2/900"
+  RATE_LIMIT_FORGOT_IDENTITY: "100/3600"
 
 services:
   redis:

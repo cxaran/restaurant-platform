@@ -56,7 +56,7 @@ test.describe.serial("fresh install bootstrap flow", () => {
     const apiRequests: string[] = [];
     page.on("request", (requestEvent) => {
       const url = requestEvent.url();
-      if (url.includes("/api/")) apiRequests.push(url);
+      if (url.includes("/api/")) apiRequests.push(`${requestEvent.method()} ${url}`);
     });
 
     await page.goto("/");
@@ -103,6 +103,31 @@ test.describe.serial("fresh install bootstrap flow", () => {
     const sessionCookie = cookies.find((cookie) => cookie.name === "session_token");
     expect(sessionCookie?.httpOnly).toBe(true);
 
+    await page.goto("/resources/roles");
+    await expect(page.getByRole("heading", { name: "Roles" })).toBeVisible();
+    await page.getByRole("link", { name: "Nuevo" }).click();
+    await expect(page.getByRole("heading", { name: "Crear Roles" })).toBeVisible();
+    await page.getByLabel("Nombre").fill("Soporte E2E");
+    await page.getByLabel("Descripción").fill("Rol creado desde el formulario genérico");
+    await page.getByRole("button", { name: "Crear" }).click();
+    await expect(page).toHaveURL(/\/resources\/roles$/);
+    await expect(page.getByText("Soporte E2E")).toBeVisible();
+
+    await page.goto("/resources/users");
+    await expect(page.getByRole("heading", { name: "Usuarios" })).toBeVisible();
+    await page.getByRole("link", { name: "Nuevo" }).click();
+    await expect(page.getByRole("heading", { name: "Crear Usuarios" })).toBeVisible();
+    await page.getByLabel("Nombre").fill("Usuario");
+    await page.getByLabel("Apellido").fill("Estandar");
+    await page.getByLabel("Correo").fill("usuario.e2e@example.com");
+    await page.getByLabel("Contraseña", { exact: true }).fill("User-password-123");
+    await page.getByLabel("Confirmar contraseña").fill("User-password-123");
+    await expect(page.getByLabel("Activo")).not.toBeChecked();
+    await page.getByLabel("Activo").check();
+    await page.getByRole("button", { name: "Crear" }).click();
+    await expect(page).toHaveURL(/\/resources\/users$/);
+    await expect(page.getByText("usuario.e2e@example.com")).toBeVisible();
+
     await page.goto("/setup");
     await expect(page).toHaveURL(/\/$/);
 
@@ -114,14 +139,18 @@ test.describe.serial("fresh install bootstrap flow", () => {
     await expect(freshPage).toHaveURL(/\/login$/);
     await freshContext.close();
 
-    expect(apiRequests.some((url) => url.includes("/api/v1/bootstrap/catalog"))).toBe(true);
-    expect(apiRequests.some((url) => url.includes("/api/v1/bootstrap/initialize"))).toBe(true);
-    expect(apiRequests.every((url) => url.startsWith(appBaseUrl))).toBe(true);
+    expect(apiRequests.some((entry) => entry.includes("/api/v1/bootstrap/catalog"))).toBe(true);
+    expect(apiRequests.some((entry) => entry === `POST ${appBaseUrl}/api/v1/bootstrap/initialize`)).toBe(true);
+    expect(apiRequests.some((entry) => entry === `POST ${appBaseUrl}/api/v1/roles`)).toBe(true);
+    expect(apiRequests.some((entry) => entry === `POST ${appBaseUrl}/api/v1/users`)).toBe(true);
+    expect(apiRequests.every((entry) => entry.split(" ")[1]?.startsWith(appBaseUrl))).toBe(true);
 
     expect(queryScalar("select status from platform_setup where id = 1;")).toBe("completed");
-    expect(queryScalar("select count(*) from \"user\";")).toBe("1");
-    expect(queryScalar("select count(*) from role;")).toBe("2");
+    expect(queryScalar("select count(*) from \"user\";")).toBe("2");
+    expect(queryScalar("select count(*) from role;")).toBe("3");
     expect(queryScalar("select count(*) from user_role;")).toBe("1");
+    expect(queryScalar("select count(*) from role where name = 'Soporte E2E';")).toBe("1");
+    expect(queryScalar("select count(*) from \"user\" where email = 'usuario.e2e@example.com';")).toBe("1");
     const systemAdminPermissions = queryScalar(`
       select count(*)
       from role_access ra

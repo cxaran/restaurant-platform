@@ -33,17 +33,18 @@ from fastapi import HTTPException  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlmodel import Session, select  # noqa: E402
 
-from backend.app.api.v1.roles import delete_role, replace_role_permissions  # noqa: E402
+from backend.app.api.v1.roles import delete_role, replace_role_permissions, update_role  # noqa: E402
 from backend.app.api.v1.users_admin import (  # noqa: E402
     delete_user,
     replace_user_roles,
+    update_user,
 )
 from backend.app.models import Base  # noqa: E402
 from backend.app.models.setup import PlatformSetup  # noqa: E402
 from backend.app.models.user import Role, RoleAccess, User, UserRole  # noqa: E402
-from backend.app.schemas.role import RolePermissionsReplace  # noqa: E402
+from backend.app.schemas.role import RolePermissionsReplace, RoleUpdate  # noqa: E402
 from backend.app.schemas.user import SessionUser  # noqa: E402
-from backend.app.schemas.user_admin import UserRolesReplace  # noqa: E402
+from backend.app.schemas.user_admin import UserAdminUpdate, UserRolesReplace  # noqa: E402
 from backend.app.security.admin_survival import ADMIN_COVERAGE_REQUIRED  # noqa: E402
 from backend.app.security.catalog import declared_permissions  # noqa: E402
 
@@ -170,6 +171,56 @@ class AdminRelationMutationTest(unittest.TestCase):
     def test_deactivating_last_admin_user_is_blocked(self) -> None:
         with self.assertRaises(HTTPException) as ctx:
             delete_user(self.admin.id, self.session, self.actor, True)
+        self._assert_blocked(ctx.exception)
+
+    # --- Generic update seguro ---
+
+    def test_update_user_email_rotates_token(self) -> None:
+        before = self.member.token
+        update_user(
+            self.member.id,
+            UserAdminUpdate(email="nuevo@example.com"),
+            self.session,
+            self.actor,
+            True,
+        )
+        self.session.refresh(self.member)
+        self.assertEqual(self.member.email, "nuevo@example.com")
+        self.assertNotEqual(self.member.token, before)
+
+    def test_deactivating_member_via_update_rotates_token(self) -> None:
+        before = self.member.token
+        update_user(
+            self.member.id,
+            UserAdminUpdate(is_active=False),
+            self.session,
+            self.actor,
+            True,
+        )
+        self.session.refresh(self.member)
+        self.assertFalse(self.member.is_active)
+        self.assertNotEqual(self.member.token, before)
+
+    def test_deactivating_last_admin_via_update_is_blocked(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            update_user(
+                self.admin.id,
+                UserAdminUpdate(is_active=False),
+                self.session,
+                self.actor,
+                True,
+            )
+        self._assert_blocked(ctx.exception)
+
+    def test_deactivating_system_role_via_update_is_blocked(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            update_role(
+                self.admin_role.id,
+                RoleUpdate(is_active=False),
+                self.session,
+                self.actor,
+                True,
+            )
         self._assert_blocked(ctx.exception)
 
     def test_second_admin_allows_removing_first(self) -> None:

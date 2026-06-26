@@ -83,7 +83,18 @@ export function BootstrapWizard({ status }: Readonly<{ status: BootstrapStatusRe
         return;
       }
       setFieldErrors(parsed.fields);
-      setGeneralError(parsed.general ?? safeBootstrapGeneralError(error));
+      // Los campos del administrador viven en el paso 1. Si el backend reporta un
+      // error en alguno de ellos al enviar Bootstrap (paso 2), se regresa al paso 1
+      // para que el usuario lo vea y lo corrija.
+      const hasAdminFieldError = Object.keys(parsed.fields).some((field) =>
+        field.startsWith("user."),
+      );
+      if (hasAdminFieldError) {
+        setStep("admin");
+        setGeneralError(parsed.general ?? "Revisa los datos del administrador inicial.");
+      } else {
+        setGeneralError(parsed.general ?? safeBootstrapGeneralError(error));
+      }
       return;
     }
     setGeneralError("No se pudo completar Bootstrap. Inténtalo nuevamente.");

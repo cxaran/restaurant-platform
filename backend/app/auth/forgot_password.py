@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import EmailStr, SecretStr
 from sqlalchemy.exc import IntegrityError
 
@@ -42,7 +44,10 @@ def get_password_reset_user(
     if not user_id:
         return None
 
-    return session.get(User, user_id)
+    try:
+        return session.get(User, UUID(user_id))
+    except ValueError:
+        return None
 
 
 def reset_password(

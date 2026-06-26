@@ -3,13 +3,16 @@ from fastapi import APIRouter, HTTPException, Response, status
 from backend.app.auth.auth import authenticate, set_session_cookie
 from backend.app.auth.auth_dependencies import CurrentUser
 from backend.app.auth.account_lock import unlock_user_by_token
+from backend.app.auth.forgot_password import reset_password, send_password_reset_token
 from backend.app.auth.register import create_user, send_registration_token
 from backend.app.core.database import SessionDep
 from backend.app.schemas.auth import (
+    ForgotPasswordRequest,
     LoginRequest,
     MessageResponse,
     RegisterCompleteRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     UnlockAccountRequest,
 )
 from backend.app.schemas.user import SessionUser
@@ -74,3 +77,26 @@ def unlock_account(
             detail="Token de desbloqueo inválido o expirado",
         )
     return MessageResponse(message="Cuenta desbloqueada correctamente")
+
+
+@router.post("/password/forgot", response_model=MessageResponse, status_code=status.HTTP_202_ACCEPTED)
+async def request_password_reset(
+    payload: ForgotPasswordRequest,
+    session: SessionDep,
+) -> MessageResponse:
+    await send_password_reset_token(session, payload.email)
+    return MessageResponse(message="Si el email es válido, se enviará un token de recuperación")
+
+
+@router.post("/password/reset", response_model=MessageResponse)
+def complete_password_reset(
+    payload: ResetPasswordRequest,
+    session: SessionDep,
+) -> MessageResponse:
+    user = reset_password(session, payload.email, payload.token, payload.password)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token de recuperación inválido o expirado",
+        )
+    return MessageResponse(message="Contraseña actualizada correctamente")

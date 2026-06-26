@@ -50,6 +50,8 @@ class AuthRoutesTest(unittest.TestCase):
         self.assertIn("/api/v1/auth/register/request", paths)
         self.assertIn("/api/v1/auth/register/complete", paths)
         self.assertIn("/api/v1/auth/unlock", paths)
+        self.assertIn("/api/v1/auth/password/forgot", paths)
+        self.assertIn("/api/v1/auth/password/reset", paths)
 
     def test_openapi_does_not_expose_unimplemented_auth_routes(self) -> None:
         response = client.get("/api/openapi.json")

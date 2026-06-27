@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { RelationEditor } from "@/components/resources/RelationEditor";
+import { ResourceEditTabs } from "@/components/resources/ResourceEditTabs";
 import { requireSession } from "@/core/auth/session";
 import { getRelationEditorData } from "@/core/resources/relation-editor-client";
 
@@ -26,15 +27,23 @@ export default async function RelationEditorPage({ params }: PageProps) {
   const listPath = `/resources/${encodeURIComponent(resourceName)}`;
 
   return (
-    <RelationEditor
-      title={data.relation.label}
-      description={data.relation.description}
-      groups={data.groups}
-      initialSelected={data.selected}
-      mutationUrl={data.mutationUrl}
-      mutationMethod={data.relation.mutation_method}
-      requestField={data.relation.request_field}
-      listPath={listPath}
-    />
+    <div className="space-y-6">
+      <ResourceEditTabs
+        resourceName={resourceName}
+        id={id}
+        relations={data.relations}
+        active={relationName}
+      />
+      <RelationEditor
+        title={data.relation.label}
+        description={data.relation.description}
+        groups={data.groups}
+        initialSelected={data.selected}
+        mutationUrl={data.mutationUrl}
+        mutationMethod={data.relation.mutation_method}
+        requestField={data.relation.request_field}
+        listPath={listPath}
+      />
+    </div>
   );
 }

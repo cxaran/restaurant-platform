@@ -17,6 +17,8 @@ export type RelationOptionGroup = {
 
 export type RelationEditorData = {
   relation: ResourceRelationCapability;
+  // Todas las relaciones editables del recurso (para la navegación por pestañas).
+  relations: ResourceRelationCapability[];
   mutationUrl: string;
   selected: string[];
   groups: RelationOptionGroup[];
@@ -195,6 +197,7 @@ export async function getRelationEditorData(
 
   return {
     relation,
+    relations: capability.relations ?? [],
     mutationUrl,
     selected: parseSelected(selectionRaw, relation),
     groups: parseGroups(optionsRaw, relation),

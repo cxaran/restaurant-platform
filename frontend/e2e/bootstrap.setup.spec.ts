@@ -593,23 +593,31 @@ test.describe.serial("fresh install bootstrap and admin relations", () => {
       await expect(userRow(page, adminEmail)).toHaveCount(0);
     });
 
-    await test.step("Editar rol: navegar al editor de permisos desde el flujo de edición", async () => {
+    await test.step("Editar rol: pestañas Datos generales/Permisos en el flujo de edición", async () => {
       await openRowAction(page, "/resources/roles", updatedRoleName, "Editar");
       await expect(page).toHaveURL(/\/edit$/);
-      // Navegación al editor relacional publicada en la edición (relaciones por permiso).
-      await page
-        .getByRole("navigation", { name: "Relaciones" })
-        .getByRole("link", { name: "Editar Permisos" })
-        .click();
+      const sections = page.getByRole("navigation", { name: "Secciones del recurso" });
+      // La pestaña activa es "Datos generales"; "Permisos" navega al editor relacional.
+      await expect(sections.getByRole("link", { name: "Datos generales" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      await sections.getByRole("link", { name: "Permisos", exact: true }).click();
       await expect(page).toHaveURL(/\/permissions$/);
       await expect(page.getByRole("heading", { name: "Permisos", exact: true })).toBeVisible();
+      // En el editor relacional, la pestaña activa es ahora "Permisos".
+      await expect(
+        page
+          .getByRole("navigation", { name: "Secciones del recurso" })
+          .getByRole("link", { name: "Permisos", exact: true }),
+      ).toHaveAttribute("aria-current", "page");
     });
 
     await test.step("Editor agrupado: 'Seleccionar todo' asigna el grupo y persiste", async () => {
       await openRowAction(page, "/resources/roles", updatedRoleName, "Editar");
       await page
-        .getByRole("navigation", { name: "Relaciones" })
-        .getByRole("link", { name: "Editar Permisos" })
+        .getByRole("navigation", { name: "Secciones del recurso" })
+        .getByRole("link", { name: "Permisos", exact: true })
         .click();
       await expect(page).toHaveURL(/\/permissions$/);
 
@@ -633,8 +641,8 @@ test.describe.serial("fresh install bootstrap and admin relations", () => {
     await test.step("Editor agrupado: 'Quitar todo' limpia el grupo y persiste", async () => {
       await openRowAction(page, "/resources/roles", updatedRoleName, "Editar");
       await page
-        .getByRole("navigation", { name: "Relaciones" })
-        .getByRole("link", { name: "Editar Permisos" })
+        .getByRole("navigation", { name: "Secciones del recurso" })
+        .getByRole("link", { name: "Permisos", exact: true })
         .click();
       await expect(page).toHaveURL(/\/permissions$/);
 
@@ -650,6 +658,26 @@ test.describe.serial("fresh install bootstrap and admin relations", () => {
         queryScalar(
           `select count(*) from role_access ra join role r on r.id = ra.role_id
            where r.name = '${updatedRoleName}' and ra.access = 'users:read' and ra.is_active = true;`,
+        ),
+      ).toBe("0");
+    });
+
+    await test.step("Editor de permisos: un permiso inválido no deja estado parcial", async () => {
+      const roleId = queryScalar(`select id from role where name = '${updatedRoleName}';`);
+      // El backend valida la lista completa antes de commit: un valor no declarado
+      // rechaza todo el reemplazo (422) sin aplicar los válidos del mismo payload.
+      // page.request comparte la sesión admin del navegador (MANAGE_PERMISSIONS). El
+      // header Origin confiable satisface la protección CSRF de la mutación por cookie.
+      const forged = await page.request.put(`/api/v1/roles/${roleId}/permissions`, {
+        headers: { Origin: appBaseUrl },
+        data: { permissions: ["users:read", "permiso:inexistente"] },
+      });
+      expect(forged.status()).toBe(422);
+      // 'users:read' era válido pero NO se aplicó: el rol sigue sin permisos.
+      expect(
+        queryScalar(
+          `select count(*) from role_access ra join role r on r.id = ra.role_id
+           where r.name = '${updatedRoleName}' and ra.is_active = true;`,
         ),
       ).toBe("0");
     });

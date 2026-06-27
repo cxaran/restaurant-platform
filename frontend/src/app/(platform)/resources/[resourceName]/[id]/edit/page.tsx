@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ResourceEditTabs } from "@/components/resources/ResourceEditTabs";
 import { ResourceUpdateForm } from "@/components/resources/ResourceUpdateForm";
 import { requireSession } from "@/core/auth/session";
 import { getResourceCapability } from "@/core/resources/capabilities-client";
@@ -48,12 +48,17 @@ export default async function EditResourcePage({ params }: PageProps) {
   }
 
   // Editores relacionales publicados por el backend (ya filtrados por permiso). Se
-  // exponen como navegación dentro del flujo de edición: las URLs se construyen con la
-  // referencia del item (placeholder), nunca asumiendo "id".
+  // exponen como pestañas junto a "Datos generales" dentro del flujo de edición.
   const relations = capability.relations ?? [];
 
   return (
     <div className="space-y-6">
+      <ResourceEditTabs
+        resourceName={resourceName}
+        id={id}
+        relations={relations}
+        active="general"
+      />
       <ResourceUpdateForm
         resourceName={resourceName}
         resourceLabel={capability.label}
@@ -61,32 +66,6 @@ export default async function EditResourcePage({ params }: PageProps) {
         mutationUrl={mutationUrl}
         initialValues={detail}
       />
-
-      {relations.length > 0 ? (
-        <nav
-          aria-label="Relaciones"
-          className="max-w-xl space-y-3 rounded-lg border border-slate-200 bg-white p-6"
-        >
-          <h2 className="text-sm font-semibold text-slate-700">Relaciones</h2>
-          <ul className="space-y-2">
-            {relations.map((relation) => (
-              <li key={relation.name}>
-                <Link
-                  href={`/resources/${encodeURIComponent(resourceName)}/${encodeURIComponent(
-                    id,
-                  )}/${encodeURIComponent(relation.name)}`}
-                  className="text-sm font-medium text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline"
-                >
-                  Editar {relation.label}
-                </Link>
-                {relation.description ? (
-                  <p className="text-xs text-slate-500">{relation.description}</p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </nav>
-      ) : null}
     </div>
   );
 }

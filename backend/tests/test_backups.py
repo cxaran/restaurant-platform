@@ -35,7 +35,7 @@ DEV_ENV = {
     "SMTP_USER": "test@example.com",
     "SMTP_PASSWORD": "test-password",
     "SMTP_FROM_EMAIL": "test@example.com",
-    "SMTP_FROM_NAME": "Platform Core Test",
+    "SMTP_FROM_NAME": "Restaurant Platform Test",
     "SMTP_TLS": "false",
     "SMTP_SSL": "false",
     "SMTP_USE_CREDENTIALS": "false",
@@ -43,7 +43,7 @@ DEV_ENV = {
     "POSTGRES_PASSWORD": "platform",
     "POSTGRES_SERVER": "postgres",
     "POSTGRES_PORT": "5432",
-    "POSTGRES_DB": "platform_core",
+    "POSTGRES_DB": "restaurant_platform",
 }
 
 os.environ.update(DEV_ENV)
@@ -187,7 +187,7 @@ class RetryPolicyTest(unittest.TestCase):
 
 class FilenameTest(unittest.TestCase):
     def test_valid_prefixes(self) -> None:
-        for prefix in ("platform-core", "mp-01", "A_b-2"):
+        for prefix in ("restaurant-platform", "mp-01", "A_b-2"):
             validate_filename_prefix(prefix)
 
     def test_invalid_prefixes(self) -> None:
@@ -198,15 +198,15 @@ class FilenameTest(unittest.TestCase):
     def test_filename_shape(self) -> None:
         run_id = uuid.UUID("91d4b3e2-0000-0000-0000-000000000000")
         encrypted = build_backup_filename(
-            "platform-core", datetime(2026, 7, 2, 8, 0), run_id, encrypted=True
+            "restaurant-platform", datetime(2026, 7, 2, 8, 0), run_id, encrypted=True
         )
-        self.assertEqual(encrypted, "platform-core-20260702T080000Z-91d4b3e2.tar.age")
+        self.assertEqual(encrypted, "restaurant-platform-20260702T080000Z-91d4b3e2.tar.age")
         # Cifrado OPCIONAL: sin recipient el archivo sube sin cifrar y la extensión
         # lo dice honestamente.
         plain = build_backup_filename(
-            "platform-core", datetime(2026, 7, 2, 8, 0), run_id, encrypted=False
+            "restaurant-platform", datetime(2026, 7, 2, 8, 0), run_id, encrypted=False
         )
-        self.assertEqual(plain, "platform-core-20260702T080000Z-91d4b3e2.tar")
+        self.assertEqual(plain, "restaurant-platform-20260702T080000Z-91d4b3e2.tar")
 
 
 @unittest.skipUnless(
@@ -262,7 +262,7 @@ class BackupApiAndTickTest(unittest.TestCase):
                 BackupSettings(
                     timezone="America/Monterrey",
                     daily_time=time(2, 0),
-                    filename_prefix="platform-core",
+                    filename_prefix="restaurant-platform",
                     retention_daily_count=7,
                     retention_monthly_count=12,
                     retention_yearly_count=5,
@@ -467,7 +467,7 @@ class BackupApiAndTickTest(unittest.TestCase):
         drive.list_backups.return_value = [
             RemoteBackupFile(
                 file_id="f1",
-                name="platform-core-20260702T080000Z-abcd1234.tar",
+                name="restaurant-platform-20260702T080000Z-abcd1234.tar",
                 size_bytes=2048,
                 sha256="deadbeef",
                 run_id="11111111-1111-1111-1111-111111111111",
@@ -476,7 +476,7 @@ class BackupApiAndTickTest(unittest.TestCase):
             ),
             RemoteBackupFile(
                 file_id="f2",
-                name="platform-core-20260702T080000Z-abcd1234.explorer.sqlite",
+                name="restaurant-platform-20260702T080000Z-abcd1234.explorer.sqlite",
                 size_bytes=1024,
                 sha256="cafe",
                 run_id="11111111-1111-1111-1111-111111111111",
@@ -502,7 +502,7 @@ class BackupApiAndTickTest(unittest.TestCase):
         self._connect_fake_drive()
         remote = RemoteBackupFile(
             file_id="f1",
-            name="platform-core-20260702T080000Z-abcd1234.tar",
+            name="restaurant-platform-20260702T080000Z-abcd1234.tar",
             size_bytes=8,
             sha256=None,
             run_id=None,
@@ -881,7 +881,7 @@ class BackupApiAndTickTest(unittest.TestCase):
             workdir=workdir,
             recipient=None,  # cifrado opcional: sin recipient sube el .sqlite plano
             folder_id="folder1",
-            prefix="platform-core",
+            prefix="restaurant-platform",
             now_utc=datetime(2026, 7, 2, 8, 0),
             drive=drive,
         )
@@ -918,7 +918,7 @@ class BackupApiAndTickTest(unittest.TestCase):
             workdir=workdir,
             recipient=None,
             folder_id="folder1",
-            prefix="platform-core",
+            prefix="restaurant-platform",
             now_utc=datetime(2026, 7, 2, 8, 0),
             drive=drive,
         )
@@ -954,7 +954,7 @@ class BackupApiAndTickTest(unittest.TestCase):
                 workdir=workdir,
                 recipient=None,
                 folder_id="folder1",
-                prefix="platform-core",
+                prefix="restaurant-platform",
                 now_utc=datetime(2026, 7, 2, 8, 0),
                 drive=drive,
             )

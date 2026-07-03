@@ -1,8 +1,8 @@
-# Platform Core Roadmap
+# Restaurant Platform Roadmap
 
 ## Alcance
 
-Platform Core es una base administrativa reusable sobre FastAPI y Next.js. Su
+Restaurant Platform es una base administrativa reusable sobre FastAPI y Next.js. Su
 responsabilidad es ofrecer autenticacion, sesiones, RBAC, recursos
 administrativos, capacidades declarativas, formularios, relaciones, acciones,
 auditoria y operacion minima para productos futuros.

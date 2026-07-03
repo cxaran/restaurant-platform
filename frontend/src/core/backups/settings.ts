@@ -41,7 +41,7 @@ export function parseBackupSettings(payload: unknown): BackupSettings | null {
     dailyTime: typeof payload.daily_time === "string" ? payload.daily_time : "02:00:00",
     nextRunAt: optionalString(payload.next_run_at),
     filenamePrefix:
-      typeof payload.filename_prefix === "string" ? payload.filename_prefix : "platform-core",
+      typeof payload.filename_prefix === "string" ? payload.filename_prefix : "restaurant-platform",
     retentionDaily: Number(payload.retention_daily_count ?? 7),
     retentionMonthly: Number(payload.retention_monthly_count ?? 12),
     retentionYearly: Number(payload.retention_yearly_count ?? 5),

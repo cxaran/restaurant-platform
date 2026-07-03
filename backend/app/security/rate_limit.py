@@ -27,7 +27,7 @@ from starlette.requests import Request
 from backend.app.core.settings import settings
 from backend.app.schemas.error import ErrorResponse
 
-KEY_PREFIX = "platform-core:rate-limit:v1"
+KEY_PREFIX = "restaurant-platform:rate-limit:v1"
 
 # Incremento atómico con expiración solo al crear la clave. Devuelve {contador, ttl_ms}.
 _RATE_LIMIT_LUA = """

@@ -1,6 +1,6 @@
 ---
 name: platform-query-schemas
-description: Use when adding or editing list/filter endpoints, building ResourceQuery, QueryOptions, QueryPolicy, FieldSpec, OffsetPage pagination, or Pydantic HTTP contracts (ApiReadSchema/ApiWriteSchema/ApiPatchSchema, XCreate/XRead/XUpdate) in platform-core.
+description: Use when adding or editing list/filter endpoints, building ResourceQuery, QueryOptions, QueryPolicy, FieldSpec, OffsetPage pagination, or Pydantic HTTP contracts (ApiReadSchema/ApiWriteSchema/ApiPatchSchema, XCreate/XRead/XUpdate) in restaurant-platform.
 ---
 
 # Platform Query & Schemas Toolkit

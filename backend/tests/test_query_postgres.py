@@ -12,7 +12,7 @@ base de desarrollo o producción.
 Ejemplo de uso dentro del contenedor backend::
 
     docker compose -f compose.dev.yml exec -e \
-        TEST_POSTGRES_URL="postgresql+psycopg2://platform:platform@postgres:5432/platform_core_test" \
+        TEST_POSTGRES_URL="postgresql+psycopg2://platform:platform@postgres:5432/restaurant_platform_test" \
         backend python -m unittest backend.tests.test_query_postgres
 """
 
@@ -132,7 +132,7 @@ def _is_test_url(url: str) -> bool:
 @unittest.skipUnless(
     _is_test_url(_TEST_PG_URL),
     "TEST_POSTGRES_URL no definida o no apunta a una base *_test. "
-    "Ej: postgresql+psycopg2://user:pass@host:5432/platform_core_test",
+    "Ej: postgresql+psycopg2://user:pass@host:5432/restaurant_platform_test",
 )
 class PgIntegrationTest(unittest.TestCase):
     """Ejecuta queries contra un PostgreSQL real de pruebas."""

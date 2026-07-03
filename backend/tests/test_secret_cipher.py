@@ -22,7 +22,7 @@ os.environ.setdefault("SMTP_PORT", "1025")
 os.environ.setdefault("SMTP_USER", "test@example.com")
 os.environ.setdefault("SMTP_PASSWORD", "test-password")
 os.environ.setdefault("SMTP_FROM_EMAIL", "test@example.com")
-os.environ.setdefault("SMTP_FROM_NAME", "Platform Core Test")
+os.environ.setdefault("SMTP_FROM_NAME", "Restaurant Platform Test")
 os.environ.setdefault("SMTP_TLS", "false")
 os.environ.setdefault("SMTP_SSL", "false")
 os.environ.setdefault("SMTP_USE_CREDENTIALS", "false")
@@ -30,7 +30,7 @@ os.environ.setdefault("POSTGRES_USER", "platform")
 os.environ.setdefault("POSTGRES_PASSWORD", "platform")
 os.environ.setdefault("POSTGRES_SERVER", "postgres")
 os.environ.setdefault("POSTGRES_PORT", "5432")
-os.environ.setdefault("POSTGRES_DB", "platform_core")
+os.environ.setdefault("POSTGRES_DB", "restaurant_platform")
 
 from cryptography.fernet import Fernet  # noqa: E402
 from pydantic import SecretStr  # noqa: E402

@@ -44,7 +44,7 @@ SYSTEM_SCHEMAS = {
 
 SKIPPED_TABLE_PREFIXES = (
     "taskiq_",
-    "platform_core_taskiq_",
+    "restaurant_platform_taskiq_",
 )
 
 SKIPPED_TABLE_NAMES = {

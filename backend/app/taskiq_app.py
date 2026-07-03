@@ -44,8 +44,8 @@ def taskiq_dsn(postgres_dsn: str) -> str:
 # FastAPI en la API (para publicar); importar este módulo NO abre conexiones.
 broker = PsycopgBroker(
     dsn=taskiq_dsn(str(settings.postgres_dsn)),
-    channel_name="platform_core_taskiq",
-    table_name="platform_core_taskiq_messages",
+    channel_name="restaurant_platform_taskiq",
+    table_name="restaurant_platform_taskiq_messages",
 )
 
 

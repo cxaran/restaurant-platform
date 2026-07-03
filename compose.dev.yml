@@ -1,4 +1,4 @@
-name: platform-core-dev
+name: restaurant-platform-dev
 
 x-backend-environment: &backend-environment
   ENVIRONMENT: local
@@ -18,7 +18,7 @@ x-backend-environment: &backend-environment
   SMTP_USER: dev@example.com
   SMTP_PASSWORD: dev-password
   SMTP_FROM_EMAIL: dev@example.com
-  SMTP_FROM_NAME: Platform Core Dev
+  SMTP_FROM_NAME: Restaurant Platform Dev
   SMTP_TLS: "false"
   SMTP_SSL: "false"
   SMTP_USE_CREDENTIALS: "false"
@@ -26,7 +26,7 @@ x-backend-environment: &backend-environment
   POSTGRES_PASSWORD: platform
   POSTGRES_SERVER: postgres
   POSTGRES_PORT: "5432"
-  POSTGRES_DB: platform_core
+  POSTGRES_DB: restaurant_platform
 
 services:
   redis:
@@ -45,7 +45,7 @@ services:
     environment:
       POSTGRES_USER: platform
       POSTGRES_PASSWORD: platform
-      POSTGRES_DB: platform_core
+      POSTGRES_DB: restaurant_platform
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -59,7 +59,7 @@ services:
     build:
       context: ./backend
       target: dev
-    image: platform-core-backend:dev
+    image: restaurant-platform-backend:dev
     env_file: ${APP_ENV_FILE:-.env}
     environment:
       <<: *backend-environment
@@ -80,7 +80,7 @@ services:
     restart: unless-stopped
 
   migrate:
-    image: platform-core-backend:dev
+    image: restaurant-platform-backend:dev
     profiles: [ "migrate" ]
     env_file: ${APP_ENV_FILE:-.env}
     environment:
@@ -96,7 +96,7 @@ services:
   # explícito "taskiq" (docker compose --profile taskiq up taskiq-worker taskiq-scheduler);
   # `docker compose up` normal no los levanta. UNA sola réplica del scheduler.
   taskiq-worker:
-    image: platform-core-backend:dev
+    image: restaurant-platform-backend:dev
     profiles: [ "taskiq" ]
     env_file: ${APP_ENV_FILE:-.env}
     environment:
@@ -113,7 +113,7 @@ services:
     restart: unless-stopped
 
   taskiq-scheduler:
-    image: platform-core-backend:dev
+    image: restaurant-platform-backend:dev
     profiles: [ "taskiq" ]
     env_file: ${APP_ENV_FILE:-.env}
     environment:
@@ -130,7 +130,7 @@ services:
     build:
       context: ./frontend
       target: dev
-    image: platform-core-frontend:dev
+    image: restaurant-platform-frontend:dev
     environment:
       API_PROXY_TARGET: http://backend:8000
       BACKEND_INTERNAL_URL: http://backend:8000

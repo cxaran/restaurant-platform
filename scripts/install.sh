@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instalador de Platform Core (despliegue self-hosted autocontenido).
+# Instalador de Restaurant Platform (despliegue self-hosted autocontenido).
 #
 # Reduce el conocimiento requerido a: instalar Docker, correr este script, abrir el
 # dominio y seguir el asistente. Genera el .env de producción con TODOS los secretos
@@ -54,7 +54,7 @@ POSTGRES_USER=platform
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_SERVER=postgres
 POSTGRES_PORT=5432
-POSTGRES_DB=platform_core
+POSTGRES_DB=restaurant_platform
 
 REDIS_HOST=redis
 REDIS_PORT=6379
@@ -67,7 +67,7 @@ SMTP_PORT=587
 SMTP_USER=
 SMTP_PASSWORD=
 SMTP_FROM_EMAIL=
-SMTP_FROM_NAME=Platform Core
+SMTP_FROM_NAME=Restaurant Platform
 SMTP_TLS=true
 SMTP_SSL=false
 SMTP_USE_CREDENTIALS=true

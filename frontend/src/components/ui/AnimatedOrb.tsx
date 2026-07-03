@@ -1,5 +1,5 @@
 /*
- * AnimatedOrb — el orbe gradiente animado, elemento de marca de Platform Core.
+ * AnimatedOrb — el orbe gradiente animado, elemento de marca de Restaurant Platform.
  * Portado de la funcion `orb(size, variant)` de el handoff de diseño (Platform Core.dc.html):
  * un contenedor circular con rotacion de matiz (hue-rotate), cinco circulos
  * de colores en orbita bajo una capa de desenfoque, y un brillo superior.

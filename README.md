@@ -1,8 +1,8 @@
-# Platform Core
+# Restaurant Platform
 
-Base administrativa **reutilizable y auto-hospedada** para construir productos sobre FastAPI + Next.js. Resuelve, de una vez y bien, todo lo que cualquier producto interno necesita antes de escribir su dominio: autenticación, roles y permisos, listados filtrables gobernados por contrato, configuración editable en runtime, auditoría, tareas en segundo plano y respaldos cifrados — para que el producto derivado solo añada sus recursos.
+Plataforma de gestión para restaurantes, **derivada de [platform-core](https://github.com/cxaran/platform-core)** — la base administrativa reutilizable y auto-hospedada sobre FastAPI + Next.js. Hereda resuelto todo lo que un producto necesita antes de escribir su dominio: autenticación, roles y permisos, listados filtrables gobernados por contrato, configuración editable en runtime, auditoría, tareas en segundo plano y respaldos cifrados — para que este producto solo añada sus recursos de dominio (restaurante).
 
-Diseñada como **instalación única / organización única** (ver `docs/architecture/decisions.md`). Es la plataforma de la que deriva, por ejemplo, MedicoPilot.
+Diseñada como **instalación única / organización única** (ver `docs/architecture/decisions.md`). La base upstream (`platform-core`) queda configurada como remoto `upstream` para traer mejoras futuras con `git merge`.
 
 ## Qué incluye
 

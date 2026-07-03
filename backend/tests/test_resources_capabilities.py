@@ -17,7 +17,7 @@ DEV_ENV = {
     "SMTP_USER": "test@example.com",
     "SMTP_PASSWORD": "test-password",
     "SMTP_FROM_EMAIL": "test@example.com",
-    "SMTP_FROM_NAME": "Platform Core Test",
+    "SMTP_FROM_NAME": "Restaurant Platform Test",
     "SMTP_TLS": "false",
     "SMTP_SSL": "false",
     "SMTP_USE_CREDENTIALS": "false",
@@ -25,7 +25,7 @@ DEV_ENV = {
     "POSTGRES_PASSWORD": "platform",
     "POSTGRES_SERVER": "postgres",
     "POSTGRES_PORT": "5432",
-    "POSTGRES_DB": "platform_core",
+    "POSTGRES_DB": "restaurant_platform",
 }
 
 os.environ.update(DEV_ENV)

@@ -18,7 +18,7 @@ test("parseDriveFiles normaliza la respuesta y descarta entradas malformadas", (
     files: [
       {
         file_id: "f1",
-        name: "platform-core-20260702T080000Z-abcd1234.tar",
+        name: "restaurant-platform-20260702T080000Z-abcd1234.tar",
         size_bytes: 2048,
         created_time: "2026-07-02T08:01:00.000Z",
         artifact_kind: "restore",
@@ -26,7 +26,7 @@ test("parseDriveFiles normaliza la respuesta y descarta entradas malformadas", (
       },
       {
         file_id: "f2",
-        name: "platform-core-20260702T080000Z-abcd1234.explorer.sqlite",
+        name: "restaurant-platform-20260702T080000Z-abcd1234.explorer.sqlite",
         artifact_kind: "explorer",
       },
       { name: "sin file_id: se descarta" },

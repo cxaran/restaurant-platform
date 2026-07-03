@@ -3,7 +3,7 @@
 Nadie más llama a googleapiclient: ni el router, ni la tarea, ni backup_service tocan
 la API de Google directamente. El scope ``drive.file`` sólo da acceso a archivos que la
 propia app crea — nunca a todo el Drive del administrador. Se usa una carpeta VISIBLE
-creada por la app ("Platform Core Backups"), no ``appDataFolder``.
+creada por la app ("Restaurant Platform Backups"), no ``appDataFolder``.
 
 Errores: se clasifican aquí en dos excepciones SEGURAS (sin texto crudo de Google, sin
 tokens): ``DriveTemporaryError`` (red/5xx/429: reintentable) y ``DriveReauthError``
@@ -14,14 +14,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-BACKUP_FOLDER_NAME = "Platform Core Backups"
+BACKUP_FOLDER_NAME = "Restaurant Platform Backups"
 DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
 
 # appProperties con las que se reconcilian subidas tras un timeout (idempotencia) y
 # se distingue el tipo de artefacto de un mismo respaldo (restore vs explorer).
-_PROP_RUN_ID = "platform_core_backup_run_id"
-_PROP_SHA256 = "platform_core_sha256"
-_PROP_ARTIFACT_KIND = "platform_core_artifact_kind"
+_PROP_RUN_ID = "restaurant_platform_backup_run_id"
+_PROP_SHA256 = "restaurant_platform_sha256"
+_PROP_ARTIFACT_KIND = "restaurant_platform_artifact_kind"
 
 
 class DriveTemporaryError(Exception):

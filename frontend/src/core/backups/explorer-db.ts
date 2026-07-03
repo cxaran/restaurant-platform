@@ -87,14 +87,14 @@ class ExplorerFormatError extends Error {
 
 /** Lee la metadata del artefacto y arma el catálogo navegable (tablas ordenadas por
  * nombre real; columnas por posición original). Lanza si el archivo no tiene la
- * forma del contrato (no es un artefacto de exploración de Platform Core). */
+ * forma del contrato (no es un artefacto de exploración de Restaurant Platform). */
 export function loadCatalog(exec: SqlExec): ExplorerCatalog {
   let metaRows: Record<string, unknown>[];
   try {
     metaRows = rowsAsObjects(exec("SELECT key, value FROM __mp_meta")[0]);
   } catch {
     throw new ExplorerFormatError(
-      "El archivo no es un artefacto de exploración de Platform Core.",
+      "El archivo no es un artefacto de exploración de Restaurant Platform.",
     );
   }
   const metaMap = new Map(metaRows.map((row) => [asString(row.key), asString(row.value)]));

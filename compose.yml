@@ -1,4 +1,4 @@
-name: platform-core
+name: restaurant-platform
 
 services:
   redis:
@@ -16,7 +16,7 @@ services:
     build:
       context: ./backend
       target: prod
-    image: platform-core-backend:prod
+    image: restaurant-platform-backend:prod
     # El archivo de entorno debe definir TRUSTED_BROWSER_ORIGINS con los orígenes
     # HTTPS públicos confiables; en producción la app falla al iniciar si está vacío.
     env_file: ${APP_ENV_FILE:-.env}
@@ -31,7 +31,7 @@ services:
     build:
       context: ./frontend
       target: prod
-    image: platform-core-frontend:prod
+    image: restaurant-platform-frontend:prod
     expose:
       - "3000"
     depends_on:
@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
 
   migrate:
-    image: platform-core-backend:prod
+    image: restaurant-platform-backend:prod
     profiles: [ "migrate" ]
     env_file: ${APP_ENV_FILE:-.env}
     command: [ "alembic", "-c", "backend/alembic.ini", "upgrade", "head" ]
@@ -59,7 +59,7 @@ services:
   # PROPIOS con profile explícito "taskiq"; `docker compose up` normal no los levanta.
   # UNA sola réplica del scheduler.
   taskiq-worker:
-    image: platform-core-backend:prod
+    image: restaurant-platform-backend:prod
     profiles: [ "taskiq" ]
     env_file: ${APP_ENV_FILE:-.env}
     command: [ "taskiq", "worker", "backend.app.taskiq_app:broker", "--workers", "1", "--max-async-tasks", "1" ]
@@ -68,7 +68,7 @@ services:
     restart: unless-stopped
 
   taskiq-scheduler:
-    image: platform-core-backend:prod
+    image: restaurant-platform-backend:prod
     profiles: [ "taskiq" ]
     env_file: ${APP_ENV_FILE:-.env}
     command: [ "taskiq", "scheduler", "backend.app.taskiq_app:scheduler", "--skip-first-run" ]

@@ -15,7 +15,7 @@ Monorepo with a Docker Compose stack: `nginx` (reverse proxy) → `frontend` + `
 
 Every module imports as `from backend.app... import ...`. The top-level package is **`backend`** (its parent, the repo root, must be on `PYTHONPATH`). Consequences:
 
-- Always run commands **from the repo root** (`platform-core/`), not from `backend/`.
+- Always run commands **from the repo root** (`restaurant-platform/`), not from `backend/`.
 - The ASGI app path is `backend.app.main:app` (the `Dockerfile` copies the source to `/app/backend/` with `PYTHONPATH=/app`, so this resolves both locally and in-container).
 
 ## Commands
@@ -104,7 +104,7 @@ The `app/query/` engine turns a public read schema + ORM model + `QueryOptions` 
 All feature routers are mounted (`api/v1/router.py`): `auth`, `permissions` (catalog read), `roles` (CRUD + permissions), `users` (self-service `/me`) and `users_admin` (admin CRUD + roles + revoke-sessions). `users` + `users_admin` share the `/users` prefix (self-service `/me` included first). Routers build list endpoints with `ResourceQuery` and the **general route helpers** in `api/resource_actions.py` (CRUD/relation/serialize/error helpers — keep one-off logic out of routers). `test_auth_routes.py` asserts `/auth/refresh` and `/auth/logout` are absent from the OpenAPI schema — keep it green when adding/removing routes.
 
 ### Background jobs & backups
-- **Taskiq over PostgreSQL** (`app/taskiq_app.py`; see `docs/background-tasks-taskiq.md`). Worker and scheduler are opt-in Docker services (`--profile taskiq`); FastAPI only starts the broker in its lifespan to PUBLISH tasks, never to run them. Channel/table: `platform_core_taskiq*`.
+- **Taskiq over PostgreSQL** (`app/taskiq_app.py`; see `docs/background-tasks-taskiq.md`). Worker and scheduler are opt-in Docker services (`--profile taskiq`); FastAPI only starts the broker in its lifespan to PUBLISH tasks, never to run them. Channel/table: `restaurant_platform_taskiq*`.
 - **Encrypted backups to Google Drive** (`app/services/backup_service.py`; see `docs/backups-google-drive.md`): `backups.tick` runs every minute and consults due work in PostgreSQL (`backup_settings.next_run_at`) — the real schedule/retention is DB-edited, not a cron. Pipeline: `pg_dump --snapshot` → `pg_restore --list` verify → tar → OPTIONAL `age` encryption → resumable idempotent Drive upload → local GFS retention. An EXPLORER artifact (readable SQLite from the same snapshot, sensitive columns excluded) can accompany each backup. Frontend: `/backups` (Drive files + settings panel) and `/backups/explore` (sql.js WASM + local age decryption in the browser). The Docker image installs `postgresql-client` and `age`.
 - Kill switch: `BACKUPS_ENABLED` (env); the real policy switch is `backup_settings.enabled` (UI-editable).
 

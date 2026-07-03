@@ -2,7 +2,7 @@
 
 ## 2026-06-26 - Single Installation / Single Organization
 
-Decision: Platform Core opera como single installation / single organization.
+Decision: Restaurant Platform opera como single installation / single organization.
 
 Consecuencias:
 
@@ -144,8 +144,8 @@ npm run test:e2e:bootstrap
 
 Estrategia actual:
 
-- `compose.e2e.yml` usa el proyecto Docker `platform-core-e2e`;
-- Postgres usa la base `platform_core_e2e_test` sobre almacenamiento temporal;
+- `compose.e2e.yml` usa el proyecto Docker `restaurant-platform-e2e`;
+- Postgres usa la base `restaurant_platform_e2e_test` sobre almacenamiento temporal;
 - Redis tambien es temporal;
 - Alembic corre antes del navegador;
 - nginx expone la aplicacion integrada en `http://127.0.0.1:31080`;

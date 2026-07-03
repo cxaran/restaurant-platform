@@ -2,7 +2,7 @@
 
 ## Qué es y qué problema resuelve
 
-Platform Core necesita una vía para ejecutar trabajo **fuera del ciclo request/response** de
+Restaurant Platform necesita una vía para ejecutar trabajo **fuera del ciclo request/response** de
 FastAPI (en el futuro: respaldos, correos informativos, notificaciones, recordatorios,
 limpiezas programadas). Esta base lo resuelve con [Taskiq](https://taskiq-python.github.io/)
 sobre **PostgreSQL** — sin Redis, Celery ni infraestructura adicional: la cola vive en la
@@ -28,8 +28,8 @@ publica (kick)                  taskiq-worker    → ejecuta tareas
   servicios Docker propios, opt-in por profile. El lifespan de la API sólo inicia el
   broker para PUBLICAR (p. ej. despertar el tick tras "Respaldar ahora"); un fallo del
   broker no impide arrancar la API.
-- El broker usa un canal y una tabla **propios** (`platform_core_taskiq`,
-  `platform_core_taskiq_messages`). La tabla la crea el broker en su `startup()`; **no** hay
+- El broker usa un canal y una tabla **propios** (`restaurant_platform_taskiq`,
+  `restaurant_platform_taskiq_messages`). La tabla la crea el broker en su `startup()`; **no** hay
   migración Alembic ni modelo SQLAlchemy — no forma parte del esquema de la aplicación.
 - El broker reutiliza el `postgres_dsn` existente convertido con `make_url`
   (`postgresql+psycopg2://…` → `postgresql://…`); usa psycopg v3 internamente y convive
@@ -86,7 +86,7 @@ async def main():
 
 asyncio.run(main())
 "
-docker logs platform-core-dev-taskiq-worker-1 | tail -3
+docker logs restaurant-platform-dev-taskiq-worker-1 | tail -3
 # → "Executing task backups.tick with ID: …" (y nada más si no hay trabajo vencido)
 ```
 

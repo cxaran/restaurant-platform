@@ -17,7 +17,7 @@ os.environ.update(
         "SMTP_USER": "test@example.com",
         "SMTP_PASSWORD": "test-password",
         "SMTP_FROM_EMAIL": "test@example.com",
-        "SMTP_FROM_NAME": "MedicoPilot Test",
+        "SMTP_FROM_NAME": "Restaurant Platform Test",
         "SMTP_TLS": "false",
         "SMTP_SSL": "false",
         "SMTP_USE_CREDENTIALS": "false",

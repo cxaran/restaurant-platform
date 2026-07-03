@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     rate_limit_login_verify_ip: str = "10/900"
     rate_limit_google_login_ip: str = "10/900"
 
-    # Política pública de auth. Platform Core no asume signup público: el registro
+    # Política pública de auth. Restaurant Platform no asume signup público: el registro
     # está deshabilitado por defecto y debe habilitarse explícitamente.
     # Al completarse un registro, el usuario queda ACTIVO pero SIN roles (sin acceso
     # hasta que un administrador le asigne uno) y SIN sesión automática.
@@ -118,7 +118,7 @@ class Settings(BaseSettings):
     # DEPRECADA como política: backup_settings.explorer_enabled (DB, editable) es la
     # fuente de verdad; la migración de siembra importó este valor una única vez.
     backup_explorer_enabled: bool = False
-    backup_temp_dir: str = "/tmp/platform-core-backups"
+    backup_temp_dir: str = "/tmp/restaurant-platform-backups"
     backup_run_lease_minutes: int = 120
     backup_max_attempts: int = 3
     # OAuth de la app de Google (web application). El client secret NUNCA se persiste

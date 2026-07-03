@@ -112,7 +112,7 @@ export function BootstrapWizard({ status }: Readonly<{ status: BootstrapStatusRe
     <section className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[0.85fr_1.15fr]">
       <aside className="rounded-3xl border border-[var(--border)] bg-[var(--bg2)] p-8 text-[var(--tx)] shadow-[var(--soft)]">
         <p className="text-sm font-medium uppercase tracking-[0.28em] text-[var(--accent-tx)]">
-          Platform Core
+          Restaurant Platform
         </p>
         <h1 className="mt-5 max-w-md text-4xl font-semibold tracking-tight sm:text-5xl">
           Instalación inicial segura

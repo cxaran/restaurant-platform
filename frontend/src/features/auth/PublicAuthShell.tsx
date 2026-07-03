@@ -4,7 +4,7 @@ import { AnimatedOrb } from "@/components/ui/AnimatedOrb";
 
 /**
  * Marco visual común a las páginas públicas de auth — re-skin del LOGIN del diseño (MP-CTRL-0127):
- * marca centrada (orbe animado + "Platform Core"), título/descripción de la página y una tarjeta
+ * marca centrada (orbe animado + "Restaurant Platform"), título/descripción de la página y una tarjeta
  * de panel suave; con blobs decorativos a la deriva al fondo. SÓLO presentación (tokens de tema, sin
  * lógica de auth): cada página inyecta su formulario como ``children`` sin cambios de comportamiento.
  */
@@ -42,7 +42,7 @@ export function PublicAuthShell({
           <AnimatedOrb size={84} />
         </div>
         <h1 className="text-blur-intro mt-5 text-[27px] font-semibold tracking-tight text-[var(--tx)]">
-          Platform Core
+          Restaurant Platform
         </h1>
         <h2 className="text-blur-intro-delay mt-2 text-center text-[14.5px] font-normal text-[var(--tx2)]">
           {title}

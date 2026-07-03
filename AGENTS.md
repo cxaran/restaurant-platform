@@ -97,9 +97,9 @@ docker compose up --build                                          # prod stack
 
 Dev Mailpit UI (captured outgoing email): http://localhost:8025.
 
-Bootstrap E2E uses `compose.e2e.yml`, Docker project `platform-core-e2e`, and
+Bootstrap E2E uses `compose.e2e.yml`, Docker project `restaurant-platform-e2e`, and
 host URL `http://127.0.0.1:31080`. It creates a disposable Postgres database
-named `platform_core_e2e_test`, runs Alembic, drives `/setup` through the browser,
+named `restaurant_platform_e2e_test`, runs Alembic, drives `/setup` through the browser,
 and tears the stack down with volumes. Do not point E2E at the dev database or use
 `BOOTSTRAP_ADMIN_*` as a shortcut.
 

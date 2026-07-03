@@ -559,7 +559,7 @@ def backup_settings_email(config: BackupSettings, identity_plain: Optional[str])
         origin = "generada por el sistema" if identity_plain else "clave externa del administrador"
         encryption = f"Cifrado con age ({origin}); huella {config.age_recipient_fingerprint}"
     lines = [
-        "Se actualizó la configuración de respaldos de Platform Core.",
+        "Se actualizó la configuración de respaldos de Restaurant Platform.",
         "",
         f"- Respaldos habilitados: {'sí' if config.enabled else 'no'}",
         f"- Hora diaria: {config.daily_time.strftime('%H:%M')} ({config.timezone})",
@@ -593,7 +593,7 @@ def backup_settings_email(config: BackupSettings, identity_plain: Optional[str])
             "Los respaldos sin cifrar se restauran descargando el .tar de Google",
             "Drive, extrayéndolo y usando pg_restore con database.dump.",
         ]
-    return "Platform Core: configuración de respaldos actualizada", "\n".join(lines)
+    return "Restaurant Platform: configuración de respaldos actualizada", "\n".join(lines)
 
 
 def drive_client_from_config(

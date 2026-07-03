@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Platform Core",
-  description: "Shell base reutilizable para productos Platform Core",
+  title: "Restaurant Platform",
+  description: "Shell base reutilizable para productos Restaurant Platform",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,11 +1,11 @@
 ---
 name: platform-api-conventions
-description: Use when editing FastAPI routes, Pydantic schemas, REST endpoints, pagination, filters, OpenAPI, RBAC permissions, database-facing API contracts, or API error behavior in platform-core.
+description: Use when editing FastAPI routes, Pydantic schemas, REST endpoints, pagination, filters, OpenAPI, RBAC permissions, database-facing API contracts, or API error behavior in restaurant-platform.
 ---
 
 # Platform API Conventions
 
-Use this skill for backend API work in `platform-core`.
+Use this skill for backend API work in `restaurant-platform`.
 
 The project direction is a modular monolith, API-first, reusable base backend for web and mobile products. Keep changes small and aligned with the existing structure. Do not introduce broad architectural refactors unless explicitly requested.
 

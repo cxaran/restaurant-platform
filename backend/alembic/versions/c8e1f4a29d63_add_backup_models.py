@@ -128,7 +128,7 @@ def upgrade() -> None:
             "INSERT INTO backup_settings "
             "(id, singleton_key, enabled, timezone, daily_time, filename_prefix, "
             " retention_daily_count, retention_monthly_count, retention_yearly_count, drive_status) "
-            "VALUES (:id, true, false, 'UTC', '02:00', 'platform-core', 7, 12, 5, 'disconnected')"
+            "VALUES (:id, true, false, 'UTC', '02:00', 'restaurant-platform', 7, 12, 5, 'disconnected')"
         ).bindparams(id=str(uuid.uuid4()))
     )
 

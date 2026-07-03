@@ -38,7 +38,7 @@ function queryScalar(sql: string): string {
     "-U",
     "platform",
     "-d",
-    "platform_core_e2e_test",
+    "restaurant_platform_e2e_test",
     "-t",
     "-A",
     "-c",
@@ -122,7 +122,7 @@ function clearRateLimitKeys() {
     "redis",
     "sh",
     "-c",
-    "redis-cli --scan --pattern 'platform-core:rate-limit:*' | xargs -r redis-cli del",
+    "redis-cli --scan --pattern 'restaurant-platform:rate-limit:*' | xargs -r redis-cli del",
   ]);
 }
 
@@ -263,7 +263,7 @@ test.describe.serial("fresh install bootstrap and admin relations", () => {
       await page.getByLabel("Contraseña", { exact: true }).fill(adminPassword);
       await page.getByRole("button", { name: "Ingresar" }).click();
       await expect(page).toHaveURL(/\/$/);
-      await expect(page.getByText("Platform Core")).toBeVisible();
+      await expect(page.getByText("Restaurant Platform")).toBeVisible();
       await expectNoClientAuthStorage(page);
 
       const cookies = await context.cookies();
@@ -333,7 +333,7 @@ test.describe.serial("fresh install bootstrap and admin relations", () => {
       const userPage = await userContext.newPage();
       await login(userPage, standardEmail, standardPassword);
       await expect(userPage).toHaveURL(/\/$/);
-      await expect(userPage.getByText("Platform Core")).toBeVisible();
+      await expect(userPage.getByText("Restaurant Platform")).toBeVisible();
 
       const tokenBefore = queryScalar(`select token from "user" where email = '${standardEmail}';`);
 
@@ -791,7 +791,7 @@ test.describe.serial("fresh install bootstrap and admin relations", () => {
       await expect(page).toHaveURL(/\/login$/);
       await login(page, adminEmail, adminNewPassword);
       await expect(page).toHaveURL(/\/$/);
-      await expect(page.getByText("Platform Core")).toBeVisible();
+      await expect(page.getByText("Restaurant Platform")).toBeVisible();
     });
 
     await test.step("Logout cierra la sesión y protege rutas", async () => {

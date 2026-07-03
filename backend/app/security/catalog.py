@@ -1,6 +1,7 @@
 from backend.app.security.groups.audit_events import AuditEventPermissions
 from backend.app.security.groups.backups import BackupPermissions
 from backend.app.security.groups.business import BusinessPermissions
+from backend.app.security.groups.catalog import CatalogPermissions
 from backend.app.security.groups.files import FilePermissions
 from backend.app.security.groups.permissions import PermissionPermissions
 from backend.app.security.groups.roles import RolePermissions
@@ -18,6 +19,7 @@ SECURITY_GROUPS: list[type[SecurityGroup]] = [
     AuditEventPermissions,
     FilePermissions,
     BusinessPermissions,
+    CatalogPermissions,
 ]
 
 

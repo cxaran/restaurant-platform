@@ -33,6 +33,7 @@ from backend.app.security.catalog import SECURITY_GROUPS  # noqa: E402
 from backend.app.security.groups.audit_events import AuditEventPermissions  # noqa: E402
 from backend.app.security.groups.backups import BackupPermissions  # noqa: E402
 from backend.app.security.groups.business import BusinessPermissions  # noqa: E402
+from backend.app.security.groups.catalog import CatalogPermissions  # noqa: E402
 from backend.app.security.groups.files import FilePermissions  # noqa: E402
 from backend.app.security.groups.permissions import PermissionPermissions  # noqa: E402
 from backend.app.security.groups.roles import RolePermissions  # noqa: E402
@@ -53,6 +54,7 @@ class SecurityCatalogTest(unittest.TestCase):
                 AuditEventPermissions,
                 FilePermissions,
                 BusinessPermissions,
+                CatalogPermissions,
             ],
         )
 
@@ -83,6 +85,10 @@ class SecurityCatalogTest(unittest.TestCase):
                 "files:upload",
                 "business:read",
                 "business:update",
+                "catalog:read",
+                "catalog:create",
+                "catalog:update",
+                "catalog:sort",
             ],
         )
 

@@ -10,6 +10,15 @@ from .business import (
     BusinessSpecialDateSlot,
     BusinessWeeklyHours,
 )
+from .catalog import (
+    ModifierGroup,
+    ModifierOption,
+    Product,
+    ProductCategory,
+    ProductImage,
+    ProductInclusion,
+    ProductModifierGroup,
+)
 from .profiles import CustomerProfile, StaffProfile
 from .setup import PlatformSetup
 from .stored_file import StoredFile
@@ -30,7 +39,14 @@ __all__ = [
     "BusinessSpecialDateSlot",
     "BusinessWeeklyHours",
     "CustomerProfile",
+    "ModifierGroup",
+    "ModifierOption",
     "PlatformSetup",
+    "Product",
+    "ProductCategory",
+    "ProductImage",
+    "ProductInclusion",
+    "ProductModifierGroup",
     "Role",
     "RoleAccess",
     "StaffProfile",

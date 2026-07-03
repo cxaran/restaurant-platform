@@ -32,6 +32,12 @@ google-api-python-client==2.187.0
 # tzdata del sistema.
 tzdata==2026.2
 
+# Dominio restaurante: geometrías PostGIS (zonas de reparto MultiPolygon, ubicaciones
+# Point). GeoAlchemy2 aporta los tipos de columna SQLAlchemy/Alembic; shapely valida y
+# convierte GeoJSON <-> WKB en la capa de schemas (la API habla GeoJSON, nunca WKT).
+GeoAlchemy2==0.19.0
+shapely==2.1.2
+
 argon2-cffi==25.1.0
 
 # Cifrado simétrico (Fernet) de secretos de configuración en reposo

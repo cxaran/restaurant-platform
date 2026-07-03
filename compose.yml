@@ -53,6 +53,8 @@ services:
     image: restaurant-platform-backend:prod
     profiles: [ "migrate" ]
     env_file: ${APP_ENV_FILE:-.env}
+    # El Postgres externo debe tener disponible la extensión PostGIS (paquete
+    # postgis instalado); la migración ejecuta CREATE EXTENSION IF NOT EXISTS postgis.
     command: [ "alembic", "-c", "backend/alembic.ini", "upgrade", "head" ]
 
   # Tareas en segundo plano (Taskiq sobre PostgreSQL). Worker y scheduler son procesos

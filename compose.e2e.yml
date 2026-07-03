@@ -48,7 +48,8 @@ services:
       retries: 12
 
   postgres:
-    image: postgres:16-alpine
+    # Misma base que dev: PostGIS para las migraciones del dominio restaurante.
+    image: postgis/postgis:16-3.5-alpine
     environment:
       POSTGRES_USER: platform
       POSTGRES_PASSWORD: platform

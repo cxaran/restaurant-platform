@@ -36,6 +36,7 @@ BACKEND_CANONICAL_TEST_MODULES = (
     "backend.tests.test_backups",
     "backend.tests.test_login_verification",
     "backend.tests.test_google_login",
+    "backend.tests.test_file_service",
 )
 
 

@@ -1,6 +1,16 @@
+from .addresses import UserAddress
 from .audit_event import AuditEvent
 from .backup import BackupOauthState, BackupRun, BackupSettings
 from .base import Base
+from .business import (
+    BusinessPhone,
+    BusinessProfile,
+    BusinessSettings,
+    BusinessSpecialDate,
+    BusinessSpecialDateSlot,
+    BusinessWeeklyHours,
+)
+from .profiles import CustomerProfile, StaffProfile
 from .setup import PlatformSetup
 from .stored_file import StoredFile
 from .system_settings import SystemSettings
@@ -13,12 +23,21 @@ __all__ = [
     "BackupRun",
     "BackupSettings",
     "Base",
+    "BusinessPhone",
+    "BusinessProfile",
+    "BusinessSettings",
+    "BusinessSpecialDate",
+    "BusinessSpecialDateSlot",
+    "BusinessWeeklyHours",
+    "CustomerProfile",
     "PlatformSetup",
     "Role",
     "RoleAccess",
+    "StaffProfile",
     "StoredFile",
     "SystemSettings",
     "User",
+    "UserAddress",
     "UserIdentity",
     "UserRole",
 ]

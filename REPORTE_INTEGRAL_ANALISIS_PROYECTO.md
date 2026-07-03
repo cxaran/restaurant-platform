@@ -29,7 +29,8 @@ restaurant-platform
     ├── créditos
     ├── tickets
     ├── gastos e ingresos
-    └── reportes
+    ├── reportes
+    └── composición visual del sitio (storefront)
 
 restausante
 └── configuración e información específica
@@ -88,56 +89,73 @@ Se crea pedido ligado a un usuario
 
 ---
 
-## 1.2 Compra final con usuario registrado
+## 1.2 Compra final: usuario registrado en web, cliente opcional en pedidos capturados por personal
 
-Aunque el carrito sea público, todos los pedidos confirmados deben pertenecer a un usuario registrado.
+El carrito es público, pero un pedido web sólo puede finalizarse con un usuario registrado. Nunca aplica el checkout como invitado.
 
 ```text
+Pedido web (source = online):
 orders.customer_user_id = users.id
+No se finaliza sin sesión iniciada.
 ```
 
-Esto aplica para:
+No existe una tabla de clientes: usuario = cliente. Un cliente es un usuario sin roles internos, dueño de sus propios registros.
+
+En los pedidos capturados por el personal, el cliente es opcional:
 
 ```text
-Pedido web
+Venta a mostrador
 Pedido por teléfono
 Pedido por WhatsApp
 Pedido por Facebook o Instagram
-Venta a mostrador
-Pedido para recoger
-Pedido a domicilio
+
+customer_user_id puede quedar vacío.
+
+Siempre queda registrado:
+created_by = empleado (usuario) que registró el pedido
+approved_by = empleado (usuario) que aprobó el pedido
 ```
 
-No debe existir un pedido sin usuario asociado.
+Así se distingue con certeza un pedido en línea (creado por el propio cliente con su sesión) de uno capturado por el personal (identificable por el UUID del empleado en `created_by`), además del canal registrado en `orders.source` (web, mostrador, teléfono, redes).
 
-La razón es que el sistema necesita una identidad clara para:
+La invariante se conserva: **no hay pedido sin usuario**. Todo pedido queda ligado al menos a un usuario real del sistema:
 
-* Consultar historial.
-* Asociar direcciones.
-* Acumular créditos.
-* Canjear productos.
-* Mostrar pedidos al cliente.
-* Evitar registros duplicados.
-* Controlar reembolsos y ajustes.
-* Mantener trazabilidad.
+```text
+Pedido web:
+customer_user_id = el usuario cliente que lo creó.
 
-Cuando un empleado capture un pedido por llamada, WhatsApp o redes, debe buscar primero al usuario por teléfono o correo. Si no existe, podrá crear una cuenta mínima para ese cliente.
+Pedido capturado por personal:
+created_by = el usuario empleado que lo registró.
+
+Regla dura (nivel base de datos):
+CHECK (customer_user_id IS NOT NULL OR created_by IS NOT NULL)
+```
+
+Un pedido sin cliente asociado (ligado sólo al empleado que lo registró):
+
+* No acumula créditos.
+* No puede canjear productos.
+* No aparece en el historial de ningún cliente.
+* Conserva trazabilidad completa por empleado, canal y snapshots.
+
+Asociar o crear la cuenta del cliente es opcional, no un requisito para registrar la venta. Se hace cuando el cliente quiere créditos, historial o seguimiento:
 
 ```text
 Empleado recibe pedido externo
 ↓
-Busca teléfono o correo
-↓
-Cliente existente:
-selecciona su usuario
-
-Cliente nuevo:
-crea cuenta mínima
-↓
-El pedido queda asociado al usuario
+¿El cliente quiere créditos / historial / seguimiento?
+│
+├── No:
+│   El pedido se registra sin cliente.
+│   created_by identifica al empleado.
+│
+└── Sí:
+    Busca teléfono o correo.
+    ├── Cliente existente: selecciona su usuario.
+    └── Cliente nuevo: crea cuenta mínima
+        (requiere correo: todos los usuarios tienen correo;
+        reclamable después mediante verificación).
 ```
-
-Ese usuario podrá reclamar y configurar su acceso después mediante un proceso de verificación.
 
 ---
 
@@ -602,9 +620,11 @@ Cuando un pedido venga de teléfono, WhatsApp o redes, el empleado debe poder cr
 ```text
 Nombre
 Teléfono
-Correo opcional
+Correo (obligatorio)
 Estado inicial de cuenta
 ```
+
+Todos los usuarios tienen correo: es la identidad de acceso y el canal de reclamo de la cuenta. Si el cliente no proporciona un correo, no se crea cuenta y el pedido se registra sin usuario asociado (ver sección 1.2).
 
 La cuenta puede quedar como:
 
@@ -618,6 +638,8 @@ disabled
 El empleado no debe crear una contraseña que conozca o reutilice.
 
 El cliente podrá reclamar después su acceso mediante verificación.
+
+Crear o asociar la cuenta es opcional: si el cliente no la quiere, el pedido se registra sin usuario asociado (ver sección 1.2) y simplemente no acumula créditos ni aparece en un historial de cliente.
 
 ---
 
@@ -636,6 +658,8 @@ staff_profiles
 ├── public_contact_phone VARCHAR(30) NULL
 ├── photo_file_id UUID NULL FK stored_files.id
 ├── can_deliver BOOLEAN NOT NULL DEFAULT false
+├── is_delivery_available BOOLEAN NOT NULL DEFAULT false
+├── courier_public_note VARCHAR(120) NULL
 ├── is_active BOOLEAN NOT NULL DEFAULT true
 ├── created_at TIMESTAMPTZ NOT NULL
 └── updated_at TIMESTAMPTZ NOT NULL
@@ -649,6 +673,15 @@ Número interno del empleado.
 
 public_contact_phone:
 Número autorizado para mostrarse al cliente.
+
+is_delivery_available:
+El repartidor indica si está disponible
+para tomar envíos en este momento.
+
+courier_public_note:
+Descripción breve visible para el cliente
+sólo mientras su pedido va en camino.
+Ejemplo: «Moto roja».
 ```
 
 El teléfono personal de un repartidor nunca debe exponerse automáticamente.
@@ -836,6 +869,8 @@ products
 ├── is_available BOOLEAN NOT NULL DEFAULT true
 ├── is_featured BOOLEAN NOT NULL DEFAULT false
 ├── preparation_minutes INTEGER NULL
+├── max_units_per_order INTEGER NULL
+├── daily_unit_limit INTEGER NULL
 ├── sort_order INTEGER NOT NULL DEFAULT 0
 ├── is_active BOOLEAN NOT NULL DEFAULT true
 ├── created_at TIMESTAMPTZ NOT NULL
@@ -856,6 +891,22 @@ El producto otorga créditos cuando se compra con dinero.
 
 Un producto puede venderse con dinero,
 con créditos o con ambos métodos.
+
+Si max_units_per_order IS NOT NULL:
+Un solo pedido no puede incluir más unidades
+del producto que ese límite.
+Si el cliente quiere más, debe hacer otro pedido
+(y pagar otro envío).
+
+Si daily_unit_limit IS NOT NULL:
+El sistema deja de aceptar unidades del producto
+cuando la suma de unidades en pedidos aceptados del día
+alcanza el límite. Evita sobrepedidos.
+No hay contador editable: el consumo del día
+se calcula desde order_lines.
+
+La disponibilidad se controla manualmente con is_available.
+No hay reactivación automática programada.
 ```
 
 Ejemplos:
@@ -1156,13 +1207,13 @@ orders
 ├── id UUID PK
 ├── order_number BIGINT NOT NULL
 ├── public_code VARCHAR(40) NOT NULL
-├── customer_user_id UUID NOT NULL FK users.id
+├── customer_user_id UUID NULL FK users.id
 ├── source VARCHAR(30) NOT NULL
 ├── fulfillment_type VARCHAR(30) NOT NULL
 ├── status VARCHAR(40) NOT NULL
 ├── payment_status VARCHAR(40) NOT NULL
-├── customer_name_snapshot VARCHAR(180) NOT NULL
-├── customer_phone_snapshot VARCHAR(30) NOT NULL
+├── customer_name_snapshot VARCHAR(180) NULL
+├── customer_phone_snapshot VARCHAR(30) NULL
 ├── customer_email_snapshot VARCHAR(180) NULL
 ├── items_subtotal_amount NUMERIC(12,2) NOT NULL DEFAULT 0
 ├── discount_total_amount NUMERIC(12,2) NOT NULL DEFAULT 0
@@ -1181,6 +1232,37 @@ orders
 ├── created_by UUID NULL FK users.id
 ├── created_at TIMESTAMPTZ NOT NULL
 └── updated_at TIMESTAMPTZ NOT NULL
+```
+
+Reglas de identidad por canal:
+
+```text
+source = online:
+customer_user_id NOT NULL.
+El pedido lo crea el propio cliente con sesión iniciada.
+
+source = counter, phone, whatsapp, social, manual:
+customer_user_id NULL permitido.
+created_by obligatorio a nivel de aplicación
+(empleado que registró el pedido).
+approved_by registra quién lo aprobó.
+
+fulfillment_type = delivery o pickup:
+customer_name_snapshot y customer_phone_snapshot
+obligatorios (hay que entregar o avisar a alguien).
+
+Venta a mostrador sin cliente:
+los snapshots de nombre y teléfono pueden quedar vacíos.
+
+No existe una serie de folios separada para mostrador:
+order_number y public_code son una sola secuencia.
+El canal se identifica por source y created_by,
+no por el formato del folio.
+
+Invariante global — no hay pedido sin usuario:
+CHECK (customer_user_id IS NOT NULL OR created_by IS NOT NULL)
+Todo pedido está ligado al cliente que lo creó
+o al empleado que lo registró.
 ```
 
 Valores sugeridos para `source`:
@@ -1585,6 +1667,23 @@ Pedido delivery:
 No puede aprobarse mientras final_amount sea NULL.
 ```
 
+El ajuste del costo de envío no requiere confirmación del cliente:
+
+```text
+El cliente ve el costo final informado en el
+estado / seguimiento de su pedido, con el desglose
+de lo que se está cobrando por envío.
+
+Si no está de acuerdo, se comunica con el negocio.
+
+Cuando la dirección queda fuera de los polígonos definidos,
+lo habitual es que el empleado contacte al cliente
+antes de aprobar el pedido.
+
+Las zonas por polígono existen precisamente para que
+el ajuste manual sea la excepción, no la regla.
+```
+
 ---
 
 ## 17.3 `order_shipping_history`
@@ -1853,6 +1952,10 @@ Ubicación en tiempo real.
 Actualizaciones de movimiento.
 ```
 
+El seguimiento del pedido es exclusivo del usuario autenticado que lo hizo: no existe una página pública de rastreo por código. Los pedidos capturados sin usuario asociado se siguen por el canal donde se levantaron (teléfono, WhatsApp, mostrador).
+
+La ubicación del repartidor es opcional en dos sentidos: el repartidor decide compartirla, y sólo puede existir si tiene una sesión activa con conexión.
+
 ---
 
 ## 19.3 `courier_tracking_sessions`
@@ -1918,6 +2021,95 @@ Se detiene ubicación.
 Pedido cancelado:
 Se detiene ubicación.
 ```
+
+---
+
+## 19.5 Autoasignación del repartidor
+
+Además de la asignación hecha por un empleado, el repartidor puede tomar envíos por sí mismo desde una cola de pedidos listos.
+
+```text
+Cocina marca el pedido como ready
+↓
+El pedido entra a la cola «listos para salir»
+↓
+Los usuarios con can_deliver = true
+e is_delivery_available = true ven la cola
+↓
+El repartidor toma un envío
+↓
+Se crea delivery_assignments con
+assigned_by = el propio repartidor
+↓
+El pedido sale de la cola para los demás
+```
+
+Reglas:
+
+```text
+La cola sólo muestra pedidos delivery en estado ready
+sin asignación vigente.
+
+Tomar un envío ocurre dentro de una transacción:
+si dos repartidores lo intentan a la vez, gana el primero
+y el segundo recibe aviso de que ya fue tomado.
+
+Sigue existiendo un solo repartidor vigente por pedido:
+UNIQUE(order_delivery_id) WHERE is_current = true.
+
+Un empleado con permiso puede seguir asignando
+o reasignando manualmente; la autoasignación
+es un camino adicional, no un reemplazo.
+
+La vista del repartidor muestra instrucciones de cobro
+derivadas de payments:
+«Cobrar $295 en efectivo · llevar cambio de $500»
+o «Pagado · no cobrar».
+```
+
+---
+
+## 19.6 Operación sin conexión del repartidor
+
+Salir a repartir sin internet no debe ser una limitante operativa.
+
+```text
+El repartidor puede salir sin conexión.
+
+La ubicación en tiempo real es opcional:
+sólo existe mientras haya sesión de tracking
+activa y con conexión.
+
+Cualquier empleado con permiso puede marcar
+el pedido como entregado en nombre del repartidor.
+
+También es válido esperar a que el repartidor
+recupere conexión y lo marque él mismo.
+
+Los registros aceptan captura tardía:
+la hora real de entrega puede asentarse
+cuando vuelva la conexión.
+```
+
+---
+
+## 19.7 Resumen diario del repartidor (derivado)
+
+No hay corte de caja en el sistema. El repartidor y el administrador ven un resumen del día calculado desde los registros existentes:
+
+```text
+Entregas del día:
+delivery_assignments completadas por el repartidor.
+
+Efectivo cobrado en el día:
+payments en efectivo marcados como pagados
+en pedidos entregados por él.
+
+Cobros por envío del día:
+shipping_total_amount de sus entregas.
+```
+
+Todo es derivado: no existen tablas de caja, cortes, turnos ni saldos editables.
 
 ---
 
@@ -2233,6 +2425,10 @@ Los créditos se acreditan cuando el pedido está completado.
 Los canjes se reservan antes de aprobar el pedido.
 
 Los créditos no se guardan como saldo editable.
+
+Sólo los pedidos con usuario asociado
+acumulan o canjean créditos.
+Una venta registrada sin cliente no genera créditos.
 ```
 
 ---
@@ -2718,6 +2914,10 @@ por pedido.
 
 No puede eliminarse un pago, gasto, reembolso
 o movimiento de créditos.
+
+No puede existir un pedido sin usuario:
+debe tener customer_user_id (cliente)
+o created_by (empleado que lo registró).
 ```
 
 ---
@@ -2859,3 +3059,2043 @@ historiales, tickets, pagos ni reportes.
 ```
 
 La estructura permitirá que cualquier Restaurante venda desde web, mostrador, WhatsApp, teléfono y redes; administre pedidos y repartidores; calcule costos de envío por mapa; use créditos por producto; imprima tickets; registre gastos con evidencia; y mantenga un historial confiable sin que cambios futuros de precios, productos, zonas o promociones alteren pedidos pasados.
+
+---
+
+# 29. Módulo de configuración visual del sitio (`storefront-composer`)
+
+Esto debe agregarse al proyecto como un módulo de composición visual del sitio público. Permitirá que el administrador configure banners, heroes, secciones promocionales, categorías destacadas, productos recomendados, bloques de créditos, información de entrega, botones, imágenes, colores y estilos, sin editar código.
+
+La regla principal debe ser:
+
+```text
+El administrador puede configurar contenido, orden,
+imágenes, colores, variantes y estilos permitidos.
+
+El administrador no puede escribir HTML, CSS o JavaScript libre.
+
+Cada elemento visible se construye a partir de plantillas
+predefinidas y validadas por el backend.
+```
+
+Esto evita que el sitio termine siendo un editor libre difícil de mantener, inseguro o inconsistente, pero permite mucha personalización visual.
+
+---
+
+# 30. Alcance del módulo
+
+El módulo administrará la apariencia y composición del sitio público del negocio. (Tony-Tony aparece en los ejemplos sólo como primera implementación: el módulo es genérico para cualquier restaurante.)
+
+Permitirá configurar:
+
+* Hero principal.
+* Banners promocionales.
+* Avisos superiores.
+* Secciones de productos destacados.
+* Secciones de categorías destacadas.
+* Productos canjeables con créditos.
+* Promociones temporales.
+* Información de envíos.
+* Información de horarios.
+* Botones de WhatsApp.
+* Bloques de texto con imagen.
+* Bloques de “cómo funciona”.
+* Secciones de beneficios.
+* Sección de créditos del cliente.
+* Tarjetas de contacto.
+* Preguntas frecuentes.
+* Footer.
+* Header y navegación.
+* Colores globales.
+* Tipografías autorizadas.
+* Bordes, radios, botones y tarjetas.
+* Orden de secciones.
+* Visibilidad temporal de promociones.
+* Imágenes para escritorio y móvil.
+* Título del sitio y descripción (metadatos del head).
+* Favicon.
+* Imagen social por defecto (Open Graph).
+* Previsualización antes de publicar.
+
+El menú, el carrito y el checkout siguen siendo funciones reales del sistema; no deben convertirse en contenido libre.
+
+```text
+Catálogo real:
+productos, precios, disponibilidad, créditos y categorías.
+
+Contenido visual:
+hero, banners, textos, llamadas a la acción,
+orden de secciones, imágenes y estilos permitidos.
+```
+
+---
+
+# 31. Regla de experiencia pública
+
+Aunque existan heroes y banners, el sitio debe conservar la prioridad de venta.
+
+El cliente debe poder encontrar productos rápidamente.
+
+```text
+Inicio público
+├── Header con carrito visible
+├── Hero compacto o promocional
+├── Botón “Ver menú”
+├── Productos o categorías visibles rápidamente
+├── Secciones promocionales
+└── Información adicional
+```
+
+No conviene permitir un hero gigantesco que esconda el menú en móvil.
+
+La configuración debe respetar esta regla:
+
+```text
+El hero puede promocionar,
+pero no debe bloquear ni reemplazar el acceso al menú.
+
+El catálogo y carrito siempre deben ser accesibles.
+```
+
+Una implementación razonable para Tony-Tony sería:
+
+```text
+/
+├── Hero compacto
+├── Categorías principales
+├── Menú dinámico
+├── Productos destacados
+├── Banner de créditos
+├── Información de entrega
+└── Footer
+```
+
+---
+
+# 32. Separación entre `platform-core` y `restaurant-platform`
+
+La infraestructura de páginas, revisiones, plantillas, archivos, publicación y previsualización podría ser útil para otros proyectos.
+
+```text
+platform-core
+└── capacidades genéricas
+    ├── archivos
+    ├── auditoría
+    ├── control de versiones
+    ├── permisos
+    ├── publicación de borradores
+    └── validación de configuraciones
+
+restaurant-platform
+└── plantillas específicas de restaurante
+    ├── hero de restaurante
+    ├── menú dinámico
+    ├── productos destacados
+    ├── créditos
+    ├── promociones
+    ├── delivery
+    ├── horarios
+    └── banners de comida
+```
+
+No obstante, inicialmente puede implementarse dentro de `restaurant-platform` para no aumentar el alcance de `platform-core` demasiado pronto.
+
+La arquitectura debe dejar claro que:
+
+```text
+Motor de composición visual:
+potencialmente reutilizable.
+
+Plantillas de comida, pedidos y catálogo:
+restaurant-platform.
+```
+
+---
+
+# 33. Principio de plantillas definidas
+
+No debe existir una tabla donde el administrador pueda crear “una plantilla HTML nueva”.
+
+Las plantillas deben estar registradas en código y publicadas por el backend como contratos configurables.
+
+Ejemplo conceptual:
+
+```text
+storefront.hero.background
+storefront.hero.split
+storefront.banner.promo
+storefront.banner.delivery
+storefront.catalog.categories
+storefront.catalog.featured_products
+storefront.catalog.credit_products
+storefront.content.image_text
+storefront.content.info_cards
+storefront.content.faq
+storefront.content.testimonials
+storefront.loyalty.credits
+storefront.business.hours
+storefront.business.contact
+storefront.footer.default
+```
+
+Cada plantilla define:
+
+```text
+template_key
+template_version
+nombre visible
+descripción
+campos permitidos
+tipos de datos
+imágenes requeridas u opcionales
+variantes visuales permitidas
+opciones de color permitidas
+límites de texto
+configuración móvil
+fuentes de datos dinámicos permitidas
+```
+
+El backend debe ser la fuente de verdad de estas definiciones.
+
+```text
+El frontend no inventa campos.
+
+El administrador sólo ve opciones válidas
+para la plantilla seleccionada.
+
+La API rechaza configuraciones no válidas.
+```
+
+---
+
+# 34. Catálogo inicial de plantillas
+
+## 34.1 Heroes
+
+### `storefront.hero.background`
+
+Hero con imagen de fondo, texto superpuesto y botones.
+
+Campos configurables:
+
+```text
+Etiqueta superior.
+Título.
+Texto destacado.
+Descripción.
+Botón principal.
+Botón secundario.
+Imagen de escritorio.
+Imagen de móvil.
+Color de overlay.
+Intensidad de overlay.
+Alineación del texto.
+Altura del hero.
+Color de texto.
+Variante de botones.
+```
+
+Ejemplo:
+
+```text
+Etiqueta:
+Tony-Tony
+
+Título:
+Sabor que te hace volver
+
+Descripción:
+Boneless, papas y extras preparados para tu antojo.
+
+Botón principal:
+Ver menú
+
+Botón secundario:
+Usar mis créditos
+```
+
+---
+
+### `storefront.hero.split`
+
+Hero dividido entre contenido e imagen.
+
+```text
+Columna izquierda:
+Título, subtítulo, botones.
+
+Columna derecha:
+Imagen o collage de productos.
+```
+
+Opciones:
+
+```text
+Texto a la izquierda o derecha.
+Imagen redonda, cuadrada o recortada.
+Fondo sólido, degradado o neutro.
+Estilo de tarjeta.
+Alineación vertical.
+Variante compacta o amplia.
+```
+
+Este tipo es recomendable para una página principal donde el menú debe aparecer poco después.
+
+---
+
+### `storefront.hero.minimal`
+
+Hero reducido para promociones o campañas temporales.
+
+```text
+Título corto.
+Subtítulo corto.
+Un CTA principal.
+Color de fondo.
+Imagen opcional.
+```
+
+Útil para:
+
+```text
+Nueva salsa.
+Promoción del fin de semana.
+Envío gratis.
+Horario especial.
+Producto nuevo.
+```
+
+---
+
+### Rotación de heros en portada
+
+La portada admite varios heros a la vez. Desde el inicio deben ofrecerse varias plantillas de hero para seleccionar y editar, no una sola.
+
+```text
+1 hero activo:
+Se muestra fijo.
+
+2 o más heros activos:
+La portada los rota automáticamente en carrusel.
+```
+
+Reglas:
+
+```text
+Cada hero usa una de las plantillas definidas
+(imagen a la derecha / split, imagen de fondo,
+centrado / minimal); el administrador selecciona
+la plantilla y sólo edita textos, imagen
+y colores permitidos.
+
+Los heros se ordenan arrastrando (sort_order).
+
+Estados por hero:
+activo, inactivo, o programado por rango de fechas
+(visible_from / visible_until).
+
+No hay recurrencia por día de la semana.
+```
+
+---
+
+# 35. Banners promocionales
+
+## 35.1 `storefront.banner.promo`
+
+Banner horizontal configurable.
+
+Campos:
+
+```text
+Título.
+Descripción.
+Imagen.
+Imagen móvil.
+Etiqueta.
+Botón.
+Color de fondo.
+Color de texto.
+Color de botón.
+Fecha de inicio.
+Fecha de fin.
+Prioridad visual.
+```
+
+Ejemplo:
+
+```text
+Título:
+Envío gratis desde $350
+
+Descripción:
+Haz crecer tu pedido y recibe envío gratis.
+
+Botón:
+Ver menú
+```
+
+---
+
+## 35.2 `storefront.banner.credits`
+
+Banner dedicado a créditos.
+
+Campos:
+
+```text
+Título.
+Descripción.
+Imagen o ícono.
+Texto de créditos.
+Botón “Ver productos canjeables”.
+Color principal.
+Color de acento.
+```
+
+Ejemplo:
+
+```text
+Título:
+Compra, acumula y disfruta
+
+Descripción:
+Algunos productos te dan créditos.
+Úsalos después para canjear productos seleccionados.
+```
+
+La información numérica del usuario debe ser dinámica.
+
+```text
+Cliente sin sesión:
+“Regístrate para acumular créditos.”
+
+Cliente con sesión:
+“Tienes 12 créditos disponibles.”
+```
+
+---
+
+## 35.3 `storefront.banner.delivery`
+
+Banner de cobertura o entrega.
+
+Campos:
+
+```text
+Título.
+Texto.
+Ícono o imagen.
+Botón “Verificar mi zona”.
+Color.
+Estilo.
+```
+
+Ejemplo:
+
+```text
+¿Llegamos hasta tu zona?
+
+Comparte tu ubicación al pedir y calcularemos
+el costo de envío automáticamente.
+```
+
+---
+
+## 35.4 Barra superior de envío gratis
+
+La barra fija sobre el header del sitio público informa el umbral de envío gratis. Es un dato de configuración ya definido, no contenido editable.
+
+```text
+Fuente del dato:
+business_settings.free_shipping_global_from_amount
+
+Texto mostrado (derivado):
+«Envío gratis desde $350 · Servicio a domicilio»
+```
+
+Reglas:
+
+```text
+No es un texto rodante configurable por el administrador.
+
+El administrador sólo decide si la barra se muestra.
+
+Si el umbral cambia en la configuración,
+la barra se actualiza sola.
+
+Si no hay umbral configurado,
+la barra no muestra la parte de envío gratis.
+```
+
+El carrito reutiliza el mismo dato para mostrar el progreso hacia el envío gratis («Te faltan $85 para envío gratis»).
+
+---
+
+# 36. Secciones dinámicas basadas en catálogo
+
+Estas secciones no deben duplicar productos manualmente. Deben leer los productos reales del catálogo.
+
+## 36.1 `storefront.catalog.categories`
+
+Muestra categorías del menú.
+
+Configuración:
+
+```text
+Cantidad máxima.
+Diseño de tarjetas.
+Imagen por categoría.
+Mostrar descripción.
+Mostrar cantidad de productos.
+Mostrar sólo categorías activas.
+Orden del catálogo o orden manual de selección.
+```
+
+La regla general debe ser:
+
+```text
+Por defecto:
+respeta product_categories.sort_order.
+
+Opcionalmente:
+permite destacar categorías específicas.
+```
+
+---
+
+## 36.2 `storefront.catalog.featured_products`
+
+Muestra productos destacados.
+
+Configuración:
+
+```text
+Fuente de productos:
+- productos con is_featured = true
+- categoría específica
+- selección manual de productos
+- productos más recientes
+- productos disponibles actualmente
+
+Cantidad máxima.
+Diseño de tarjetas.
+Mostrar créditos otorgados.
+Mostrar precio en créditos si aplica.
+Mostrar descripción corta.
+Mostrar botón “Agregar”.
+```
+
+Ejemplo:
+
+```text
+Título:
+Los favoritos de Tony-Tony
+
+Fuente:
+Productos destacados
+
+Máximo:
+4 productos
+```
+
+---
+
+## 36.3 `storefront.catalog.credit_products`
+
+Sección para productos canjeables.
+
+Configuración:
+
+```text
+Título.
+Descripción.
+Máximo de productos.
+Mostrar sólo credit_redemption_price IS NOT NULL.
+Mostrar créditos necesarios.
+Mostrar créditos otorgados al comprar.
+Mostrar botón de canje.
+```
+
+Ejemplo:
+
+```text
+Título:
+Canjea tus créditos
+
+Descripción:
+Usa tus créditos en productos seleccionados.
+```
+
+Esta sección debe usar datos reales de `products`.
+
+```text
+products.credit_redemption_price
+products.credits_awarded_per_unit
+products.is_available
+products.is_active
+```
+
+Nunca debe guardar el precio en créditos como texto manual dentro del banner.
+
+---
+
+# 37. Secciones de contenido
+
+## 37.1 `storefront.content.image_text`
+
+Bloque de imagen y texto.
+
+Campos:
+
+```text
+Título.
+Texto.
+Imagen.
+Imagen móvil.
+Botón opcional.
+Posición de imagen.
+Fondo.
+Alineación.
+Estilo de tarjeta.
+```
+
+Usos:
+
+```text
+Nuestra historia.
+Nuevo producto.
+Salsas especiales.
+Proceso de entrega.
+Información de créditos.
+```
+
+---
+
+## 37.2 `storefront.content.info_cards`
+
+Tarjetas informativas.
+
+Configuración:
+
+```text
+Título general.
+Descripción general.
+Tarjetas.
+Ícono por tarjeta.
+Título.
+Descripción.
+Color.
+Estilo.
+```
+
+Ejemplos:
+
+```text
+Pide fácil.
+Elige tus favoritos.
+
+Seguimiento claro.
+Consulta el estado de tu pedido.
+
+Créditos.
+Compra y canjea productos seleccionados.
+```
+
+---
+
+## 37.3 `storefront.content.faq`
+
+Preguntas frecuentes.
+
+Campos:
+
+```text
+Título.
+Descripción opcional.
+Preguntas.
+Respuestas.
+Orden.
+Estilo visual.
+```
+
+Preguntas posibles:
+
+```text
+¿En qué zonas entregan?
+¿Cómo funcionan los créditos?
+¿Puedo pagar con transferencia?
+¿Puedo pedir sin ubicación exacta?
+¿Cuándo se confirma mi pedido?
+```
+
+---
+
+## 37.4 `storefront.business.hours`
+
+Bloque dinámico de horarios.
+
+No debe duplicar horarios en contenido manual.
+
+Debe leer de:
+
+```text
+business_weekly_hours
+business_special_dates
+business_special_date_slots
+```
+
+Configuración visual:
+
+```text
+Título.
+Texto de negocio abierto o cerrado.
+Estilo.
+Ícono.
+Mostrar horario de hoy.
+Mostrar horario semanal.
+Mostrar días especiales.
+```
+
+---
+
+## 37.5 `storefront.business.contact`
+
+Bloque de contacto.
+
+Debe leer teléfonos públicos desde:
+
+```text
+business_phones
+```
+
+Configuración:
+
+```text
+Mostrar teléfono principal.
+Mostrar WhatsApp.
+Mostrar correo.
+Mostrar dirección.
+Mostrar botón de mapa.
+Mostrar redes sociales, si se agregan.
+```
+
+---
+
+# 38. Header, navegación y footer
+
+El header y footer deben ser configurables, pero mediante plantillas fijas.
+
+## 38.1 Header
+
+Plantillas sugeridas:
+
+```text
+storefront.header.default
+storefront.header.compact
+storefront.header.transparent
+```
+
+Configuración:
+
+```text
+Logo.
+Nombre comercial.
+Eslogan opcional.
+Color de fondo.
+Color de texto.
+Estilo de navegación.
+Botón de iniciar sesión.
+Botón de carrito.
+Botón de WhatsApp.
+Sticky header.
+Mostrar estado abierto/cerrado.
+```
+
+Regla importante:
+
+```text
+El carrito debe estar visible o disponible
+desde cualquier pantalla pública.
+
+El acceso al menú debe permanecer claro.
+
+El header no puede ocultar funciones esenciales
+como carrito, sesión o seguimiento.
+```
+
+---
+
+## 38.2 Footer
+
+Plantillas sugeridas:
+
+```text
+storefront.footer.default
+storefront.footer.compact
+```
+
+Configuración:
+
+```text
+Logo.
+Texto de marca.
+Teléfonos.
+WhatsApp.
+Correo.
+Dirección.
+Horarios.
+Enlaces internos.
+Redes sociales.
+Aviso de privacidad.
+Texto de derechos.
+```
+
+---
+
+# 39. Configuración global de tema
+
+La personalización visual no debe hacerse con CSS libre.
+
+Debe basarse en tokens controlados.
+
+## `storefront_theme_revisions`
+
+```text
+storefront_theme_revisions
+├── id UUID PK
+├── version_number INTEGER NOT NULL
+├── status VARCHAR(30) NOT NULL
+├── theme_name VARCHAR(120) NOT NULL
+├── tokens_json JSONB NOT NULL
+├── created_by UUID NULL FK users.id
+├── published_by UUID NULL FK users.id
+├── published_at TIMESTAMPTZ NULL
+├── created_at TIMESTAMPTZ NOT NULL
+└── updated_at TIMESTAMPTZ NOT NULL
+```
+
+Estados:
+
+```text
+draft
+published
+archived
+```
+
+Ejemplo de `tokens_json`:
+
+```json
+{
+  "colors": {
+    "brand_primary": "#F97316",
+    "brand_secondary": "#7C2D12",
+    "accent": "#FACC15",
+    "surface": "#FFFFFF",
+    "surface_muted": "#FFF7ED",
+    "text_primary": "#1F2937",
+    "text_inverse": "#FFFFFF",
+    "success": "#16A34A"
+  },
+  "typography": {
+    "font_family_key": "modern_sans",
+    "heading_weight": "700",
+    "body_weight": "400"
+  },
+  "shape": {
+    "button_radius": "rounded",
+    "card_radius": "large",
+    "image_radius": "large"
+  },
+  "effects": {
+    "card_shadow": "soft",
+    "button_style": "solid",
+    "page_background_style": "flat"
+  }
+}
+```
+
+El administrador puede elegir:
+
+```text
+Paleta de colores.
+Color principal.
+Color secundario.
+Color de acento.
+Fondos.
+Color de texto.
+Variantes de botones.
+Radio de botones.
+Radio de tarjetas.
+Sombras.
+Estilo de tarjetas.
+Tipografía dentro de una lista autorizada.
+```
+
+No debe poder pegar:
+
+```text
+CSS personalizado.
+JavaScript.
+Código HTML.
+Fuentes externas arbitrarias.
+URLs peligrosas.
+```
+
+---
+
+# 40. Configuración por sección
+
+Cada hero, banner o sección puede tener una configuración propia, pero limitada por su plantilla.
+
+Ejemplo de configuración de hero:
+
+```json
+{
+  "content": {
+    "eyebrow": "Tony-Tony",
+    "title": "Sabor que te hace volver",
+    "description": "Boneless, papas y extras para pedir desde donde estés.",
+    "primary_cta": {
+      "label": "Ver menú",
+      "link_type": "anchor",
+      "target": "menu"
+    },
+    "secondary_cta": {
+      "label": "Usar mis créditos",
+      "link_type": "internal_route",
+      "target": "/credits"
+    }
+  },
+  "style": {
+    "variant": "background_overlay",
+    "content_alignment": "left",
+    "height": "compact",
+    "overlay_strength": "medium",
+    "color_scheme": "brand_inverse",
+    "button_variant": "solid"
+  },
+  "behavior": {
+    "show_on_mobile": true,
+    "show_on_desktop": true
+  }
+}
+```
+
+El backend debe validar:
+
+```text
+Que title no exceda el límite.
+
+Que el link_type sea válido.
+
+Que target corresponda al tipo de enlace.
+
+Que el color o variante exista.
+
+Que los estilos sean compatibles con la plantilla.
+
+Que los archivos de imagen sean válidos.
+
+Que no existan claves desconocidas.
+```
+
+---
+
+# 41. Páginas y revisiones
+
+El sitio público debe usar revisiones para que los cambios no aparezcan automáticamente en producción.
+
+## `storefront_pages`
+
+Representa una página lógica estable.
+
+```text
+storefront_pages
+├── id UUID PK
+├── page_key VARCHAR(80) UNIQUE NOT NULL
+├── slug VARCHAR(180) UNIQUE NOT NULL
+├── page_type VARCHAR(40) NOT NULL
+├── is_system_page BOOLEAN NOT NULL DEFAULT false
+├── is_active BOOLEAN NOT NULL DEFAULT true
+├── published_revision_id UUID NULL
+├── created_at TIMESTAMPTZ NOT NULL
+└── updated_at TIMESTAMPTZ NOT NULL
+```
+
+Ejemplos:
+
+```text
+page_key: home
+slug: /
+page_type: storefront_home
+is_system_page: true
+```
+
+```text
+page_key: menu
+slug: /menu
+page_type: catalog
+is_system_page: true
+```
+
+```text
+page_key: credits
+slug: /credits
+page_type: loyalty
+is_system_page: true
+```
+
+```text
+page_key: about
+slug: /nosotros
+page_type: content
+is_system_page: false
+```
+
+Las páginas del sistema no deben poder eliminarse desde administración.
+
+```text
+/
+ /menu
+ /cart
+ /checkout
+ /orders
+ /account
+```
+
+El administrador puede configurar su apariencia pública, pero no eliminar su lógica.
+
+---
+
+## `storefront_page_revisions`
+
+Cada página debe tener borradores y versiones publicadas.
+
+```text
+storefront_page_revisions
+├── id UUID PK
+├── page_id UUID NOT NULL FK storefront_pages.id
+├── revision_number INTEGER NOT NULL
+├── status VARCHAR(30) NOT NULL
+├── page_title VARCHAR(180) NULL
+├── meta_description VARCHAR(300) NULL
+├── og_image_file_id UUID NULL FK stored_files.id
+├── created_by UUID NULL FK users.id
+├── published_by UUID NULL FK users.id
+├── published_at TIMESTAMPTZ NULL
+├── scheduled_publish_at TIMESTAMPTZ NULL
+├── created_at TIMESTAMPTZ NOT NULL
+└── updated_at TIMESTAMPTZ NOT NULL
+```
+
+Estados:
+
+```text
+draft
+scheduled
+published
+archived
+```
+
+Esto permite:
+
+```text
+Editar una campaña sin afectar el sitio visible.
+
+Previsualizar el borrador.
+
+Publicar manualmente.
+
+Programar una promoción.
+
+Volver a una versión publicada anterior.
+```
+
+---
+
+# 42. Secciones configurables de cada página
+
+## `storefront_page_sections`
+
+Esta es la tabla principal de composición visual.
+
+```text
+storefront_page_sections
+├── id UUID PK
+├── page_revision_id UUID NOT NULL FK storefront_page_revisions.id
+├── template_key VARCHAR(120) NOT NULL
+├── template_version INTEGER NOT NULL
+├── section_name VARCHAR(180) NULL
+├── sort_order INTEGER NOT NULL DEFAULT 0
+├── is_visible BOOLEAN NOT NULL DEFAULT true
+├── visible_from TIMESTAMPTZ NULL
+├── visible_until TIMESTAMPTZ NULL
+├── content_config JSONB NOT NULL DEFAULT '{}'
+├── style_config JSONB NOT NULL DEFAULT '{}'
+├── data_binding_config JSONB NOT NULL DEFAULT '{}'
+├── behavior_config JSONB NOT NULL DEFAULT '{}'
+├── created_at TIMESTAMPTZ NOT NULL
+└── updated_at TIMESTAMPTZ NOT NULL
+```
+
+Separar configuraciones ayuda a mantener orden.
+
+```text
+content_config:
+Textos, títulos, etiquetas, CTA.
+
+style_config:
+Variante, colores, tamaño, alineación,
+radios, fondo y estilos permitidos.
+
+data_binding_config:
+Productos destacados, categorías,
+horarios, teléfonos o créditos.
+
+behavior_config:
+Visibilidad móvil, carrusel,
+fecha de inicio y fin, etc.
+```
+
+Ejemplo de una sección de productos destacados:
+
+```json
+{
+  "content_config": {
+    "title": "Los favoritos de Tony-Tony",
+    "description": "Lo más pedido por nuestros clientes"
+  },
+  "style_config": {
+    "layout": "horizontal_cards",
+    "color_scheme": "surface",
+    "show_product_description": true,
+    "show_credits": true
+  },
+  "data_binding_config": {
+    "source": "featured_products",
+    "max_items": 4
+  },
+  "behavior_config": {
+    "show_on_mobile": true,
+    "show_on_desktop": true
+  }
+}
+```
+
+---
+
+# 43. Imágenes y archivos por sección
+
+Aunque podría guardarse el `file_id` dentro de JSON, es mejor tener una relación explícita para imágenes, porque permite validar roles, tamaños, accesos y reemplazos.
+
+## `storefront_section_media`
+
+```text
+storefront_section_media
+├── id UUID PK
+├── section_id UUID NOT NULL FK storefront_page_sections.id
+├── slot_key VARCHAR(80) NOT NULL
+├── desktop_file_id UUID NULL FK stored_files.id
+├── mobile_file_id UUID NULL FK stored_files.id
+├── alt_text VARCHAR(255) NULL
+├── focal_point_x NUMERIC(5,2) NULL
+├── focal_point_y NUMERIC(5,2) NULL
+├── created_at TIMESTAMPTZ NOT NULL
+└── updated_at TIMESTAMPTZ NOT NULL
+```
+
+Ejemplos de `slot_key`:
+
+```text
+hero_background
+hero_image
+promo_image
+card_image
+mobile_banner
+og_image
+```
+
+Esto permite que un hero use una imagen amplia para escritorio y otra recortada para móvil.
+
+```text
+Hero escritorio:
+Imagen horizontal 1920 × 800.
+
+Hero móvil:
+Imagen vertical 1080 × 1350.
+```
+
+Los puntos focales sirven para que el administrador indique qué parte de la imagen debe conservarse al recortar.
+
+---
+
+# 44. Header y footer configurables
+
+## `storefront_layout_revisions`
+
+El header y footer también deben tener borrador y publicación.
+
+```text
+storefront_layout_revisions
+├── id UUID PK
+├── version_number INTEGER NOT NULL
+├── status VARCHAR(30) NOT NULL
+├── header_template_key VARCHAR(120) NOT NULL
+├── header_config JSONB NOT NULL DEFAULT '{}'
+├── footer_template_key VARCHAR(120) NOT NULL
+├── footer_config JSONB NOT NULL DEFAULT '{}'
+├── created_by UUID NULL FK users.id
+├── published_by UUID NULL FK users.id
+├── published_at TIMESTAMPTZ NULL
+├── created_at TIMESTAMPTZ NOT NULL
+└── updated_at TIMESTAMPTZ NOT NULL
+```
+
+Configuración de header:
+
+```text
+Logo.
+Nombre.
+Color de fondo.
+Color de texto.
+Sticky header.
+Botón de WhatsApp.
+Estado abierto/cerrado.
+Mostrar inicio de sesión.
+Mostrar carrito.
+Estilo de navegación.
+```
+
+Configuración de footer:
+
+```text
+Logo.
+Descripción.
+Teléfonos.
+Correo.
+Horario.
+Dirección.
+Enlaces.
+Redes.
+Aviso de privacidad.
+Texto legal.
+```
+
+---
+
+# 45. Configuración global activa
+
+## `storefront_settings`
+
+Tabla de un solo registro para seleccionar qué tema y layout están publicados.
+
+```text
+storefront_settings
+├── id SMALLINT PK CHECK (id = 1)
+├── active_theme_revision_id UUID NULL FK storefront_theme_revisions.id
+├── active_layout_revision_id UUID NULL FK storefront_layout_revisions.id
+├── storefront_enabled BOOLEAN NOT NULL DEFAULT true
+├── maintenance_message TEXT NULL
+├── site_title VARCHAR(120) NULL
+├── site_description VARCHAR(300) NULL
+├── favicon_file_id UUID NULL FK stored_files.id
+├── social_image_file_id UUID NULL FK stored_files.id
+├── created_at TIMESTAMPTZ NOT NULL
+└── updated_at TIMESTAMPTZ NOT NULL
+```
+
+Esto permite que el sitio público cargue sólo configuraciones publicadas.
+
+```text
+Tema activo.
+Layout activo.
+Página publicada.
+Secciones publicadas.
+Catálogo real actual.
+Metadatos globales del sitio.
+```
+
+## 45.1 Metadatos del sitio (head de la página)
+
+El administrador configura los metadatos que se muestran en el `<head>` del HTML, sin escribir código:
+
+```text
+site_title:
+Título del sitio (pestaña del navegador y buscadores).
+Si no se configura, se usa business_profile.trade_name.
+
+site_description:
+Descripción mostrada en buscadores y previews.
+
+favicon_file_id:
+Ícono del sitio (favicon).
+Formatos permitidos: ICO, PNG, SVG.
+Tamaño y dimensiones validados por el backend.
+
+social_image_file_id:
+Imagen por defecto al compartir en redes (Open Graph).
+```
+
+Cadena de resolución por página:
+
+```text
+Título:
+storefront_page_revisions.page_title
+↓ (si no hay)
+site_title
+↓ (si no hay)
+business_profile.trade_name
+
+Descripción:
+storefront_page_revisions.meta_description
+↓ site_description
+
+Imagen social:
+storefront_page_revisions.og_image_file_id
+↓ social_image_file_id
+```
+
+---
+
+# 46. Flujo de edición y previsualización
+
+El flujo del administrador debe ser similar a un constructor visual controlado.
+
+```text
+Administrador abre “Diseño del sitio”
+↓
+Selecciona una página
+↓
+Se crea o abre un borrador
+↓
+Agrega, elimina o reordena secciones
+↓
+Edita contenido, imágenes y estilos
+↓
+Guarda automáticamente el borrador
+↓
+Previsualiza en escritorio, tableta y móvil
+↓
+Corrige errores
+↓
+Publica o programa publicación
+```
+
+La pantalla ideal tendría tres zonas:
+
+```text
+Izquierda:
+Biblioteca de plantillas disponibles.
+
+Centro:
+Canvas o vista de página.
+
+Derecha:
+Panel de configuración de la sección seleccionada.
+```
+
+Ejemplo:
+
+```text
+Biblioteca
+├── Hero
+├── Banner
+├── Productos
+├── Categorías
+├── Créditos
+├── Entrega
+├── Información
+├── FAQ
+└── Footer
+
+Canvas
+├── Hero principal
+├── Categorías
+├── Productos destacados
+├── Banner de créditos
+└── Información de entrega
+
+Inspector
+├── Contenido
+├── Estilo
+├── Imagen
+├── Botones
+├── Visibilidad
+└── Programación
+```
+
+---
+
+# 47. Previsualización segura
+
+El borrador no debe ser visible para cualquier visitante público.
+
+La previsualización debe funcionar mediante una ruta privada o firmada.
+
+```text
+/admin/storefront/preview?page_revision_id=...
+```
+
+O mediante un enlace temporal firmado:
+
+```text
+/preview/token-seguro-temporal
+```
+
+Reglas:
+
+```text
+Sólo administradores autorizados pueden generar preview.
+
+El preview puede mostrar borradores.
+
+El sitio público sólo carga revisiones publicadas.
+
+Los enlaces de preview deben expirar.
+
+El preview no debe indexarse por buscadores.
+
+El preview no debe modificar catálogo, pedidos,
+pagos ni datos reales.
+```
+
+La previsualización debe permitir cambiar dispositivo:
+
+```text
+Desktop.
+Tablet.
+Mobile.
+```
+
+Y mostrar advertencias de diseño:
+
+```text
+Texto demasiado largo.
+Imagen móvil faltante.
+Contraste insuficiente.
+CTA sin enlace.
+Banner visible sin fecha de fin.
+Producto vinculado inactivo.
+Sección sin contenido obligatorio.
+```
+
+---
+
+# 48. Publicación y rollback
+
+Publicar debe ser una acción explícita.
+
+```text
+Borrador
+↓
+Validación
+↓
+Publicación
+↓
+Sitio público actualizado
+```
+
+Antes de publicar, el backend debe validar:
+
+```text
+La plantilla existe.
+
+La versión de plantilla es compatible.
+
+Todos los campos requeridos existen.
+
+Las imágenes referidas están disponibles.
+
+No existen enlaces inseguros.
+
+No hay colores imposibles de leer.
+
+Las secciones dinámicas tienen una fuente válida.
+
+El orden de las secciones es válido.
+
+No hay dos secciones con posición duplicada.
+
+No hay una promoción vencida configurada como visible.
+```
+
+Al publicar:
+
+```text
+La revisión anterior se archiva.
+
+La nueva revisión se marca como publicada.
+
+storefront_pages.published_revision_id se actualiza.
+
+Se invalida caché de la página pública.
+
+Se registra auditoría del cambio.
+```
+
+Rollback:
+
+```text
+Administrador abre historial.
+↓
+Selecciona versión anterior.
+↓
+Previsualiza.
+↓
+Publica nuevamente esa versión.
+```
+
+No se deben sobrescribir las versiones anteriores.
+
+---
+
+# 49. Orden de secciones
+
+El administrador debe poder reorganizar las secciones de una página mediante arrastrar y soltar.
+
+```text
+Hero
+↓
+Categorías
+↓
+Productos destacados
+↓
+Banner de créditos
+↓
+Información de entrega
+↓
+FAQ
+```
+
+La posición se guarda en:
+
+```text
+storefront_page_sections.sort_order
+```
+
+Regla:
+
+```text
+El orden de secciones afecta la vista pública.
+
+No afecta productos, pedidos, tickets,
+precios, créditos ni reportes.
+```
+
+Se recomienda usar posiciones separadas:
+
+```text
+10
+20
+30
+40
+```
+
+Cuando el administrador cambie el orden, el backend recibe la lista completa de secciones y actualiza todo dentro de una transacción.
+
+---
+
+# 50. Configuración de enlaces y CTA
+
+Los botones no deben aceptar HTML ni enlaces peligrosos.
+
+Los CTA deben usar tipos de enlace controlados.
+
+```text
+internal_route
+anchor
+product
+category
+credits_page
+menu_page
+whatsapp
+phone
+external_https
+```
+
+Ejemplos:
+
+```json
+{
+  "label": "Ver menú",
+  "link_type": "anchor",
+  "target": "menu"
+}
+```
+
+```json
+{
+  "label": "Usar mis créditos",
+  "link_type": "credits_page"
+}
+```
+
+```json
+{
+  "label": "Pedir por WhatsApp",
+  "link_type": "whatsapp",
+  "phone_source": "primary_business_whatsapp"
+}
+```
+
+El backend debe bloquear:
+
+```text
+javascript:
+data:
+iframe:
+HTML embebido
+URLs no permitidas
+```
+
+---
+
+# 51. Datos dinámicos contra contenido manual
+
+Debe existir una distinción clara.
+
+## Contenido manual
+
+```text
+Título de campaña.
+Texto promocional.
+Descripción.
+Botón.
+Imagen.
+Color.
+Estilo.
+```
+
+## Datos dinámicos
+
+```text
+Productos disponibles.
+Precios actuales.
+Créditos otorgados.
+Costo de canje.
+Categorías.
+Horarios.
+Teléfonos.
+Estado abierto/cerrado.
+Saldo de créditos del cliente.
+```
+
+Ejemplo correcto:
+
+```text
+Banner:
+“Canjea tus créditos por productos seleccionados.”
+
+Sección dinámica:
+Lee products.credit_redemption_price.
+```
+
+Ejemplo incorrecto:
+
+```text
+Banner manual:
+“Papas a la francesa por 5 créditos.”
+
+Problema:
+Si el precio cambia a 6 créditos,
+el banner queda desactualizado.
+```
+
+Cuando se quiera mostrar información de producto o crédito, debe vincularse a la entidad real.
+
+---
+
+# 52. Permisos del módulo storefront
+
+Permisos sugeridos:
+
+```text
+storefront:read_draft
+storefront:edit
+storefront:manage_media
+storefront:manage_theme
+storefront:preview
+storefront:publish
+storefront:rollback
+storefront:manage_navigation
+```
+
+Roles prácticos:
+
+| Rol                   | Alcance                                            |
+| --------------------- | -------------------------------------------------- |
+| Empleado              | No modifica diseño público.                        |
+| Editor de contenido   | Puede editar borradores, textos e imágenes.        |
+| Administrador         | Puede cambiar tema, publicar y revertir versiones. |
+| Administrador técnico | Puede registrar o actualizar plantillas de código. |
+
+La edición del diseño no debe otorgar automáticamente permisos para modificar:
+
+```text
+Productos.
+Precios.
+Pagos.
+Pedidos.
+Créditos.
+Gastos.
+Usuarios.
+```
+
+---
+
+# 53. Seguridad y consistencia
+
+Reglas críticas:
+
+```text
+No HTML libre.
+
+No CSS libre.
+
+No JavaScript libre.
+
+No archivos sin validar.
+
+No URLs peligrosas.
+
+No publicación directa sin validación.
+
+No borradores visibles al público.
+
+No modificación de plantillas desde interfaz administrativa.
+
+No eliminación física de imágenes usadas por contenido publicado.
+
+No modificación de precios mediante banners o secciones visuales.
+```
+
+Los archivos deben validarse por:
+
+```text
+Tipo MIME.
+Tamaño máximo.
+Extensión.
+Hash.
+Permisos.
+Relación con una entidad válida.
+```
+
+Las imágenes pueden tener límites iniciales, por ejemplo:
+
+```text
+JPG, PNG, WEBP.
+Tamaño máximo configurable.
+Resolución mínima para hero.
+Recorte automático optimizado.
+Versión móvil opcional.
+```
+
+---
+
+# 54. Tablas resumidas del módulo
+
+```text
+storefront_settings
+└── Registro único con tema y layout activos,
+   más metadatos globales del sitio
+   (título, descripción, favicon, imagen social).
+
+storefront_theme_revisions
+└── Paleta, tipografías, botones, bordes, tarjetas y estilos globales.
+
+storefront_layout_revisions
+└── Configuración versionada de header y footer.
+
+storefront_pages
+└── Página lógica estable: inicio, menú, créditos, nosotros.
+
+storefront_page_revisions
+└── Borradores, publicadas, programadas y archivadas.
+
+storefront_page_sections
+└── Instancias de heroes, banners, productos, FAQ y demás bloques.
+
+storefront_section_media
+└── Imágenes desktop/móvil, alt text y punto focal.
+
+stored_files
+└── Archivos binarios reutilizados por logo, productos, banners,
+   comprobantes, tickets y evidencias.
+```
+
+---
+
+# 55. Relación con el resto del proyecto
+
+```text
+business_profile
+└── Logo, nombre, eslogan.
+
+business_phones
+└── Teléfonos y WhatsApp visibles.
+
+business_weekly_hours
+business_special_dates
+└── Horarios dinámicos.
+
+product_categories
+products
+modifier_groups
+modifier_options
+└── Catálogo real.
+
+orders
+payments
+order_shipping
+└── Operación real, no editable por banners.
+
+credit_ledger_entries
+credit_redemptions
+└── Créditos reales del usuario.
+
+storefront_*
+└── Composición visual y promoción del sitio público.
+```
+
+La configuración visual no debe cambiar la lógica comercial.
+
+```text
+El banner puede promocionar un producto.
+
+El banner no puede modificar su precio.
+
+La sección puede mostrar créditos.
+
+La sección no puede aumentar créditos.
+
+El hero puede enlazar al carrito.
+
+El hero no puede crear pedidos sin validación.
+```
+
+---
+
+# 56. Fases de implementación del módulo storefront
+
+## Fase 1: configuración visual esencial
+
+```text
+Tema global.
+Logo.
+Header.
+Footer.
+Hero.
+Banners.
+Secciones de categorías.
+Productos destacados.
+Sección de menú dinámico.
+Orden de secciones.
+Imágenes desktop y móvil.
+Borrador.
+Preview.
+Publicación manual.
+```
+
+Tablas prioritarias:
+
+```text
+storefront_settings
+storefront_theme_revisions
+storefront_layout_revisions
+storefront_pages
+storefront_page_revisions
+storefront_page_sections
+storefront_section_media
+```
+
+Plantillas iniciales:
+
+```text
+storefront.hero.split
+storefront.hero.background
+storefront.banner.promo
+storefront.catalog.categories
+storefront.catalog.featured_products
+storefront.catalog.credit_products
+storefront.banner.delivery
+storefront.business.hours
+storefront.business.contact
+storefront.footer.default
+```
+
+---
+
+## Fase 2: mejoras editoriales
+
+```text
+Programación de campañas.
+Preview mediante enlace temporal.
+Rollback visual.
+FAQ.
+Tarjetas informativas.
+Bloques de imagen y texto.
+Campañas por fechas.
+Promociones de temporada.
+SEO por página.
+Open Graph personalizado.
+```
+
+---
+
+## Fase 3: funciones avanzadas
+
+```text
+A/B testing de hero.
+Banners segmentados por cliente.
+Contenido diferente según créditos.
+Campañas por zona de reparto.
+Analytics de clics por sección.
+Métricas de conversión por banner.
+Recomendaciones dinámicas.
+```
+
+Estas funciones no deben formar parte de la primera versión.
+
+---
+
+# 57. Resultado esperado del módulo storefront
+
+El administrador tendrá un editor visual controlado donde podrá modificar el sitio sin depender de código para cada campaña.
+
+```text
+Cambiar hero.
+Cambiar colores.
+Cambiar imágenes.
+Mover banners.
+Publicar promociones.
+Destacar productos.
+Mostrar créditos.
+Modificar estilo de botones.
+Reordenar bloques.
+Previsualizar desktop y móvil.
+Publicar o revertir cambios.
+```
+
+Pero el sitio seguirá siendo consistente y seguro porque:
+
+```text
+Las plantillas están definidas por el sistema.
+
+Los estilos se limitan a opciones permitidas.
+
+El backend valida toda configuración.
+
+El catálogo y pedidos siguen siendo fuentes reales de datos.
+
+Las promociones no alteran precios históricos.
+
+Los borradores no afectan el sitio público.
+
+Las versiones publicadas pueden restaurarse.
+```
+
+---
+
+# 58. Fidelidad al diseño visual (prototipo «Tony-Tony Etapa 1»)
+
+El prototipo visual de Etapa 1 (sitio público móvil y escritorio, detalle de producto, carrito, checkout, seguimiento, perfil con créditos, panel de empleado, punto de venta, panel de administrador, catálogo, apariencia, editor del sitio, vistas de repartidor móvil/web y ticket de 58 mm) se contrastó pantalla por pantalla contra este reporte. Las decisiones resultantes ya quedaron integradas en las secciones correspondientes; aquí se consolidan como registro.
+
+## 58.1 Decisiones tomadas
+
+| Tema surgido del diseño | Decisión | Sección |
+| --- | --- | --- |
+| Checkout como invitado | No aplica. Un pedido web sólo se finaliza con usuario registrado. | 1.2 |
+| Cliente en ventas capturadas por personal | El cliente es opcional (`customer_user_id NULL`); siempre quedan `created_by` y `approved_by`. Usuario = cliente; no hay tabla de clientes. | 1.2, 14.1 |
+| Corte de caja | No aplica para este proyecto. Sólo resúmenes derivados: del negocio y del día del repartidor. | 19.7, 24 |
+| Folio separado para mostrador («TT-M-…») | No aplica. Una sola secuencia de folios; el canal se identifica por `source` y `created_by`. | 14.1 |
+| Programación de contenido por día de la semana | No aplica. Sólo estados activo/inactivo y rango de fechas. | 34.1 |
+| Varios heros con rotación | Sí aplica. Varias plantillas de hero seleccionables y editables; con 2 o más activos, carrusel automático. | 34.1 |
+| Barra de anuncio | Sólo para el envío gratis: dato fijo derivado de la configuración, no texto rodante editable. | 35.4 |
+| Autoasignación del repartidor | Sí aplica: cola de pedidos listos, «tomar envío», disponibilidad del repartidor. | 19.5, 8.4 |
+| Descripción pública del repartidor | Sí aplica (`courier_public_note` en `staff_profiles`). | 8.4 |
+| Confirmación del cliente ante ajuste de envío | No aplica. El cliente ve el costo final informado en el seguimiento; si no está de acuerdo, se comunica. El empleado contacta cuando la dirección quede fuera de los polígonos. | 17.2 |
+| Reactivación automática de disponibilidad | No aplica. Desactivación manual + límites de venta por producto (`max_units_per_order`, `daily_unit_limit`). | 11.2 |
+| Rastreo público de pedido por código | No aplica. Seguimiento sólo para el usuario autenticado dueño del pedido. | 19.2 |
+| Repartidor sin internet | No debe ser limitante: otro empleado puede marcar entregado, o se espera la reconexión. | 19.6 |
+
+## 58.2 Estados públicos del pedido (mapeo)
+
+El cliente ve una línea de tiempo simple. Los estados internos granulares se agrupan en etiquetas públicas; los pasos de verificación interna no se le exponen como estados, aunque el seguimiento sí informa el costo de envío final y el método de pago.
+
+| Estado interno | Etiqueta pública |
+| --- | --- |
+| `draft`, `submitted`, `pending_shipping_review`, `pending_payment_verification`, `pending_approval` | Pedido recibido |
+| `approved` | Confirmado |
+| `preparing` | En preparación |
+| `ready` | Listo |
+| `out_for_delivery` | En camino |
+| `completed` | Entregado |
+| `cancelled` | Cancelado |
+
+## 58.3 Funciones confirmadas por el diseño (derivadas, sin cambios de modelo)
+
+```text
+Barra de progreso hacia envío gratis en el carrito,
+derivada de free_shipping_global_from_amount
+o de la tarifa de la zona.
+
+«Repetir pedido» desde el historial del cliente:
+clona las líneas de un pedido anterior a un carrito nuevo
+con precios y disponibilidad ACTUALES.
+Nunca reutiliza precios históricos.
+
+Tarjeta de créditos del perfil
+(disponibles / ganados / canjeados):
+tres agregaciones del credit_ledger_entries.
+
+«Más vendidos» incluyendo salsas y extras elegidos:
+agregación sobre order_lines y order_line_modifiers.
+
+Instrucciones de cobro para el repartidor
+derivadas de payments:
+cobrar y cambio a llevar, o pagado / no cobrar.
+
+Duplicar producto en el catálogo administrativo.
+
+Estado abierto / cerrado en el header del sitio,
+derivado de horarios semanales y fechas especiales.
+
+Toggle «Aceptando pedidos»
+(business_profile.is_accepting_orders),
+visible también para el personal.
+
+El catálogo se publica al instante (sin revisiones);
+el flujo borrador → publicar aplica sólo
+al contenido visual del storefront.
+```
+
+## 58.4 Presets de paleta del tema
+
+En lugar de exponer los tokens uno por uno, el selector de apariencia ofrece paletas predefinidas en código más la elección del color de acento. La selección se guarda como tokens en `storefront_theme_revisions.tokens_json`. Los colores configurables por sección referencian tokens del tema, nunca valores hexadecimales libres.
+
+Regla importante: **no existe ningún preset de marca**. Los presets integrados son genéricos y neutros (por ejemplo: «Cálido», «Oscuro», «Fresco», «Terroso»), pensados para cualquier restaurante. Cada negocio construye su identidad configurando paleta, acento, tipografía autorizada, logo, favicon y metadatos — nunca editando código.
+
+## 58.5 Dirección visual de referencia (ejemplo de configuración)
+
+El prototipo de la primera implementación demuestra el nivel de identidad visual que las plantillas del storefront deben poder reproducir sólo con configuración:
+
+```text
+Paleta: rojo #C1272D · negro #1C1512 · cremas #F6EEDD / #FBF5E9.
+
+Tipografía display para títulos y marca
+(estilo Alfa Slab One) + sans para texto (estilo Archivo).
+
+Botones y chips redondeados (pill), tarjetas con
+radios amplios y bordes suaves.
+
+Fotos de producto en PNG con fondo transparente
+sobre fondos crema.
+
+Paneles internos con barra lateral oscura
+y acento en la sección activa.
+
+Ticket de 58 mm monoespaciado con separadores punteados.
+```
+
+Estos valores NO se incluyen como preset del sistema: son la configuración que la primera implementación cargará sobre los presets neutros y los campos del tema. La vara de calidad es que cualquier restaurante alcance un resultado igual de propio usando únicamente el editor.

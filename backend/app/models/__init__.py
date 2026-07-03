@@ -21,6 +21,7 @@ from .catalog import (
 )
 from .profiles import CustomerProfile, StaffProfile
 from .setup import PlatformSetup
+from .shipping import DeliveryZone, ShippingRateRule
 from .stored_file import StoredFile
 from .system_settings import SystemSettings
 from .user import User, Role, UserRole, RoleAccess
@@ -39,6 +40,7 @@ __all__ = [
     "BusinessSpecialDateSlot",
     "BusinessWeeklyHours",
     "CustomerProfile",
+    "DeliveryZone",
     "ModifierGroup",
     "ModifierOption",
     "PlatformSetup",
@@ -49,6 +51,7 @@ __all__ = [
     "ProductModifierGroup",
     "Role",
     "RoleAccess",
+    "ShippingRateRule",
     "StaffProfile",
     "StoredFile",
     "SystemSettings",

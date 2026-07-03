@@ -1,0 +1,100 @@
+"""Schemas de zonas de reparto y tarifas (§10) + cotización pública.
+
+La cobertura viaja como GeoJSON ``Polygon``/``MultiPolygon``; la validación
+geométrica real (shapely) ocurre en la capa de servicio/router y produce EWKT.
+"""
+
+from decimal import Decimal
+from typing import Optional
+from uuid import UUID
+
+from pydantic import Field
+
+from backend.app.schemas.address import GeoPoint
+from backend.app.schemas.base import ApiPatchSchema, ApiReadSchema, ApiWriteSchema
+
+
+# ---------------------------------------------------------------------------
+# Zonas
+# ---------------------------------------------------------------------------
+
+class DeliveryZoneCreate(ApiWriteSchema):
+    code: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=120)
+    description: Optional[str] = None
+    # GeoJSON Polygon o MultiPolygon; se valida con shapely en el backend.
+    coverage: dict
+    priority: int = 0
+
+
+class DeliveryZoneUpdate(ApiPatchSchema):
+    code: Optional[str] = Field(default=None, min_length=1, max_length=40)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    description: Optional[str] = None
+    coverage: Optional[dict] = None
+    priority: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class ShippingRateRead(ApiReadSchema):
+    id: UUID
+    name: str
+    base_fee: Decimal
+    minimum_order_amount: Optional[Decimal] = None
+    free_shipping_from_amount: Optional[Decimal] = None
+    estimated_minutes: Optional[int] = None
+    priority: int
+    is_active: bool
+
+
+class DeliveryZoneRead(ApiReadSchema):
+    id: UUID
+    code: str
+    name: str
+    description: Optional[str] = None
+    coverage: dict
+    priority: int
+    is_active: bool
+    rates: list[ShippingRateRead] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Tarifas
+# ---------------------------------------------------------------------------
+
+class ShippingRateCreate(ApiWriteSchema):
+    name: str = Field(min_length=1, max_length=120)
+    base_fee: Decimal = Field(ge=0)
+    minimum_order_amount: Optional[Decimal] = Field(default=None, ge=0)
+    free_shipping_from_amount: Optional[Decimal] = Field(default=None, ge=0)
+    estimated_minutes: Optional[int] = Field(default=None, ge=0)
+    priority: int = 0
+
+
+class ShippingRateUpdate(ApiPatchSchema):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    base_fee: Optional[Decimal] = Field(default=None, ge=0)
+    minimum_order_amount: Optional[Decimal] = Field(default=None, ge=0)
+    free_shipping_from_amount: Optional[Decimal] = Field(default=None, ge=0)
+    estimated_minutes: Optional[int] = Field(default=None, ge=0)
+    priority: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+# ---------------------------------------------------------------------------
+# Cotización pública (carrito / checkout)
+# ---------------------------------------------------------------------------
+
+class PublicShippingQuoteRequest(ApiWriteSchema):
+    subtotal: Decimal = Field(ge=0)
+    # Sin ubicación la cotización queda pending_review (§17.2); el pedido se
+    # recibe igual y el costo se valida manualmente.
+    location: Optional[GeoPoint] = None
+
+
+class PublicShippingQuoteResult(ApiReadSchema):
+    status: str  # calculated | pending_review
+    zone_name: Optional[str] = None
+    amount: Optional[Decimal] = None
+    is_free_shipping: bool = False
+    estimated_minutes: Optional[int] = None

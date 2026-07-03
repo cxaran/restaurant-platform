@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from urllib.parse import quote
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Request, Response, status
 from sqlmodel import select
 
 from backend.app.api.resource_actions import api_error, serialize_many
@@ -22,6 +22,11 @@ from backend.app.schemas.business import (
     PublicDaySlot,
 )
 from backend.app.schemas.catalog import PublicMenuCategory
+from backend.app.schemas.shipping import (
+    PublicShippingQuoteRequest,
+    PublicShippingQuoteResult,
+)
+from backend.app.security.rate_limit import limit_public_quote
 from backend.app.services.business_service import (
     business_timezone,
     effective_schedule_for_date,
@@ -31,6 +36,7 @@ from backend.app.services.business_service import (
 )
 from backend.app.services.catalog_service import build_public_menu
 from backend.app.services.file_service import get_active_file
+from backend.app.services.shipping_service import quote_shipping
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -85,6 +91,34 @@ def read_public_menu(session: SessionDep, response: Response) -> list[PublicMenu
     """Menú público: catálogo REAL vigente (§58.3: se publica al instante)."""
     response.headers["Cache-Control"] = "public, max-age=60"
     return [PublicMenuCategory.model_validate(category) for category in build_public_menu(session)]
+
+
+@router.post("/shipping-quote", response_model=PublicShippingQuoteResult)
+def quote_public_shipping(
+    payload: PublicShippingQuoteRequest,
+    request: Request,
+    session: SessionDep,
+) -> PublicShippingQuoteResult:
+    """Cotización ESTIMADA de envío para el carrito (§17.2).
+
+    Sin ubicación → ``pending_review``: el pedido puede recibirse igual y el
+    costo se valida manualmente. El costo final por pedido se decide en
+    ``order_shipping`` al capturar/aprobar (etapa 4), nunca aquí.
+    """
+    limit_public_quote(request)
+    longitude, latitude = (None, None)
+    if payload.location is not None:
+        longitude, latitude = payload.location.coordinates
+    quote = quote_shipping(
+        session, subtotal=payload.subtotal, longitude=longitude, latitude=latitude
+    )
+    return PublicShippingQuoteResult(
+        status=quote.status,
+        zone_name=quote.zone_name,
+        amount=quote.amount,
+        is_free_shipping=quote.is_free_shipping,
+        estimated_minutes=quote.estimated_minutes,
+    )
 
 
 @router.get("/files/{file_id}")

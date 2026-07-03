@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     rate_limit_bootstrap_ip: str = "5/900"
     rate_limit_login_verify_ip: str = "10/900"
     rate_limit_google_login_ip: str = "10/900"
+    # Cotización pública de envío (carrito sin sesión): consulta geoespacial barata
+    # pero abierta a internet; límite generoso por IP.
+    rate_limit_public_quote_ip: str = "60/60"
 
     # Política pública de auth. Restaurant Platform no asume signup público: el registro
     # está deshabilitado por defecto y debe habilitarse explícitamente.

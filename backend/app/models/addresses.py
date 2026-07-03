@@ -12,44 +12,12 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from geoalchemy2 import Geometry
-from sqlalchemy import (
-    Boolean,
-    DateTime,
-    ForeignKey,
-    Index,
-    LargeBinary,
-    String,
-    Text,
-    TypeDecorator,
-    func,
-    text,
-)
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
-
-
-class PointGeometry(TypeDecorator):
-    """``geometry(Point, 4326)`` en PostgreSQL; binario inerte en otros dialectos.
-
-    Los tests unitarios crean el metadata completo sobre SQLite en memoria; el
-    tipo ``Geometry`` de GeoAlchemy2 exigiría SpatiaLite ahí. Este decorador
-    entrega el tipo real sólo bajo PostgreSQL (el único dialecto de producción;
-    las migraciones reales declaran ``Geometry`` a mano) y un BLOB neutro en el
-    resto, donde la columna nunca se usa.
-    """
-
-    impl = LargeBinary
-    cache_ok = True
-
-    def load_dialect_impl(self, dialect):  # type: ignore[override]
-        if dialect.name == "postgresql":
-            return dialect.type_descriptor(
-                Geometry(geometry_type="POINT", srid=4326, spatial_index=False)
-            )
-        return dialect.type_descriptor(LargeBinary())
+from .geometry import PointGeometry
 
 
 class UserAddress(Base):

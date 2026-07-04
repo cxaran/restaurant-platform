@@ -47,6 +47,7 @@ BACKEND_CANONICAL_TEST_MODULES = (
     "backend.tests.test_deliveries",
     "backend.tests.test_finances",
     "backend.tests.test_credits",
+    "backend.tests.test_storefront",
 )
 
 

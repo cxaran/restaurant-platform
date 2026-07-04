@@ -48,6 +48,15 @@ from .profiles import CustomerProfile, StaffProfile
 from .setup import PlatformSetup
 from .shipping import DeliveryZone, ShippingRateRule
 from .stored_file import StoredFile
+from .storefront import (
+    StorefrontLayoutRevision,
+    StorefrontPage,
+    StorefrontPageRevision,
+    StorefrontPageSection,
+    StorefrontSectionMedia,
+    StorefrontSettings,
+    StorefrontThemeRevision,
+)
 from .system_settings import SystemSettings
 from .user import User, Role, UserRole, RoleAccess
 from .user_identity import UserIdentity
@@ -100,6 +109,13 @@ __all__ = [
     "ShippingRateRule",
     "StaffProfile",
     "StoredFile",
+    "StorefrontLayoutRevision",
+    "StorefrontPage",
+    "StorefrontPageRevision",
+    "StorefrontPageSection",
+    "StorefrontSectionMedia",
+    "StorefrontSettings",
+    "StorefrontThemeRevision",
     "SystemSettings",
     "TicketPrintLog",
     "User",

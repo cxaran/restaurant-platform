@@ -43,6 +43,7 @@ from backend.app.security.groups.payments import PaymentPermissions, TicketPermi
 from backend.app.security.groups.permissions import PermissionPermissions  # noqa: E402
 from backend.app.security.groups.roles import RolePermissions  # noqa: E402
 from backend.app.security.groups.shipping import ShippingPermissions  # noqa: E402
+from backend.app.security.groups.storefront import StorefrontPermissions  # noqa: E402
 from backend.app.security.groups.system_settings import SystemSettingsPermissions  # noqa: E402
 from backend.app.security.groups.users import UserPermissions  # noqa: E402
 
@@ -68,6 +69,7 @@ class SecurityCatalogTest(unittest.TestCase):
                 DeliveryPermissions,
                 FinancePermissions,
                 CreditPermissions,
+                StorefrontPermissions,
             ],
         )
 
@@ -125,6 +127,14 @@ class SecurityCatalogTest(unittest.TestCase):
                 "finances:void",
                 "credits:read_all",
                 "credits:manual_adjust",
+                "storefront:read_draft",
+                "storefront:edit",
+                "storefront:manage_media",
+                "storefront:manage_theme",
+                "storefront:preview",
+                "storefront:publish",
+                "storefront:rollback",
+                "storefront:manage_navigation",
             ],
         )
 

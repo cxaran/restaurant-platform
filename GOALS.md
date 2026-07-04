@@ -5,6 +5,23 @@
 > conflicto. Ninguna fase puede declararse terminada si contradice ese documento.
 > El estado factual de avance se lleva en `docs/release-candidate-plan.md`.
 
+## Estado factual (cierre RC — 2026-07-04)
+
+Las fases 0–9 de este roadmap están **implementadas y validadas** con la evidencia exigida
+por el spec: suite backend 599/0 (también contra PostgreSQL real), frontend canónico verde,
+migraciones reales en base virgen y reversibles, concurrencia con dos sesiones PG (5
+carreras), `check:api` contra backend vivo sin drift, E2E integral HTTP (49 pasos), spec
+Playwright A–G (8/8) sobre el stack Docker aislado, validación por roles/viewports con
+Chrome DevTools MCP y revisión visual 4/5 contra el handoff con P0/P1 corregidos.
+**Estado por fase y comandos:** `docs/release-candidate-plan.md` ·
+**detalle:** `docs/implementation-completion-report.md`,
+`docs/browser-e2e-validation-report.md`, `docs/tony-tony-visual-fidelity-review.md`.
+**Decisión ajustada durante el cierre (documentada en decisions):** H10 — la venta
+`counter/counter` aprobada y totalmente pagada SÍ se completa al verificar el pago (única
+auto-transición; reversible); los canales operativos nunca se auto-completan. Riesgos
+restantes: sección de riesgos del implementation report (brand_primary por contrato,
+política de borrador único al cancelar programación, notificaciones a broker).
+
 **Proyecto:** restaurant-platform / Tony-Tony  
 **Estado:** instrucciones de producto y ejecución consolidadas.  
 **Objetivo:** cerrar el flujo de compra, operación diaria, códigos de descuento simples y la validación integral sin convertir el proyecto en un motor de promociones ni duplicar reglas de backend.

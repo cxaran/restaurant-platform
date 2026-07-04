@@ -9,16 +9,23 @@ en `docs/implementation-completion-report.md` o en los reportes de validación).
 
 | Etapa | Planeado | Implementado | Unit | Integración | Browser/E2E | Visual | Commit | Riesgo restante |
 |---|---|---|---|---|---|---|---|---|
-| 0. Baseline y documentación | ☑ | ☑ | — | — | — | — | ☐ | — |
-| 1. Configurador de producto | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
-| 2. Canje íntegro (money XOR credits) | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
-| 3. /cuenta pública | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
-| 4. Pagos vs fulfillment + panel | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
-| 5. Códigos de descuento fijo | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
-| 6. Storefront completo | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
-| 7. Perfiles/registry/expiración/notif./reportes | ☑ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | |
-| 8. Pruebas reales (migraciones/concurrencia/E2E) | ☑ | ☐ | ☐ | ☐ | ☐ | — | ☐ | |
-| 9. Revisión visual y browser MCP | ☑ | ☐ | — | — | ☐ | ☐ | ☐ | |
+| 0. Baseline y documentación | ☑ | ☑ | — | — | — | — | ☑ `201c3d3` | — |
+| 1. Configurador de producto | ☑ | ☑ | ☑ 19 tests | ☐ | ☐ | ☐ | ☑ `4f4ed29` | validar E2E/visual |
+| 2. Canje íntegro (money XOR credits) | ☑ | ☑ (`dee91bb` backend, `210a13f` frontend) | ☑ | ☑ migración PostGIS | ☐ | ☐ | ☑ | validar E2E |
+| 3. /cuenta pública | ☑ | ☑ (`210a13f`) | ☑ | ☐ | ☐ | ☐ | ☑ | validar E2E/visual |
+| 4. Pagos vs fulfillment + panel | ☑ | ☑ (`ebbeeef` backend, `6d65024` panel) | ☑ | ☑ migración PostGIS | ☐ | ☐ | ☑ | validar E2E |
+| 5. Códigos de descuento fijo | ☑ | ☑ (`d81c…` backend 27 tests, `008b7e2` UI) | ☑ | ☑ migración PostGIS | ☐ | ☐ | ☑ | validar E2E |
+| 6. Storefront completo | ☑ | ☑ (`3c98b4c` backend + frontend final) | ☑ | ☑ migración PostGIS | ☑ Playwright F | ☑ | ☑ | brand_primary por contrato (riesgo doc.) |
+| 7. Perfiles/registry/expiración/notif./reportes | ☑ | ☑ (backend + navegación/reportes frontend) | ☑ (suite 599/0) | ☑ | ☑ (nav dinámica verificada) | ☑ | ☑ | notif. a broker (futuro) |
+| 8. Pruebas reales (migraciones/concurrencia/E2E) | ☑ | ☑ | ☑ suites SQLite y PG | ☑ BD virgen + 5 carreras PG + check:api vivo + E2E integral 49/49 | ☑ Playwright A–G 8/8 | — | ☑ (`b78c6bf`+spec) | — |
+| 9. Revisión visual y browser MCP | ☑ | ☑ | — | — | ☑ MCP 5 roles × 3 viewports | ☑ 4/5, P0/P1 corregidos | ☑ | 2×P3 documentados |
+
+## Cierre
+
+**Release Candidate: criterios de la sección 14 del spec cumplidos** (2026-07-04). Stack
+Docker aislado levantado y validado; migraciones reales; check:api vivo sin drift; suites
+verdes; concurrencia PG; Playwright A–G; Chrome DevTools MCP por roles y viewports;
+fidelidad ≥4/5 sin P0/P1; reportes Markdown reales; Git limpio con commits por concern.
 
 ## Estado de partida por etapa (hallazgos del inventario)
 

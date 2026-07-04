@@ -1026,6 +1026,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/courier/deliveries/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Active Deliveries
+         * @description Entregas VIGENTES del propio repartidor (sobrevive recargas del panel).
+         */
+        get: operations["my_active_deliveries_api_v1_courier_deliveries_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/courier/availability": {
         parameters: {
             query?: never;
@@ -2295,6 +2315,27 @@ export interface paths {
          */
         post: operations["publish_page_api_v1_storefront_pages__page_key__publish_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storefront/pages/{page_key}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schedule Page
+         * @description Programa la publicación del borrador; la ejecuta la tarea Taskiq.
+         */
+        post: operations["schedule_page_api_v1_storefront_pages__page_key__schedule_post"];
+        /** Unschedule Page */
+        delete: operations["unschedule_page_api_v1_storefront_pages__page_key__schedule_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4254,6 +4295,36 @@ export interface components {
             is_active?: boolean | null;
         };
         /**
+         * MyActiveDelivery
+         * @description Entrega vigente del propio repartidor: la cola + el estado de SU asignación.
+         */
+        MyActiveDelivery: {
+            /**
+             * Order Id
+             * Format: uuid
+             */
+            order_id: string;
+            /**
+             * Order Delivery Id
+             * Format: uuid
+             */
+            order_delivery_id: string;
+            /** Public Code */
+            public_code: string;
+            /** Customer Name */
+            customer_name?: string | null;
+            /** Address Summary */
+            address_summary: string;
+            /** Zone Name */
+            zone_name?: string | null;
+            /** Collection Label */
+            collection_label: string;
+            /** Ready Since */
+            ready_since?: string | null;
+            /** Assignment Status */
+            assignment_status: string;
+        };
+        /**
          * MyOrderRead
          * @description Vista del CLIENTE: etiqueta pública, sin datos internos (§58.2).
          */
@@ -5682,6 +5753,14 @@ export interface components {
             description?: string | null;
             /** Activo */
             is_active?: boolean | null;
+        };
+        /** ScheduleRequest */
+        ScheduleRequest: {
+            /**
+             * Publish At
+             * Format: date-time
+             */
+            publish_at: string;
         };
         /** SearchCapability */
         SearchCapability: {
@@ -9127,6 +9206,37 @@ export interface operations {
             };
         };
     };
+    my_active_deliveries_api_v1_courier_deliveries_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyActiveDelivery"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_availability_api_v1_courier_availability_post: {
         parameters: {
             query?: never;
@@ -12131,6 +12241,76 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RevisionRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_page_api_v1_storefront_pages__page_key__schedule_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_key: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unschedule_page_api_v1_storefront_pages__page_key__schedule_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_key: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

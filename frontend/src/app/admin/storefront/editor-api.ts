@@ -62,6 +62,8 @@ export type LayoutConfig = {
   version_number: number | null;
   header_config: Record<string, unknown>;
   footer_config: Record<string, unknown>;
+  header_schema?: JsonSchema;
+  footer_schema?: JsonSchema;
 };
 
 export type ThemePreset = { name: string; tokens: Record<string, unknown>; is_default: boolean };
@@ -155,4 +157,15 @@ export const applyTheme = (preset: string, accent?: string) =>
   browserApi("/api/v1/storefront/theme", {
     method: "POST",
     body: { preset, ...(accent ? { accent } : {}) },
+  });
+
+export const schedulePublish = (pageKey: string, publishAt: string) =>
+  browserApi(`/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/schedule`, {
+    method: "POST",
+    body: { publish_at: publishAt },
+  });
+
+export const unschedulePublish = (pageKey: string) =>
+  browserApi(`/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/schedule`, {
+    method: "DELETE",
   });

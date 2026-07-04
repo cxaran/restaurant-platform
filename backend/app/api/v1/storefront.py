@@ -27,6 +27,9 @@ from backend.app.security.groups.storefront import StorefrontPermissions
 from backend.app.services.config_audit import record_config_change
 from backend.app.services.file_service import get_active_file
 from backend.app.services.storefront_service import (
+    publish_due_scheduled,
+    schedule_draft,
+    unschedule_revision,
     StorefrontRuleError,
     active_layout,
     get_or_create_draft,
@@ -40,7 +43,12 @@ from backend.app.services.storefront_service import (
     templates_catalog,
 )
 from backend.app.storefront.presets import DEFAULT_PRESET, THEME_PRESETS, build_tokens
-from backend.app.storefront.templates import TemplateValidationError, validate_section_configs
+from backend.app.storefront.templates import (
+    FooterConfig,
+    HeaderConfig,
+    TemplateValidationError,
+    validate_section_configs,
+)
 from backend.app.utils.utc_now import utc_now
 
 router = APIRouter(tags=["storefront"])
@@ -290,11 +298,19 @@ def read_layout(
 ) -> dict:
     layout = active_layout(session)
     if layout is None:
-        return {"version_number": None, "header_config": {}, "footer_config": {}}
+        return {
+            "version_number": None,
+            "header_config": {},
+            "footer_config": {},
+            "header_schema": HeaderConfig.model_json_schema(),
+            "footer_schema": FooterConfig.model_json_schema(),
+        }
     return {
         "version_number": layout.version_number,
         "header_config": layout.header_config,
         "footer_config": layout.footer_config,
+        "header_schema": HeaderConfig.model_json_schema(),
+        "footer_schema": FooterConfig.model_json_schema(),
     }
 
 
@@ -542,6 +558,58 @@ def publish_page(
     commit_or_conflict(session, "No fue posible publicar la página.")
     session.refresh(revision)
     return _revision_read(revision)
+
+
+class ScheduleRequest(ApiWriteSchema):
+    publish_at: datetime
+
+
+@router.post("/storefront/pages/{page_key}/schedule")
+def schedule_page(
+    page_key: str,
+    payload: ScheduleRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.PUBLISH.requiere,
+) -> dict:
+    """Programa la publicación del borrador; la ejecuta la tarea Taskiq."""
+    page = _page_or_404(session, page_key)
+    try:
+        revision = schedule_draft(
+            session, page, publish_at=payload.publish_at, actor_id=current_user.id
+        )
+    except StorefrontRuleError as exc:
+        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
+    commit_or_conflict(session, "No fue posible programar la publicación.")
+    return {
+        "revision_number": revision.revision_number,
+        "status": revision.status,
+        "scheduled_publish_at": revision.scheduled_publish_at.isoformat()
+        if revision.scheduled_publish_at
+        else None,
+    }
+
+
+@router.delete("/storefront/pages/{page_key}/schedule", status_code=status.HTTP_204_NO_CONTENT)
+def unschedule_page(
+    page_key: str,
+    session: SessionDep,
+    _: StorefrontPermissions.PUBLISH.requiere,
+) -> None:
+    page = _page_or_404(session, page_key)
+    revision = session.exec(
+        select(StorefrontPageRevision).where(
+            StorefrontPageRevision.page_id == page.id,
+            StorefrontPageRevision.status == "scheduled",
+        )
+    ).first()
+    if revision is None:
+        api_error(status.HTTP_404_NOT_FOUND, "no_programada", "No hay publicación programada.")
+    try:
+        unschedule_revision(session, revision)
+    except StorefrontRuleError as exc:
+        api_error(status.HTTP_409_CONFLICT, exc.code, exc.message)
+    commit_or_conflict(session, "No fue posible cancelar la programación.")
 
 
 @router.get("/storefront/pages/{page_key}/preview")

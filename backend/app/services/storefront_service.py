@@ -162,7 +162,7 @@ def publish_revision(
     """Publica (o re-publica: rollback §48). La anterior se archiva, no se pierde."""
     if revision.page_id != page.id:
         raise StorefrontRuleError("revision_ajena", "La revisión no pertenece a la página.")
-    if revision.status not in ("draft", "archived"):
+    if revision.status not in ("draft", "scheduled", "archived"):
         raise StorefrontRuleError(
             "revision_no_publicable", "Sólo un borrador o una versión anterior se publican."
         )
@@ -246,6 +246,68 @@ def public_page_payload(session: Session, page_key: str) -> dict:
         ),
         "sections": sections,
     }
+
+
+def schedule_draft(
+    session: Session,
+    page: StorefrontPage,
+    *,
+    publish_at,
+    actor_id: Optional[uuid.UUID],
+) -> StorefrontPageRevision:
+    """Programa el BORRADOR para publicarse (draft → scheduled). Se valida YA:
+    una revisión inválida no puede quedar en espera de fallar a medianoche."""
+    draft = get_or_create_draft(session, page, created_by=actor_id)
+    validate_revision(draft)
+    if publish_at <= utc_now():
+        raise StorefrontRuleError(
+            "fecha_invalida", "La fecha de publicación debe ser futura."
+        )
+    draft.status = "scheduled"
+    draft.scheduled_publish_at = publish_at
+    draft.updated_at = utc_now()
+    session.add(draft)
+    session.flush()
+    return draft
+
+
+def unschedule_revision(session: Session, revision: StorefrontPageRevision) -> None:
+    if revision.status != "scheduled":
+        raise StorefrontRuleError("no_programada", "La revisión no está programada.")
+    revision.status = "draft"
+    revision.scheduled_publish_at = None
+    revision.updated_at = utc_now()
+    session.add(revision)
+    session.flush()
+
+
+def publish_due_scheduled(session: Session) -> int:
+    """Publica las revisiones programadas vencidas (la llama la tarea Taskiq).
+
+    Si una revisión ya no valida (el catálogo cambió), vuelve a borrador en vez
+    de reintentar por siempre: el editor la ve y decide.
+    """
+    due = session.exec(
+        select(StorefrontPageRevision).where(
+            StorefrontPageRevision.status == "scheduled",
+            StorefrontPageRevision.scheduled_publish_at <= utc_now(),  # pyright: ignore[reportArgumentType]
+        )
+    ).all()
+    published = 0
+    for revision in due:
+        page = session.get(StorefrontPage, revision.page_id)
+        if page is None:
+            continue
+        try:
+            publish_revision(session, page, revision, actor_id=revision.created_by)
+            revision.scheduled_publish_at = None
+            published += 1
+        except StorefrontRuleError:
+            revision.status = "draft"
+            revision.updated_at = utc_now()
+            session.add(revision)
+    session.flush()
+    return published
 
 
 def serialize_section_media(section: StorefrontPageSection) -> dict:

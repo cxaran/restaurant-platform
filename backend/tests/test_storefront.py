@@ -36,7 +36,7 @@ os.environ.update(DEV_ENV)
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
-from sqlmodel import Session  # noqa: E402
+from sqlmodel import Session, select  # noqa: E402
 
 from backend.app.core.database import get_db  # noqa: E402
 from backend.app.main import app  # noqa: E402
@@ -448,3 +448,82 @@ class Phase1Test(unittest.TestCase):
         hero = next(t for t in templates if t["key"] == "storefront.hero")
         self.assertIn("properties", hero["content_schema"])
         self.assertIn("slides", hero["content_schema"]["properties"])
+
+
+class ScheduledPublishTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = _engine()
+        with Session(self.engine) as session:
+            session.add(StorefrontPage(page_key="home", slug="/", page_type="storefront_home"))
+            session.commit()
+
+    def test_schedule_validates_and_tick_publishes_due(self) -> None:
+        from datetime import timedelta
+
+        from backend.app.services.storefront_service import (
+            get_or_create_draft,
+            publish_due_scheduled,
+            schedule_draft,
+        )
+        from backend.app.utils.utc_now import utc_now
+
+        with Session(self.engine) as session:
+            page = session.exec(select(StorefrontPage)).one()
+            draft = get_or_create_draft(session, page, created_by=None)
+            session.add(
+                StorefrontPageSection(
+                    page_revision_id=draft.id, template_key="storefront.hero",
+                    template_version=1, sort_order=10, content_config=HERO_CONTENT,
+                )
+            )
+            session.flush()
+            session.refresh(draft)
+
+            # Fecha pasada -> rechazada; futura -> queda scheduled.
+            with self.assertRaises(StorefrontRuleError):
+                schedule_draft(session, page, publish_at=utc_now() - timedelta(minutes=1),
+                               actor_id=None)
+            scheduled = schedule_draft(
+                session, page, publish_at=utc_now() + timedelta(minutes=5), actor_id=None
+            )
+            session.commit()
+            self.assertEqual(scheduled.status, "scheduled")
+
+            # Aún no vence: el tick no publica nada.
+            self.assertEqual(publish_due_scheduled(session), 0)
+
+            # Vencida: el tick la publica y el puntero de la página apunta a ella.
+            scheduled.scheduled_publish_at = utc_now() - timedelta(seconds=1)
+            session.add(scheduled)
+            session.flush()
+            self.assertEqual(publish_due_scheduled(session), 1)
+            session.commit()
+            session.refresh(page)
+            self.assertEqual(page.published_revision_id, scheduled.id)
+            self.assertEqual(scheduled.status, "published")
+
+
+class LayoutSchemaExposureTest(unittest.TestCase):
+    def test_layout_endpoint_exposes_contract_schemas(self) -> None:
+        engine = _engine()
+
+        def override_db():
+            with Session(engine) as session:
+                yield session
+
+        from backend.app.auth.auth_dependencies import get_current_user
+        from backend.app.core.database import get_db
+        from backend.app.schemas.user import SessionUser
+
+        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_current_user] = lambda: SessionUser(
+            id=uuid.uuid4(), name="A", last_name="B", email="a@b.mx",
+            permissions={"storefront:read_draft"},
+        )
+        try:
+            client = TestClient(app)
+            body = client.get("/api/v1/storefront/layout").json()
+            self.assertIn("nav_links", body["header_schema"]["properties"])
+            self.assertIn("note", body["footer_schema"]["properties"])
+        finally:
+            app.dependency_overrides.clear()

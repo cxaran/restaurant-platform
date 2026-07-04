@@ -2,9 +2,8 @@
 
 // Vista del repartidor (§19), mobile-first. Solo consume la cola que el
 // backend YA filtró para este usuario; la privacidad y las reglas de
-// asignación única viven en el servidor. Nota: no existe aún un GET de "mis
-// entregas activas" — la entrega tomada se sigue en estado local y, si se
-// recarga, se retoma desde la cola/el pedido (gap documentado).
+// asignación única viven en el servidor. La entrega vigente se recarga desde
+// GET /courier/deliveries/mine: sobrevive recargas del navegador.
 
 import { useEffect, useState } from "react";
 
@@ -45,13 +44,22 @@ export function RepartoView() {
     let active = true;
     (async () => {
       try {
-        const [queueData, summaryData] = await Promise.all([
+        const [queueData, summaryData, mine] = await Promise.all([
           browserApi<QueueItem[]>("/api/v1/courier/available-orders"),
           browserApi<Summary>("/api/v1/courier/summary"),
+          browserApi<(QueueItem & { assignment_status: string })[]>(
+            "/api/v1/courier/deliveries/mine",
+          ),
         ]);
         if (!active) return;
         setQueue(queueData);
         setSummary(summaryData);
+        const active_ = mine[0];
+        setCurrent(
+          active_
+            ? { ...active_, status: active_.assignment_status === "in_progress" ? "in_progress" : "assigned" }
+            : null,
+        );
         setError(null);
       } catch (err) {
         if (!active) return;

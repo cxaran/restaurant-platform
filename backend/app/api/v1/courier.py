@@ -17,6 +17,7 @@ from backend.app.core.database import SessionDep
 from backend.app.models.deliveries import DeliveryAssignment
 from backend.app.models.profiles import StaffProfile
 from backend.app.schemas.delivery import (
+    MyActiveDelivery,
     AssignCourierRequest,
     AssignmentRead,
     AvailableDeliveryItem,
@@ -101,6 +102,48 @@ def list_available_orders(
                 zone_name=shipping.delivery_zone_name_snapshot if shipping else None,
                 collection_label=collection_instruction(session, order).label,
                 ready_since=order.updated_at,
+            )
+        )
+    return items
+
+
+@router.get("/courier/deliveries/mine", response_model=list[MyActiveDelivery])
+def my_active_deliveries(
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: DeliveryPermissions.SELF_ASSIGN.requiere,
+) -> list[MyActiveDelivery]:
+    """Entregas VIGENTES del propio repartidor (sobrevive recargas del panel)."""
+    from backend.app.models.orders import Order, OrderDelivery
+
+    rows = session.exec(
+        select(DeliveryAssignment, OrderDelivery, Order)
+        .join(OrderDelivery, OrderDelivery.id == DeliveryAssignment.order_delivery_id)  # pyright: ignore[reportArgumentType]
+        .join(Order, Order.id == OrderDelivery.order_id)  # pyright: ignore[reportArgumentType]
+        .where(
+            DeliveryAssignment.courier_user_id == current_user.id,
+            DeliveryAssignment.is_current == True,  # noqa: E712
+            DeliveryAssignment.status != "completed",  # pyright: ignore[reportArgumentType]
+        )
+        .order_by(DeliveryAssignment.assigned_at)  # pyright: ignore[reportArgumentType]
+    ).all()
+    items: list[MyActiveDelivery] = []
+    for assignment, delivery, order in rows:
+        address = delivery.street
+        if delivery.neighborhood:
+            address += f", {delivery.neighborhood}"
+        shipping = order.shipping
+        items.append(
+            MyActiveDelivery(
+                order_id=order.id,
+                order_delivery_id=delivery.id,
+                public_code=order.public_code,
+                customer_name=order.customer_name_snapshot,
+                address_summary=address,
+                zone_name=shipping.delivery_zone_name_snapshot if shipping else None,
+                collection_label=collection_instruction(session, order).label,
+                ready_since=order.updated_at,
+                assignment_status=assignment.status,
             )
         )
     return items

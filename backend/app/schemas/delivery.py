@@ -24,6 +24,12 @@ class AvailableDeliveryItem(ApiReadSchema):
     ready_since: Optional[datetime] = None
 
 
+class MyActiveDelivery(AvailableDeliveryItem):
+    """Entrega vigente del propio repartidor: la cola + el estado de SU asignación."""
+
+    assignment_status: str
+
+
 class AssignmentRead(ApiReadSchema):
     id: UUID
     order_delivery_id: UUID

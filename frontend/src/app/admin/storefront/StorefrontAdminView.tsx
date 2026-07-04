@@ -25,6 +25,8 @@ import {
   patchDraftMeta,
   publishPage,
   putLayout,
+  schedulePublish,
+  unschedulePublish,
   sortSections,
   type DraftRevision,
   type DraftSection,
@@ -44,9 +46,7 @@ const btn: React.CSSProperties = {
 
 // Solo queda fuera lo que el backend aún no ofrece:
 const STILL_PENDING = [
-  "Programar publicación: scheduled_publish_at existe pero no hay job backend que publique.",
   "Enlace de preview firmado para compartir: el preview requiere permiso administrativo.",
-  "GET de mis entregas activas del repartidor (no afecta a este editor).",
 ];
 
 type PreviewSection = DraftSection & { media?: MediaSlots };
@@ -88,6 +88,7 @@ export function StorefrontAdminView({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tick, setTick] = useState(0);
+  const [scheduleAt, setScheduleAt] = useState("");
   const refresh = useCallback(() => setTick((value) => value + 1), []);
 
   useEffect(() => {
@@ -215,14 +216,44 @@ export function StorefrontAdminView({
           </button>
         ))}
         {canPublish ? (
-          <button
-            type="button"
-            style={{ ...btn, marginLeft: "auto" }}
-            disabled={busy}
-            onClick={() => void run(() => publishPage(pageKey), "Revisión publicada: el sitio ya la muestra.")}
-          >
-            Publicar borrador
-          </button>
+          <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="datetime-local"
+              aria-label="Programar publicación"
+              value={scheduleAt}
+              onChange={(event) => setScheduleAt(event.target.value)}
+              style={{ padding: "6px 8px", borderRadius: 8 }}
+            />
+            <button
+              type="button"
+              style={btn}
+              disabled={busy || !scheduleAt}
+              onClick={() =>
+                void run(
+                  () => schedulePublish(pageKey, `${scheduleAt}:00`),
+                  "Publicación programada: la ejecutará el servidor a la hora indicada.",
+                )
+              }
+            >
+              Programar
+            </button>
+            <button
+              type="button"
+              style={btn}
+              disabled={busy}
+              onClick={() => void run(() => unschedulePublish(pageKey), "Programación cancelada.")}
+            >
+              Cancelar prog.
+            </button>
+            <button
+              type="button"
+              style={btn}
+              disabled={busy}
+              onClick={() => void run(() => publishPage(pageKey), "Revisión publicada: el sitio ya la muestra.")}
+            >
+              Publicar ahora
+            </button>
+          </span>
         ) : null}
       </div>
 
@@ -407,9 +438,8 @@ export function StorefrontAdminView({
   );
 }
 
-// Layout: contratos HeaderConfig/FooterConfig del backend. Sus JSON Schema no
-// se exponen aún vía API (solo los de plantillas): este schema espejo mínimo
-// está documentado como deuda — si el contrato cambia, el backend rechaza.
+// Layout: el backend YA expone los JSON Schema de HeaderConfig/FooterConfig en
+// GET /storefront/layout; el espejo local queda solo como fallback defensivo.
 const HEADER_SCHEMA = {
   type: "object",
   properties: {
@@ -462,11 +492,11 @@ function LayoutPanel({
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
       <fieldset style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: 12 }}>
         <legend style={{ fontWeight: 800, fontSize: 13 }}>Header · navegación</legend>
-        <SchemaForm schema={HEADER_SCHEMA as never} value={header} onChange={setHeader} />
+        <SchemaForm schema={(layout.header_schema ?? HEADER_SCHEMA) as never} value={header} onChange={setHeader} />
       </fieldset>
       <fieldset style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: 12 }}>
         <legend style={{ fontWeight: 800, fontSize: 13 }}>Footer</legend>
-        <SchemaForm schema={FOOTER_SCHEMA as never} value={footer} onChange={setFooter} />
+        <SchemaForm schema={(layout.footer_schema ?? FOOTER_SCHEMA) as never} value={footer} onChange={setFooter} />
       </fieldset>
       <div>
         <button type="button" style={btn} disabled={busy} onClick={() => onSave(header, footer)}>

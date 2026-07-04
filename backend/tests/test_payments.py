@@ -175,6 +175,13 @@ class PaymentsRoutesTest(unittest.TestCase):
         self.assertEqual(verified.status_code, 200, verified.text)
         self.assertEqual(verified.json()["status"], "paid")
 
+        # H10: la venta de MOSTRADOR ya entregada se completa al verificar.
+        with _As("orders:read"):
+            order_after = self.client.get(
+                f"/api/v1/orders/{body['order']['id']}"
+            ).json()
+        self.assertEqual(order_after["status"], "completed")
+
         with _As("payments:read"):
             payments = self.client.get(
                 f"/api/v1/orders/{body['order']['id']}/payments"

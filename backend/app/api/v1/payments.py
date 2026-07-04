@@ -197,6 +197,24 @@ def verify_payment(
     except PaymentRuleError as exc:
         api_error(status.HTTP_409_CONFLICT, exc.code, exc.message)
 
+    # H10 (decisión de producto): una venta de MOSTRADOR ya entregada que solo
+    # esperaba la verificación de su pago se COMPLETA al verificar — no queda
+    # «approved» eterna. Pedidos web/teléfono siguen su ciclo operativo normal.
+    if (
+        payload.approve
+        and order.source == "counter"
+        and order.fulfillment_type == "counter"
+        and order.status == "approved"
+        and order.payment_status == "paid"
+    ):
+        from backend.app.services.order_service import transition_order
+
+        transition_order(
+            session, order, "completed",
+            actor_id=current_user.id,
+            internal_note="Venta de mostrador completada al verificar el pago.",
+        )
+
     commit_or_conflict(session, "No fue posible actualizar el pago.")
     session.refresh(payment)
     return _payment_read(payment)

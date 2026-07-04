@@ -47,18 +47,15 @@ export function StorefrontHeader({
         zIndex: 30,
       }}
     >
-      <div
-        className="sf-container"
-        style={{ display: "flex", alignItems: "center", gap: 18, paddingBlock: 12 }}
-      >
-        <Link href="/" style={{ color: "inherit", textDecoration: "none", minWidth: 0 }}>
+      <div className="sf-container sf-header-row">
+        <Link
+          href="/"
+          className="sf-header-brand"
+          style={{ color: "inherit", textDecoration: "none", minWidth: 0 }}
+        >
           <BrandLockup business={business} logoUrl={logoUrl} compact />
         </Link>
-        <nav
-          aria-label="Navegación del sitio"
-          style={{ display: "flex", gap: 16, fontSize: 14, fontWeight: 600, flex: 1 }}
-          className="sf-header-nav"
-        >
+        <nav aria-label="Navegación del sitio" className="sf-header-nav">
           {navLinks.length > 0 ? (
             navLinks.map((link) => (
               <Link

@@ -29,6 +29,50 @@
   }
 }
 
+/* Header público: una fila en desktop; en móvil la navegación baja a una
+   segunda fila para que la marca nunca se encime con los enlaces. */
+.sf-header-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-block: 12px;
+  flex-wrap: wrap;
+}
+
+.sf-header-brand {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sf-header-nav {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 699px) {
+  .sf-header-nav {
+    order: 10;
+    width: 100%;
+    padding-top: 2px;
+  }
+
+  .sf-header-state {
+    display: none;
+  }
+}
+
+@media (min-width: 700px) {
+  .sf-header-brand {
+    flex: 0 1 auto;
+  }
+
+  .sf-header-nav {
+    flex: 1;
+  }
+}
+
 .sf-btn {
   display: inline-flex;
   align-items: center;

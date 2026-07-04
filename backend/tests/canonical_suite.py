@@ -42,6 +42,7 @@ BACKEND_CANONICAL_TEST_MODULES = (
     "backend.tests.test_shipping",
     "backend.tests.test_pricing",
     "backend.tests.test_orders",
+    "backend.tests.test_order_routes",
 )
 
 

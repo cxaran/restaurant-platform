@@ -35,6 +35,7 @@ from backend.app.security.groups.backups import BackupPermissions  # noqa: E402
 from backend.app.security.groups.business import BusinessPermissions  # noqa: E402
 from backend.app.security.groups.catalog import CatalogPermissions  # noqa: E402
 from backend.app.security.groups.files import FilePermissions  # noqa: E402
+from backend.app.security.groups.orders import OrderPermissions  # noqa: E402
 from backend.app.security.groups.permissions import PermissionPermissions  # noqa: E402
 from backend.app.security.groups.roles import RolePermissions  # noqa: E402
 from backend.app.security.groups.shipping import ShippingPermissions  # noqa: E402
@@ -57,6 +58,7 @@ class SecurityCatalogTest(unittest.TestCase):
                 BusinessPermissions,
                 CatalogPermissions,
                 ShippingPermissions,
+                OrderPermissions,
             ],
         )
 
@@ -93,6 +95,13 @@ class SecurityCatalogTest(unittest.TestCase):
                 "catalog:sort",
                 "shipping:read",
                 "shipping:manage",
+                "orders:read",
+                "orders:capture",
+                "orders:transition",
+                "orders:approve",
+                "orders:cancel",
+                "orders:adjust_shipping",
+                "orders:adjust",
             ],
         )
 

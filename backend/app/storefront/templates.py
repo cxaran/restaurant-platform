@@ -139,6 +139,46 @@ class SectionBehavior(_Config):
     show_on_desktop: bool = True
 
 
+# --- Fase 1 restante: plantillas §36.1, §35.2 y §35.3 ---
+
+class CategoriesContent(_Config):
+    title: Optional[str] = Field(default=None, max_length=120)
+
+
+class CategoriesBinding(_Config):
+    # §36.1: SIEMPRE categorías reales visibles del catálogo; sin listas manuales.
+    max_items: int = Field(default=8, ge=1, le=12)
+
+
+class CreditsBannerContent(_Config):
+    # §35.2: invita al programa de créditos; los números salen del backend.
+    title: str = Field(min_length=1, max_length=120)
+    description: Optional[str] = Field(default=None, max_length=300)
+    cta: Optional[Cta] = None
+
+
+class DeliveryBannerContent(_Config):
+    # §35.3: el umbral de envío gratis es DERIVADO (data), nunca texto libre.
+    title: Optional[str] = Field(default=None, max_length=120)
+    description: Optional[str] = Field(default=None, max_length=300)
+
+
+# ---------------------------------------------------------------------------
+# Layout (§44): header/footer con contratos propios, versionados aparte
+# ---------------------------------------------------------------------------
+
+class HeaderConfig(_Config):
+    nav_links: list[Cta] = Field(default_factory=list, max_length=6)
+    show_status_indicator: bool = True
+    show_cart: bool = True
+
+
+class FooterConfig(_Config):
+    show_phones: bool = True
+    note: Optional[str] = Field(default=None, max_length=200)
+    social_links: list[Cta] = Field(default_factory=list, max_length=6)
+
+
 @dataclass(frozen=True)
 class TemplateDef:
     key: str
@@ -207,6 +247,33 @@ TEMPLATES: dict[str, TemplateDef] = {
             data_binding_model=_Empty,
             behavior_model=SectionBehavior,
         ),
+        TemplateDef(
+            key="storefront.catalog.categories",
+            version=1,
+            label="Grilla de categorías",
+            content_model=CategoriesContent,
+            style_model=_Empty,
+            data_binding_model=CategoriesBinding,
+            behavior_model=SectionBehavior,
+        ),
+        TemplateDef(
+            key="storefront.banner.credits",
+            version=1,
+            label="Banner del programa de créditos",
+            content_model=CreditsBannerContent,
+            style_model=PromoBannerStyle,
+            data_binding_model=_Empty,
+            behavior_model=SectionBehavior,
+        ),
+        TemplateDef(
+            key="storefront.banner.delivery",
+            version=1,
+            label="Banner de servicio a domicilio",
+            content_model=DeliveryBannerContent,
+            style_model=PromoBannerStyle,
+            data_binding_model=_Empty,
+            behavior_model=SectionBehavior,
+        ),
     )
 }
 
@@ -249,20 +316,34 @@ def validate_section_configs(
     except Exception as exc:  # errores Pydantic → mensaje estable
         raise TemplateValidationError("configuracion_invalida", str(exc))
 
-    # Validación semántica de CTAs (§50): target coherente con el tipo.
-    for field_name in ("slides",):
-        slides = getattr(parsed_content, field_name, None)
-        if slides:
-            for slide in slides:
-                for cta in (slide.primary_cta, slide.secondary_cta):
-                    if cta is not None:
-                        try:
-                            cta.validate_by_type()
-                        except ValueError as exc:
-                            raise TemplateValidationError("enlace_invalido", str(exc))
-    cta = getattr(parsed_content, "cta", None)
-    if cta is not None:
+    # Validación semántica de CTAs (§50), GENERALIZADA: recorre el modelo
+    # completo buscando instancias Cta — una plantilla futura con CTAs en
+    # cualquier estructura queda cubierta sin recordar añadirla aquí.
+    _validate_ctas_recursive(parsed_content)
+
+
+def _validate_ctas_recursive(value: object) -> None:
+    if isinstance(value, Cta):
         try:
-            cta.validate_by_type()
+            value.validate_by_type()
         except ValueError as exc:
             raise TemplateValidationError("enlace_invalido", str(exc))
+        return
+    if isinstance(value, BaseModel):
+        for name in type(value).model_fields:
+            _validate_ctas_recursive(getattr(value, name))
+        return
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            _validate_ctas_recursive(item)
+
+
+def validate_layout_configs(*, header: dict, footer: dict) -> None:
+    """Valida los contratos del layout (§44) con la misma disciplina."""
+    try:
+        parsed_header = HeaderConfig.model_validate(header)
+        parsed_footer = FooterConfig.model_validate(footer)
+    except Exception as exc:
+        raise TemplateValidationError("configuracion_invalida", str(exc))
+    _validate_ctas_recursive(parsed_header)
+    _validate_ctas_recursive(parsed_footer)

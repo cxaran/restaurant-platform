@@ -305,3 +305,146 @@ class StorefrontRoutesTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Phase1Test(unittest.TestCase):
+    """Fase 1 restante: páginas, media por slot, reorder atómico, layout, schemas."""
+
+    def setUp(self) -> None:
+        self.engine = _engine()
+
+        def override_db():
+            with Session(self.engine) as session:
+                yield session
+
+        from backend.app.auth.auth_dependencies import get_current_user
+        from backend.app.core.database import get_db
+        from backend.app.schemas.user import SessionUser
+
+        app.dependency_overrides[get_db] = override_db
+        self._user = SessionUser(
+            id=uuid.uuid4(), name="Ed", last_name="Itor", email="ed@example.com",
+            permissions={
+                "storefront:read_draft", "storefront:edit", "storefront:manage_media",
+                "storefront:publish", "storefront:preview", "storefront:manage_navigation",
+            },
+        )
+        app.dependency_overrides[get_current_user] = lambda: self._user
+        self.client = TestClient(app)
+
+        with Session(self.engine) as session:
+            session.add(StorefrontPage(page_key="home", slug="/", page_type="storefront_home",
+                                       is_system_page=True))
+            from backend.app.models.stored_file import StoredFile
+
+            self.image_id = uuid.uuid4()
+            session.add(
+                StoredFile(
+                    id=self.image_id, kind="image", mime_type="image/png",
+                    original_filename="hero.png", byte_size=10,
+                    sha256="a" * 64, file_content=b"x",
+                )
+            )
+            session.commit()
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
+    def test_pages_listing_media_reorder_and_layout(self) -> None:
+        # Listado real de páginas (sin listas sembradas en frontend).
+        pages = self.client.get("/api/v1/storefront/pages").json()
+        self.assertEqual([p["page_key"] for p in pages], ["home"])
+        self.assertFalse(pages[0]["has_draft"])
+
+        # Borrador con dos secciones.
+        for key, order in (("storefront.hero", 20), ("storefront.banner.credits", 10)):
+            content = (
+                HERO_CONTENT if key == "storefront.hero" else {"title": "Gana créditos"}
+            )
+            created = self.client.post(
+                "/api/v1/storefront/pages/home/draft/sections",
+                json={"template_key": key, "sort_order": order, "content_config": content},
+            )
+            self.assertEqual(created.status_code, 201, created.text)
+        draft = self.client.get("/api/v1/storefront/pages/home/draft").json()
+        ids = [s["id"] for s in draft["sections"]]  # ordenados por sort_order
+
+        # Reorden ATÓMICO: set incompleto → 422; completo → posiciones nuevas.
+        bad = self.client.post(
+            "/api/v1/storefront/pages/home/draft/sections/sort",
+            json={"section_ids": [ids[0]]},
+        )
+        self.assertEqual(bad.status_code, 422)
+        ok = self.client.post(
+            "/api/v1/storefront/pages/home/draft/sections/sort",
+            json={"section_ids": [ids[1], ids[0]]},
+        )
+        self.assertEqual(ok.status_code, 200, ok.text)
+        self.assertEqual([s["id"] for s in ok.json()], [ids[1], ids[0]])
+
+        # Media por slot: sólo imágenes activas; queda en preview y se clona.
+        hero_id = ids[1]  # el hero quedó primero tras el reorden
+        media = self.client.put(
+            f"/api/v1/storefront/sections/{hero_id}/media/main",
+            json={"desktop_file_id": str(self.image_id), "alt_text": "Boneless"},
+        )
+        self.assertEqual(media.status_code, 200, media.text)
+        self.assertEqual(media.json()["main"]["desktop_file_id"], str(self.image_id))
+        preview = self.client.get("/api/v1/storefront/pages/home/preview").json()
+        hero_preview = next(s for s in preview["sections"] if s["template_key"] == "storefront.hero")
+        self.assertIn("main", hero_preview["media"])
+
+        # Publicar → payload público incluye media y el binding del banner delivery.
+        published = self.client.post("/api/v1/storefront/pages/home/publish")
+        self.assertEqual(published.status_code, 200, published.text)
+        with Session(self.engine) as session:
+            from backend.app.models.business import BusinessSettings
+
+            session.add(BusinessSettings(id=1))
+            session.commit()
+        public = self.client.get("/api/v1/public/storefront/home").json()
+        hero_public = next(s for s in public["sections"] if s["template_key"] == "storefront.hero")
+        self.assertEqual(hero_public["media"]["main"]["desktop_file_id"], str(self.image_id))
+
+        # El siguiente borrador CLONA la media publicada.
+        cloned = self.client.get("/api/v1/storefront/pages/home/draft").json()
+        self.assertEqual(cloned["revision_number"], 2)
+        cloned_hero = next(
+            s for s in self.client.get("/api/v1/storefront/pages/home/preview").json()["sections"]
+            if s["template_key"] == "storefront.hero"
+        )
+        self.assertIn("main", cloned_hero["media"])
+
+        # Layout: CTA peligroso rechazado; válido publica y sale en público.
+        bad_layout = self.client.put(
+            "/api/v1/storefront/layout",
+            json={"header_config": {"nav_links": [
+                {"label": "X", "link_type": "external_https", "target": "javascript:alert(1)"}
+            ]}},
+        )
+        self.assertEqual(bad_layout.status_code, 422)
+        good_layout = self.client.put(
+            "/api/v1/storefront/layout",
+            json={
+                "header_config": {"nav_links": [{"label": "Menú", "link_type": "menu_page"}]},
+                "footer_config": {"note": "Hecho en casa"},
+            },
+        )
+        self.assertEqual(good_layout.status_code, 200, good_layout.text)
+        public2 = self.client.get("/api/v1/public/storefront/home").json()
+        self.assertEqual(
+            public2["layout"]["header"]["nav_links"][0]["label"], "Menú"
+        )
+
+    def test_templates_expose_json_schema_and_new_templates(self) -> None:
+        templates = self.client.get("/api/v1/storefront/templates").json()
+        keys = {t["key"] for t in templates}
+        for expected in (
+            "storefront.catalog.categories",
+            "storefront.banner.credits",
+            "storefront.banner.delivery",
+        ):
+            self.assertIn(expected, keys)
+        hero = next(t for t in templates if t["key"] == "storefront.hero")
+        self.assertIn("properties", hero["content_schema"])
+        self.assertIn("slides", hero["content_schema"]["properties"])

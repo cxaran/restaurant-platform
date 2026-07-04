@@ -19,6 +19,7 @@ from backend.app.models.storefront import (
     StorefrontPage,
     StorefrontPageRevision,
     StorefrontPageSection,
+    StorefrontSectionMedia,
     StorefrontThemeRevision,
 )
 from backend.app.schemas.base import ApiPatchSchema, ApiReadSchema, ApiWriteSchema
@@ -27,11 +28,15 @@ from backend.app.services.config_audit import record_config_change
 from backend.app.services.file_service import get_active_file
 from backend.app.services.storefront_service import (
     StorefrontRuleError,
+    active_layout,
     get_or_create_draft,
     get_page,
     get_storefront_settings,
+    list_pages,
     public_page_payload,
+    publish_layout,
     publish_revision,
+    serialize_section_media,
     templates_catalog,
 )
 from backend.app.storefront.presets import DEFAULT_PRESET, THEME_PRESETS, build_tokens
@@ -139,6 +144,187 @@ def _page_or_404(session: SessionDep, page_key: str) -> StorefrontPage:
 @router.get("/storefront/templates")
 def list_templates(_: StorefrontPermissions.READ_DRAFT.requiere) -> list[dict]:
     return templates_catalog()
+
+
+@router.get("/storefront/pages")
+def list_storefront_pages(
+    session: SessionDep, _: StorefrontPermissions.READ_DRAFT.requiere
+) -> list[dict]:
+    """Listado real de páginas con su estado de publicación y borrador (§41)."""
+    return list_pages(session)
+
+
+class SectionMediaUpsert(ApiWriteSchema):
+    """Media por slot (§43): imágenes verificadas del banco de archivos."""
+
+    desktop_file_id: Optional[uuid.UUID] = None
+    mobile_file_id: Optional[uuid.UUID] = None
+    alt_text: Optional[str] = Field(default=None, max_length=255)
+    focal_point_x: Optional[float] = Field(default=None, ge=0, le=1)
+    focal_point_y: Optional[float] = Field(default=None, ge=0, le=1)
+
+
+def _draft_section_or_error(session: SessionDep, section_id: uuid.UUID) -> StorefrontPageSection:
+    section = get_or_404(session, StorefrontPageSection, section_id, _SECTION_NOT_FOUND)
+    if section.revision.status != "draft":
+        api_error(
+            status.HTTP_409_CONFLICT, "revision_publicada",
+            "La media se edita en el borrador; publica una nueva versión (§48).",
+        )
+    return section
+
+
+@router.put("/storefront/sections/{section_id}/media/{slot_key}")
+def upsert_section_media(
+    section_id: uuid.UUID,
+    slot_key: str,
+    payload: SectionMediaUpsert,
+    session: SessionDep,
+    _: StorefrontPermissions.MANAGE_MEDIA.requiere,
+) -> dict:
+    if not slot_key.replace("_", "").replace("-", "").isalnum() or len(slot_key) > 80:
+        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, "slot_invalido", "Slot no válido.")
+    if payload.desktop_file_id is None and payload.mobile_file_id is None:
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "imagen_requerida",
+            "Indica al menos la imagen de escritorio o la de móvil.",
+        )
+    section = _draft_section_or_error(session, section_id)
+    for file_id in (payload.desktop_file_id, payload.mobile_file_id):
+        if file_id is not None:
+            stored = get_active_file(session, file_id)
+            if stored is None or stored.kind != "image":
+                api_error(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    "archivo_invalido",
+                    "La media de sección debe ser una imagen activa del banco.",
+                )
+    media = session.exec(
+        select(StorefrontSectionMedia).where(
+            StorefrontSectionMedia.section_id == section.id,
+            StorefrontSectionMedia.slot_key == slot_key,
+        )
+    ).first()
+    if media is None:
+        media = StorefrontSectionMedia(section_id=section.id, slot_key=slot_key)
+    for field, value in payload.model_dump().items():
+        setattr(media, field, value)
+    media.updated_at = utc_now()
+    session.add(media)
+    commit_or_conflict(session, "No fue posible guardar la media de la sección.")
+    session.refresh(section)
+    return serialize_section_media(section)
+
+
+@router.delete(
+    "/storefront/sections/{section_id}/media/{slot_key}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_section_media(
+    section_id: uuid.UUID,
+    slot_key: str,
+    session: SessionDep,
+    _: StorefrontPermissions.MANAGE_MEDIA.requiere,
+) -> None:
+    section = _draft_section_or_error(session, section_id)
+    media = session.exec(
+        select(StorefrontSectionMedia).where(
+            StorefrontSectionMedia.section_id == section.id,
+            StorefrontSectionMedia.slot_key == slot_key,
+        )
+    ).first()
+    if media is None:
+        api_error(status.HTTP_404_NOT_FOUND, "media_no_encontrada", "Slot sin media.")
+    session.delete(media)
+    commit_or_conflict(session, "No fue posible quitar la media.")
+
+
+class SectionsSortRequest(ApiWriteSchema):
+    """Reorden ATÓMICO (§49): el set completo de secciones del borrador."""
+
+    section_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+@router.post("/storefront/pages/{page_key}/draft/sections/sort")
+def sort_draft_sections(
+    page_key: str,
+    payload: SectionsSortRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.EDIT.requiere,
+) -> list[dict]:
+    page = _page_or_404(session, page_key)
+    draft = get_or_create_draft(session, page, created_by=current_user.id)
+    existing = {section.id: section for section in draft.sections}
+    if set(payload.section_ids) != set(existing) or len(payload.section_ids) != len(existing):
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "orden_incompleto",
+            "El reorden debe incluir exactamente todas las secciones del borrador.",
+        )
+    now = utc_now()
+    for position, section_id in enumerate(payload.section_ids, start=1):
+        section = existing[section_id]
+        section.sort_order = position * 10
+        section.updated_at = now
+        session.add(section)
+    commit_or_conflict(session, "No fue posible reordenar las secciones.")
+    session.refresh(draft)
+    return [
+        {"id": str(section.id), "sort_order": section.sort_order}
+        for section in sorted(draft.sections, key=lambda s: s.sort_order)
+    ]
+
+
+class LayoutPublishRequest(ApiWriteSchema):
+    """Header/footer (§44): contratos validados en código, versionados."""
+
+    header_config: dict = Field(default_factory=dict)
+    footer_config: dict = Field(default_factory=dict)
+
+
+@router.get("/storefront/layout")
+def read_layout(
+    session: SessionDep, _: StorefrontPermissions.READ_DRAFT.requiere
+) -> dict:
+    layout = active_layout(session)
+    if layout is None:
+        return {"version_number": None, "header_config": {}, "footer_config": {}}
+    return {
+        "version_number": layout.version_number,
+        "header_config": layout.header_config,
+        "footer_config": layout.footer_config,
+    }
+
+
+@router.put("/storefront/layout")
+def update_layout(
+    payload: LayoutPublishRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.MANAGE_NAVIGATION.requiere,
+) -> dict:
+    try:
+        revision = publish_layout(
+            session,
+            header_config=payload.header_config,
+            footer_config=payload.footer_config,
+            actor_id=current_user.id,
+        )
+    except StorefrontRuleError as exc:
+        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
+    record_config_change(
+        session, actor_user_id=current_user.id, entity_type="storefront_layout_revisions",
+        entity_id=revision.id, action="publish",
+        changed_fields=["header_config", "footer_config"],
+    )
+    commit_or_conflict(session, "No fue posible publicar el layout.")
+    return {
+        "version_number": revision.version_number,
+        "header_config": revision.header_config,
+        "footer_config": revision.footer_config,
+    }
 
 
 @router.get("/storefront/theme-presets")
@@ -373,7 +559,10 @@ def preview_draft(
         "page_key": page.page_key,
         "revision_number": draft.revision_number,
         "sections": [
-            SectionRead.model_validate(s, from_attributes=True).model_dump()
+            {
+                **SectionRead.model_validate(s, from_attributes=True).model_dump(),
+                "media": serialize_section_media(s),
+            }
             for s in sorted(draft.sections, key=lambda s: s.sort_order)
         ],
     }

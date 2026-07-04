@@ -8,7 +8,7 @@ contrato atómico del §13: lista completa de IDs, validación exacta y pasos de
 """
 
 import uuid
-from typing import Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 from sqlmodel import select
@@ -17,6 +17,7 @@ from backend.app.api.resource_actions import (
     api_error,
     commit_or_conflict,
     get_or_404,
+    paginate_resource,
     serialize,
     serialize_many,
 )
@@ -31,11 +32,14 @@ from backend.app.models.catalog import (
     ProductInclusion,
     ProductModifierGroup,
 )
+from backend.app.resources.registry import MODIFIER_GROUPS, PRODUCTS, PRODUCT_CATEGORIES
 from backend.app.schemas.catalog import (
     CategoryCreate,
+    CategoryListItem,
     CategoryRead,
     CategoryUpdate,
     ModifierGroupCreate,
+    ModifierGroupListItem,
     ModifierGroupRead,
     ModifierGroupUpdate,
     ModifierOptionCreate,
@@ -46,12 +50,14 @@ from backend.app.schemas.catalog import (
     ProductImageRead,
     ProductInclusionRead,
     ProductInclusionsReplace,
+    ProductListItem,
     ProductModifierGroupRead,
     ProductModifierGroupsReplace,
     ProductRead,
     ProductUpdate,
     SortOrderReplace,
 )
+from backend.app.schemas.pagination import OffsetPage
 from backend.app.security.groups.catalog import CatalogPermissions
 from backend.app.services.catalog_service import (
     CATALOG_AUDIT_ID,
@@ -115,17 +121,25 @@ def _serialize_product(product: Product) -> ProductRead:
 # Categorías
 # ---------------------------------------------------------------------------
 
-@router.get("/categories", response_model=list[CategoryRead])
+@router.get("/categories", response_model=OffsetPage[CategoryListItem])
 def list_categories(
-    session: SessionDep, _: CatalogPermissions.READ.requiere
-) -> list[CategoryRead]:
-    rows = session.exec(
-        select(ProductCategory).order_by(
-            ProductCategory.sort_order,  # pyright: ignore[reportArgumentType]
-            ProductCategory.created_at,  # pyright: ignore[reportArgumentType]
-        )
-    ).all()
-    return serialize_many(CategoryRead, rows)
+    session: SessionDep,
+    query: Annotated[PRODUCT_CATEGORIES.Query, Query()],  # pyright: ignore[reportInvalidTypeForm]
+    _: CatalogPermissions.READ.requiere,
+) -> OffsetPage[CategoryListItem]:
+    """Listado genérico (motor de query): filtros/búsqueda/orden del contrato."""
+    return paginate_resource(PRODUCT_CATEGORIES, session, query)
+
+
+@router.get("/categories/{category_id}", response_model=CategoryRead)
+def get_category(
+    category_id: uuid.UUID,
+    session: SessionDep,
+    _: CatalogPermissions.READ.requiere,
+) -> CategoryRead:
+    return serialize(
+        CategoryRead, get_or_404(session, ProductCategory, category_id, _CATEGORY_NOT_FOUND)
+    )
 
 
 @router.post("/categories", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
@@ -193,30 +207,38 @@ def sort_categories(
         action="sort", fields=["sort_order"],
     )
     commit_or_conflict(session, "No fue posible reordenar las categorías.")
-    return list_categories(session, True)  # type: ignore[arg-type]
+    ordered = session.exec(
+        select(ProductCategory).order_by(
+            ProductCategory.sort_order,  # pyright: ignore[reportArgumentType]
+            ProductCategory.created_at,  # pyright: ignore[reportArgumentType]
+        )
+    ).all()
+    return serialize_many(CategoryRead, ordered)
 
 
 # ---------------------------------------------------------------------------
 # Productos
 # ---------------------------------------------------------------------------
 
-@router.get("/products", response_model=list[ProductRead])
+@router.get("/products", response_model=OffsetPage[ProductListItem])
 def list_products(
     session: SessionDep,
+    query: Annotated[PRODUCTS.Query, Query()],  # pyright: ignore[reportInvalidTypeForm]
     _: CatalogPermissions.READ.requiere,
-    category_id: Optional[uuid.UUID] = Query(default=None),
-    include_inactive: bool = Query(default=False),
-) -> list[ProductRead]:
-    stmt = select(Product)
-    if category_id is not None:
-        stmt = stmt.where(Product.category_id == category_id)
-    if not include_inactive:
-        stmt = stmt.where(Product.is_active == True)  # noqa: E712
-    stmt = stmt.order_by(
-        Product.category_id,  # pyright: ignore[reportArgumentType]
-        Product.sort_order,  # pyright: ignore[reportArgumentType]
-    )
-    return [_serialize_product(product) for product in session.exec(stmt).all()]
+) -> OffsetPage[ProductListItem]:
+    """Listado genérico (motor de query). ``category_id`` sigue acotando por
+    categoría; el estado se filtra con ``is_active`` (antes ``include_inactive``).
+    Las imágenes/inclusiones del producto viven en el detalle, no en la lista."""
+    return paginate_resource(PRODUCTS, session, query)
+
+
+@router.get("/products/{product_id}", response_model=ProductRead)
+def get_product(
+    product_id: uuid.UUID,
+    session: SessionDep,
+    _: CatalogPermissions.READ.requiere,
+) -> ProductRead:
+    return _serialize_product(get_or_404(session, Product, product_id, _PRODUCT_NOT_FOUND))
 
 
 @router.post("/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
@@ -317,7 +339,13 @@ def sort_products_in_category(
         action="sort_products", fields=["sort_order"],
     )
     commit_or_conflict(session, "No fue posible reordenar los productos.")
-    return list_products(session, True, category_id=category.id, include_inactive=False)  # type: ignore[arg-type]
+    ordered = session.exec(
+        select(Product)
+        .where(Product.category_id == category.id)
+        .where(Product.is_active == True)  # noqa: E712
+        .order_by(Product.sort_order)  # pyright: ignore[reportArgumentType]
+    ).all()
+    return [_serialize_product(product) for product in ordered]
 
 
 # ---------------------------------------------------------------------------
@@ -465,17 +493,23 @@ def _serialize_group(group: ModifierGroup) -> ModifierGroupRead:
     )
 
 
-@router.get("/modifier-groups", response_model=list[ModifierGroupRead])
+@router.get("/modifier-groups", response_model=OffsetPage[ModifierGroupListItem])
 def list_modifier_groups(
-    session: SessionDep, _: CatalogPermissions.READ.requiere
-) -> list[ModifierGroupRead]:
-    rows = session.exec(
-        select(ModifierGroup).order_by(
-            ModifierGroup.sort_order,  # pyright: ignore[reportArgumentType]
-            ModifierGroup.created_at,  # pyright: ignore[reportArgumentType]
-        )
-    ).all()
-    return [_serialize_group(group) for group in rows]
+    session: SessionDep,
+    query: Annotated[MODIFIER_GROUPS.Query, Query()],  # pyright: ignore[reportInvalidTypeForm]
+    _: CatalogPermissions.READ.requiere,
+) -> OffsetPage[ModifierGroupListItem]:
+    """Listado genérico (motor de query); las opciones del grupo viven en el detalle."""
+    return paginate_resource(MODIFIER_GROUPS, session, query)
+
+
+@router.get("/modifier-groups/{group_id}", response_model=ModifierGroupRead)
+def get_modifier_group(
+    group_id: uuid.UUID,
+    session: SessionDep,
+    _: CatalogPermissions.READ.requiere,
+) -> ModifierGroupRead:
+    return _serialize_group(get_or_404(session, ModifierGroup, group_id, _GROUP_NOT_FOUND))
 
 
 @router.post(

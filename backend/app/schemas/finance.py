@@ -10,10 +10,38 @@ from pydantic import Field
 from backend.app.schemas.base import ApiReadSchema, ApiWriteSchema
 
 
+# Opciones cerradas de dirección (mismos values que el CHECK de la base).
+_DIRECTION_OPTIONS = [
+    {"value": "income", "label": "Ingreso"},
+    {"value": "expense", "label": "Egreso"},
+]
+# Declaración del filtro de dirección para el listado genérico.
+_DIRECTION_FILTER = {
+    "operator": "eq",
+    "label": "Dirección",
+    "widget": "select",
+    "options": _DIRECTION_OPTIONS,
+}
+
+
 class FinancialCategoryCreate(ApiWriteSchema):
-    direction: Literal["income", "expense"]
-    name: str = Field(min_length=1, max_length=120)
-    parent_id: Optional[UUID] = None
+    direction: Literal["income", "expense"] = Field(
+        title="Dirección",
+        json_schema_extra={
+            "ui": {"form": True, "widget": "select", "options": _DIRECTION_OPTIONS}
+        },
+    )
+    name: str = Field(
+        min_length=1,
+        max_length=120,
+        title="Nombre",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    parent_id: Optional[UUID] = Field(
+        default=None,
+        title="Categoría padre (ID)",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
 
 
 class FinancialCategoryRead(ApiReadSchema):
@@ -22,6 +50,40 @@ class FinancialCategoryRead(ApiReadSchema):
     name: str
     parent_id: Optional[UUID] = None
     is_active: bool
+
+
+class FinancialCategoryListItem(ApiReadSchema):
+    """Fila del listado administrativo genérico de categorías financieras."""
+
+    id: UUID
+    # ``str`` (no Literal): el motor de query solo acepta tipos escalares en los
+    # campos filtrables; el universo cerrado se declara en el filtro select.
+    direction: str = Field(
+        title="Dirección",
+        json_schema_extra={"ui": {"list": True, "filter": _DIRECTION_FILTER}},
+    )
+    name: str = Field(title="Nombre", json_schema_extra={"ui": {"list": True}})
+    parent_id: Optional[UUID] = None
+    is_active: bool = Field(
+        title="Activa",
+        json_schema_extra={
+            "ui": {
+                "list": True,
+                "filter": {
+                    "operator": "eq",
+                    "label": "Estado",
+                    "widget": "select",
+                    "options": [
+                        {"value": "true", "label": "Activas"},
+                        {"value": "false", "label": "Inactivas"},
+                    ],
+                },
+            }
+        },
+    )
+    created_at: datetime = Field(
+        title="Creada", json_schema_extra={"ui": {"list": True}}
+    )
 
 
 class FinancialEntryCreate(ApiWriteSchema):

@@ -5,6 +5,7 @@ base: venta monetaria exige precio, y todo producto debe poder venderse con
 dinero o canjearse con créditos.
 """
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
 from uuid import UUID
@@ -12,6 +13,21 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from backend.app.schemas.base import ApiPatchSchema, ApiReadSchema, ApiWriteSchema
+
+# Declaración compartida del filtro de estado (mismo contrato que users/roles).
+_ACTIVE_FILTER = {
+    "operator": "eq",
+    "label": "Estado",
+    "widget": "select",
+    "options": [
+        {"value": "true", "label": "Activos"},
+        {"value": "false", "label": "Inactivos"},
+    ],
+}
+_SELECTION_TYPE_OPTIONS = [
+    {"value": "single", "label": "Una sola opción"},
+    {"value": "multiple", "label": "Varias opciones"},
+]
 
 
 # ---------------------------------------------------------------------------
@@ -29,14 +45,37 @@ class SortOrderReplace(ApiWriteSchema):
 # ---------------------------------------------------------------------------
 
 class CategoryCreate(ApiWriteSchema):
-    name: str = Field(min_length=1, max_length=100)
-    description: Optional[str] = None
+    name: str = Field(
+        min_length=1,
+        max_length=100,
+        title="Nombre",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    description: Optional[str] = Field(
+        default=None,
+        title="Descripción",
+        json_schema_extra={"ui": {"form": True, "widget": "textarea"}},
+    )
 
 
 class CategoryUpdate(ApiPatchSchema):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
+    name: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        title="Nombre",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    description: Optional[str] = Field(
+        default=None,
+        title="Descripción",
+        json_schema_extra={"ui": {"form": True, "widget": "textarea"}},
+    )
+    is_active: Optional[bool] = Field(
+        default=None,
+        title="Activa",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
 
 
 class CategoryRead(ApiReadSchema):
@@ -45,6 +84,24 @@ class CategoryRead(ApiReadSchema):
     description: Optional[str] = None
     sort_order: int
     is_active: bool
+
+
+class CategoryListItem(ApiReadSchema):
+    """Fila del listado administrativo genérico de categorías (shell contract-driven)."""
+
+    id: UUID
+    name: str = Field(title="Nombre", json_schema_extra={"ui": {"list": True}})
+    description: Optional[str] = Field(
+        default=None, title="Descripción", json_schema_extra={"ui": {"list": True}}
+    )
+    sort_order: int = Field(title="Orden", json_schema_extra={"ui": {"list": True}})
+    is_active: bool = Field(
+        title="Activa",
+        json_schema_extra={"ui": {"list": True, "filter": _ACTIVE_FILTER}},
+    )
+    created_at: datetime = Field(
+        title="Creada", json_schema_extra={"ui": {"list": True}}
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -68,19 +125,78 @@ def _validate_product_coherence(
 
 
 class ProductCreate(ApiWriteSchema):
-    category_id: UUID
-    sku: Optional[str] = Field(default=None, max_length=80)
-    name: str = Field(min_length=1, max_length=180)
-    description: Optional[str] = None
-    money_price_amount: Optional[Decimal] = Field(default=None, ge=0)
-    is_money_purchase_available: bool = True
-    credits_awarded_per_unit: int = Field(default=0, ge=0)
-    credit_redemption_price: Optional[int] = Field(default=None, ge=1)
-    is_available: bool = True
-    is_featured: bool = False
-    preparation_minutes: Optional[int] = Field(default=None, ge=0)
-    max_units_per_order: Optional[int] = Field(default=None, ge=1)
-    daily_unit_limit: Optional[int] = Field(default=None, ge=1)
+    category_id: UUID = Field(
+        title="Categoría (ID)",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    sku: Optional[str] = Field(
+        default=None,
+        max_length=80,
+        title="SKU",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    name: str = Field(
+        min_length=1,
+        max_length=180,
+        title="Nombre",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    description: Optional[str] = Field(
+        default=None,
+        title="Descripción",
+        json_schema_extra={"ui": {"form": True, "widget": "textarea"}},
+    )
+    money_price_amount: Optional[Decimal] = Field(
+        default=None,
+        ge=0,
+        title="Precio",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    is_money_purchase_available: bool = Field(
+        default=True,
+        title="Venta por dinero",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
+    credits_awarded_per_unit: int = Field(
+        default=0,
+        ge=0,
+        title="Créditos por unidad",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    credit_redemption_price: Optional[int] = Field(
+        default=None,
+        ge=1,
+        title="Precio en créditos",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    is_available: bool = Field(
+        default=True,
+        title="Disponible",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
+    is_featured: bool = Field(
+        default=False,
+        title="Destacado",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
+    preparation_minutes: Optional[int] = Field(
+        default=None,
+        ge=0,
+        title="Minutos de preparación",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    max_units_per_order: Optional[int] = Field(
+        default=None,
+        ge=1,
+        title="Máximo por pedido",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    daily_unit_limit: Optional[int] = Field(
+        default=None,
+        ge=1,
+        title="Límite diario",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
 
     @model_validator(mode="after")
     def _coherence(self) -> "ProductCreate":
@@ -93,20 +209,85 @@ class ProductCreate(ApiWriteSchema):
 
 
 class ProductUpdate(ApiPatchSchema):
-    category_id: Optional[UUID] = None
-    sku: Optional[str] = Field(default=None, max_length=80)
-    name: Optional[str] = Field(default=None, min_length=1, max_length=180)
-    description: Optional[str] = None
-    money_price_amount: Optional[Decimal] = Field(default=None, ge=0)
-    is_money_purchase_available: Optional[bool] = None
-    credits_awarded_per_unit: Optional[int] = Field(default=None, ge=0)
-    credit_redemption_price: Optional[int] = Field(default=None, ge=1)
-    is_available: Optional[bool] = None
-    is_featured: Optional[bool] = None
-    preparation_minutes: Optional[int] = Field(default=None, ge=0)
-    max_units_per_order: Optional[int] = Field(default=None, ge=1)
-    daily_unit_limit: Optional[int] = Field(default=None, ge=1)
-    is_active: Optional[bool] = None
+    category_id: Optional[UUID] = Field(
+        default=None,
+        title="Categoría (ID)",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    sku: Optional[str] = Field(
+        default=None,
+        max_length=80,
+        title="SKU",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    name: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=180,
+        title="Nombre",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    description: Optional[str] = Field(
+        default=None,
+        title="Descripción",
+        json_schema_extra={"ui": {"form": True, "widget": "textarea"}},
+    )
+    money_price_amount: Optional[Decimal] = Field(
+        default=None,
+        ge=0,
+        title="Precio",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    is_money_purchase_available: Optional[bool] = Field(
+        default=None,
+        title="Venta por dinero",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
+    credits_awarded_per_unit: Optional[int] = Field(
+        default=None,
+        ge=0,
+        title="Créditos por unidad",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    credit_redemption_price: Optional[int] = Field(
+        default=None,
+        ge=1,
+        title="Precio en créditos",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    is_available: Optional[bool] = Field(
+        default=None,
+        title="Disponible",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
+    is_featured: Optional[bool] = Field(
+        default=None,
+        title="Destacado",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
+    preparation_minutes: Optional[int] = Field(
+        default=None,
+        ge=0,
+        title="Minutos de preparación",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    max_units_per_order: Optional[int] = Field(
+        default=None,
+        ge=1,
+        title="Máximo por pedido",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    daily_unit_limit: Optional[int] = Field(
+        default=None,
+        ge=1,
+        title="Límite diario",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    is_active: Optional[bool] = Field(
+        default=None,
+        title="Activo",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
 
 
 class ProductImageRead(ApiReadSchema):
@@ -155,6 +336,45 @@ class ProductRead(ApiReadSchema):
     inclusions: list[ProductInclusionRead] = Field(default_factory=list)
 
 
+class ProductListItem(ApiReadSchema):
+    """Fila del listado administrativo genérico de productos.
+
+    Sin imágenes, inclusiones ni modificadores: esas colecciones se administran
+    en la pantalla especializada del catálogo, no en la tabla genérica."""
+
+    id: UUID
+    category_id: UUID = Field(
+        # Campo de scoping: no es columna visible, pero su filtro EQ permite acotar
+        # la lista a una categoría (mismo parámetro ``category_id`` de siempre).
+        title="Categoría",
+        json_schema_extra={"ui": {"list": False}},
+    )
+    name: str = Field(title="Nombre", json_schema_extra={"ui": {"list": True}})
+    sku: Optional[str] = Field(
+        default=None, title="SKU", json_schema_extra={"ui": {"list": True}}
+    )
+    money_price_amount: Optional[Decimal] = Field(
+        default=None, title="Precio", json_schema_extra={"ui": {"list": True}}
+    )
+    credit_redemption_price: Optional[int] = Field(
+        default=None, title="Precio en créditos", json_schema_extra={"ui": {"list": True}}
+    )
+    is_available: bool = Field(
+        title="Disponible", json_schema_extra={"ui": {"list": True}}
+    )
+    is_featured: bool = Field(
+        title="Destacado", json_schema_extra={"ui": {"list": True}}
+    )
+    sort_order: int = Field(title="Orden", json_schema_extra={"ui": {"list": True}})
+    is_active: bool = Field(
+        title="Activo",
+        json_schema_extra={"ui": {"list": True, "filter": _ACTIVE_FILTER}},
+    )
+    created_at: datetime = Field(
+        title="Creado", json_schema_extra={"ui": {"list": True}}
+    )
+
+
 # ---------------------------------------------------------------------------
 # Imágenes de producto
 # ---------------------------------------------------------------------------
@@ -170,11 +390,36 @@ class ProductImageAttach(ApiWriteSchema):
 # ---------------------------------------------------------------------------
 
 class ModifierGroupCreate(ApiWriteSchema):
-    name: str = Field(min_length=1, max_length=120)
-    selection_type: Literal["single", "multiple"] = "single"
-    min_selections: int = Field(default=0, ge=0)
-    max_selections: Optional[int] = Field(default=None, ge=1)
-    is_required: bool = False
+    name: str = Field(
+        min_length=1,
+        max_length=120,
+        title="Nombre",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    selection_type: Literal["single", "multiple"] = Field(
+        default="single",
+        title="Tipo de selección",
+        json_schema_extra={
+            "ui": {"form": True, "widget": "select", "options": _SELECTION_TYPE_OPTIONS}
+        },
+    )
+    min_selections: int = Field(
+        default=0,
+        ge=0,
+        title="Selecciones mínimas",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    max_selections: Optional[int] = Field(
+        default=None,
+        ge=1,
+        title="Selecciones máximas",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    is_required: bool = Field(
+        default=False,
+        title="Obligatorio",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
 
     @model_validator(mode="after")
     def _max_gte_min(self) -> "ModifierGroupCreate":
@@ -184,12 +429,42 @@ class ModifierGroupCreate(ApiWriteSchema):
 
 
 class ModifierGroupUpdate(ApiPatchSchema):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
-    selection_type: Optional[Literal["single", "multiple"]] = None
-    min_selections: Optional[int] = Field(default=None, ge=0)
-    max_selections: Optional[int] = Field(default=None, ge=1)
-    is_required: Optional[bool] = None
-    is_active: Optional[bool] = None
+    name: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=120,
+        title="Nombre",
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    selection_type: Optional[Literal["single", "multiple"]] = Field(
+        default=None,
+        title="Tipo de selección",
+        json_schema_extra={
+            "ui": {"form": True, "widget": "select", "options": _SELECTION_TYPE_OPTIONS}
+        },
+    )
+    min_selections: Optional[int] = Field(
+        default=None,
+        ge=0,
+        title="Selecciones mínimas",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    max_selections: Optional[int] = Field(
+        default=None,
+        ge=1,
+        title="Selecciones máximas",
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    is_required: Optional[bool] = Field(
+        default=None,
+        title="Obligatorio",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
+    is_active: Optional[bool] = Field(
+        default=None,
+        title="Activo",
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
 
 
 class ModifierOptionCreate(ApiWriteSchema):
@@ -226,6 +501,36 @@ class ModifierGroupRead(ApiReadSchema):
     sort_order: int
     is_active: bool
     options: list[ModifierOptionRead] = Field(default_factory=list)
+
+
+class ModifierGroupListItem(ApiReadSchema):
+    """Fila del listado administrativo genérico de grupos de modificadores.
+
+    Sin las opciones anidadas: se administran en los endpoints especializados del
+    grupo (crear/editar/reordenar opciones)."""
+
+    id: UUID
+    name: str = Field(title="Nombre", json_schema_extra={"ui": {"list": True}})
+    selection_type: str = Field(
+        title="Tipo de selección", json_schema_extra={"ui": {"list": True}}
+    )
+    min_selections: int = Field(
+        title="Mínimo", json_schema_extra={"ui": {"list": True}}
+    )
+    max_selections: Optional[int] = Field(
+        default=None, title="Máximo", json_schema_extra={"ui": {"list": True}}
+    )
+    is_required: bool = Field(
+        title="Obligatorio", json_schema_extra={"ui": {"list": True}}
+    )
+    sort_order: int = Field(title="Orden", json_schema_extra={"ui": {"list": True}})
+    is_active: bool = Field(
+        title="Activo",
+        json_schema_extra={"ui": {"list": True, "filter": _ACTIVE_FILTER}},
+    )
+    created_at: datetime = Field(
+        title="Creado", json_schema_extra={"ui": {"list": True}}
+    )
 
 
 # ---------------------------------------------------------------------------

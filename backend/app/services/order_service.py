@@ -216,6 +216,52 @@ def transition_order(
     return order
 
 
+# ---------------------------------------------------------------------------
+# Expiración de pedidos web abandonados (§1.12 GOALS)
+# ---------------------------------------------------------------------------
+
+# Un pedido web «submitted» que nadie tomó en 60 minutos se cancela solo:
+# libera créditos reservados, código de descuento y cupo diario. Jamás genera
+# reembolso automático y jamás toca pedidos con dinero ya cobrado (esos exigen
+# resolución humana H5) ni estados de revisión activa.
+EXPIRE_SUBMITTED_AFTER_MINUTES = 60
+
+
+def expire_abandoned_submitted(session: Session) -> int:
+    from datetime import timedelta
+
+    cutoff = utc_now() - timedelta(minutes=EXPIRE_SUBMITTED_AFTER_MINUTES)
+    stale = session.exec(
+        select(Order).where(
+            Order.source == "online",
+            Order.status == "submitted",
+            Order.submitted_at <= cutoff,  # pyright: ignore[reportArgumentType]
+            Order.payment_status.in_(("unpaid", "pending")),  # pyright: ignore[reportAttributeAccessIssue]
+        )
+    ).all()
+    expired = 0
+    for order in stale:
+        try:
+            transition_order(
+                session,
+                order,
+                "cancelled",
+                actor_id=None,
+                reason_code="expired",
+                internal_note=(
+                    "Expirado automáticamente: pedido web sin actividad por "
+                    f"{EXPIRE_SUBMITTED_AFTER_MINUTES} minutos."
+                ),
+            )
+            expired += 1
+        except OrderRuleError:
+            # Un cobro registrado entre la consulta y la transición exige
+            # resolución humana (H5): ese pedido se queda para revisión.
+            continue
+    session.flush()
+    return expired
+
+
 def _freeze_totals_on_approval(order: Order) -> None:
     """Congela totales al aprobar (§16). Delivery exige envío FINAL (§17.2)."""
     shipping_amount = Decimal("0")

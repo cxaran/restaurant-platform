@@ -77,16 +77,40 @@ class ResourcesAuthTest(unittest.TestCase):
         self.assertEqual(client.get("/api/v1/resources").status_code, 401)
 
     def test_partial_permissions_only_returns_allowed_resources(self) -> None:
+        # El catálogo es un envelope {resources, navigation_modules} (parte B).
         with _As("users:read"):
             body = client.get("/api/v1/resources").json()
-        names = [resource["name"] for resource in body]
+        names = [resource["name"] for resource in body["resources"]]
         self.assertEqual(names, ["users"])
 
     def test_revoke_visible_resource_requires_read_not_revoke(self) -> None:
         # Tiene revoke pero no read: no debe ver el recurso users en el catálogo.
         with _As("users:revoke_sessions"):
             body = client.get("/api/v1/resources").json()
-        self.assertEqual([r["name"] for r in body], [])
+        self.assertEqual([r["name"] for r in body["resources"]], [])
+
+    def test_full_permissions_expose_exact_catalog(self) -> None:
+        # Lista EXACTA y ordenada del registry: al registrar un recurso nuevo este
+        # test se actualiza CONSCIENTEMENTE (es el contrato de descubrimiento).
+        with _As(*declared_permissions()):
+            body = client.get("/api/v1/resources").json()
+        self.assertEqual(
+            [resource["name"] for resource in body["resources"]],
+            [
+                "users",
+                "roles",
+                "system_settings",
+                "backup_settings",
+                "backup_runs",
+                "audit_events",
+                "permissions",
+                "product_categories",
+                "products",
+                "modifier_groups",
+                "delivery_zones",
+                "finance_categories",
+            ],
+        )
 
     def test_hidden_and_missing_return_same_404(self) -> None:
         with _As("users:read"):
@@ -151,8 +175,8 @@ class RevokeEndpointPermissionTest(unittest.TestCase):
 class PermissionsResourceTest(unittest.TestCase):
     def test_permissions_requires_its_read_permission(self) -> None:
         with _As("users:read"):
-            names = [r["name"] for r in client.get("/api/v1/resources").json()]
-        self.assertNotIn("permissions", names)
+            body = client.get("/api/v1/resources").json()
+        self.assertNotIn("permissions", [r["name"] for r in body["resources"]])
 
     def test_permissions_is_grouped_catalog_without_table_shape(self) -> None:
         with _As("permissions:read"):
@@ -165,8 +189,11 @@ class PermissionsResourceTest(unittest.TestCase):
 
 class CapabilityContentTest(unittest.TestCase):
     def test_no_permission_strings_leak_in_payload(self) -> None:
+        # Solo la parte ``resources`` del envelope: las capabilities jamás serializan
+        # permisos. ``navigation_modules`` declara ``required_permissions`` POR
+        # CONTRATO (parte B: requisito de navegación anyOf), no es una fuga.
         with _As(*declared_permissions()):
-            blob = json.dumps(client.get("/api/v1/resources").json())
+            blob = json.dumps(client.get("/api/v1/resources").json()["resources"])
         leaks = [permission for permission in declared_permissions() if permission in blob]
         self.assertEqual(leaks, [])
 
@@ -177,7 +204,7 @@ class CapabilityContentTest(unittest.TestCase):
 
     def test_all_projected_fields_have_labels(self) -> None:
         with _As(*declared_permissions()):
-            resources = client.get("/api/v1/resources").json()
+            resources = client.get("/api/v1/resources").json()["resources"]
         for resource in resources:
             for field in resource.get("list", {}).get("fields", []):
                 self.assertTrue(field["label"], resource["name"])
@@ -357,6 +384,94 @@ class PermissionsCatalogTest(unittest.TestCase):
             for permission in group["permissions"]:
                 self.assertTrue(permission["access"])
                 self.assertTrue(permission["label"])
+
+
+class DomainResourcesVisibilityTest(unittest.TestCase):
+    """Recursos del dominio restaurante (Etapa 7): proyección por permisos."""
+
+    DOMAIN_RESOURCES = (
+        "product_categories",
+        "products",
+        "modifier_groups",
+        "delivery_zones",
+        "finance_categories",
+    )
+
+    def test_without_permissions_domain_resources_hidden(self) -> None:
+        with _As("users:read"):
+            body = client.get("/api/v1/resources").json()
+        names = [resource["name"] for resource in body["resources"]]
+        for name in self.DOMAIN_RESOURCES:
+            self.assertNotIn(name, names)
+        # Sin permisos de módulos tampoco hay navegación especializada.
+        self.assertEqual(body.get("navigation_modules", []), [])
+
+    def test_catalog_read_exposes_only_catalog_resources(self) -> None:
+        with _As("catalog:read"):
+            body = client.get("/api/v1/resources").json()
+        names = [resource["name"] for resource in body["resources"]]
+        self.assertEqual(names, ["product_categories", "products", "modifier_groups"])
+
+    def test_shipping_and_finances_read_expose_their_resource(self) -> None:
+        with _As("shipping:read"):
+            shipping = client.get("/api/v1/resources").json()
+        with _As("finances:read"):
+            finances = client.get("/api/v1/resources").json()
+        self.assertEqual([r["name"] for r in shipping["resources"]], ["delivery_zones"])
+        self.assertEqual([r["name"] for r in finances["resources"]], ["finance_categories"])
+
+    def test_hidden_domain_resource_detail_is_404(self) -> None:
+        with _As("users:read"):
+            response = client.get("/api/v1/resources/products")
+        self.assertEqual(response.status_code, 404)
+
+    def test_delivery_zones_have_update_form_but_no_create(self) -> None:
+        # Crear una zona exige el polígono GeoJSON: pantalla especializada, no
+        # formulario genérico. El update solo edita campos simples.
+        with _As("shipping:read", "shipping:manage"):
+            zones = client.get("/api/v1/resources/delivery_zones").json()
+        self.assertNotIn("create", zones["forms"])
+        update_fields = [f["name"] for f in zones["forms"]["update"]["fields"]]
+        self.assertIn("name", update_fields)
+        self.assertNotIn("coverage", update_fields)
+
+
+class NavigationModulesTest(unittest.TestCase):
+    """Contrato mínimo de navegación de módulos especializados (parte B)."""
+
+    def test_module_projected_with_its_permission(self) -> None:
+        with _As("orders:read"):
+            body = client.get("/api/v1/resources").json()
+        modules = {m["name"]: m for m in body["navigation_modules"]}
+        self.assertEqual(list(modules), ["pedidos"])
+        self.assertEqual(modules["pedidos"]["href"], "/panel/pedidos")
+        self.assertEqual(modules["pedidos"]["section"], "panel")
+        self.assertEqual(modules["pedidos"]["required_permissions"], ["orders:read"])
+
+    def test_any_of_permissions_is_enough(self) -> None:
+        # storefront declara anyOf(read_draft, edit): con solo edit ya es visible.
+        with _As("storefront:edit"):
+            body = client.get("/api/v1/resources").json()
+        self.assertEqual(
+            [m["name"] for m in body["navigation_modules"]], ["storefront"]
+        )
+
+    def test_full_permissions_expose_exact_module_list(self) -> None:
+        with _As(*declared_permissions()):
+            body = client.get("/api/v1/resources").json()
+        self.assertEqual(
+            [m["name"] for m in body["navigation_modules"]],
+            [
+                "storefront",
+                "codigos-descuento",
+                "reportes",
+                "pedidos",
+                "pos",
+                "entregas",
+                "reparto",
+                "tickets",
+            ],
+        )
 
 
 class ResourcesOpenApiTest(unittest.TestCase):

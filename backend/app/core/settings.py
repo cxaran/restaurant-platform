@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     # Cotización pública de envío (carrito sin sesión): consulta geoespacial barata
     # pero abierta a internet; límite generoso por IP.
     rate_limit_public_quote_ip: str = "60/60"
+    # Checkout y validación de códigos (§1.14): límites moderados por IP + usuario
+    # autenticado; no limitan la navegación del menú ni sustituyen constraints.
+    rate_limit_checkout_ip: str = "20/600"
+    rate_limit_checkout_identity: str = "10/600"
+    rate_limit_discount_quote_ip: str = "30/600"
+    rate_limit_discount_quote_identity: str = "15/600"
 
     # Política pública de auth. Restaurant Platform no asume signup público: el registro
     # está deshabilitado por defecto y debe habilitarse explícitamente.

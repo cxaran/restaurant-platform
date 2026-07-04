@@ -50,6 +50,8 @@ BACKEND_CANONICAL_TEST_MODULES = (
     "backend.tests.test_storefront",
     "backend.tests.test_profiles",
     "backend.tests.test_discounts",
+    "backend.tests.test_operations",
+    "backend.tests.test_domain_resources",
 )
 
 

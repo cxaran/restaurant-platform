@@ -15,6 +15,9 @@ from pydantic import BaseModel
 
 from backend.app.models.audit_event import AuditEvent
 from backend.app.models.backup import BackupRun, BackupSettings
+from backend.app.models.catalog import ModifierGroup, Product, ProductCategory
+from backend.app.models.finances import FinancialCategory
+from backend.app.models.shipping import DeliveryZone
 from backend.app.models.system_settings import SystemSettings
 from backend.app.models.user import Role, User
 from backend.app.query import QueryOptions, ResourceQuery
@@ -51,6 +54,22 @@ from backend.app.schemas.backup import (
     BackupSettingsListItem,
     BackupSettingsUpdate,
 )
+from backend.app.schemas.catalog import (
+    CategoryCreate,
+    CategoryListItem,
+    CategoryUpdate,
+    ModifierGroupCreate,
+    ModifierGroupListItem,
+    ModifierGroupUpdate,
+    ProductCreate,
+    ProductListItem,
+    ProductUpdate,
+)
+from backend.app.schemas.finance import (
+    FinancialCategoryCreate,
+    FinancialCategoryListItem,
+)
+from backend.app.schemas.shipping import DeliveryZoneListItem, DeliveryZoneUpdate
 from backend.app.schemas.role import RoleCreate, RoleListItem, RoleRead, RoleUpdate
 from backend.app.schemas.system_settings import (
     SendTestEmailRequest,
@@ -65,8 +84,11 @@ from backend.app.schemas.user_admin import (
 )
 from backend.app.security.groups.audit_events import AuditEventPermissions
 from backend.app.security.groups.backups import BackupPermissions
+from backend.app.security.groups.catalog import CatalogPermissions
+from backend.app.security.groups.finances import FinancePermissions
 from backend.app.security.groups.permissions import PermissionPermissions
 from backend.app.security.groups.roles import RolePermissions
+from backend.app.security.groups.shipping import ShippingPermissions
 from backend.app.security.groups.system_settings import SystemSettingsPermissions
 from backend.app.security.groups.users import UserPermissions
 from backend.app.security.security_group import SecurityGroup
@@ -176,6 +198,97 @@ AUDIT_EVENTS = ResourceQuery(
         sort_fields=("occurred_at",),
         in_fields=("id",),
         default_sort="-occurred_at",
+    ),
+)
+
+# --- Dominio restaurante (Etapa 7 RC): queries compartidas con los routers ---
+
+PRODUCT_CATEGORIES = ResourceQuery(
+    name="ProductCategoryQuery",
+    model=ProductCategory,
+    schema=CategoryListItem,
+    options=QueryOptions(
+        filter_fields=("is_active", "name"),
+        sort_fields=("sort_order", "name", "created_at"),
+        search_fields=("name",),
+        in_fields=("id",),
+        field_operators={
+            "name": _TEXT_FILTER_OPERATORS,
+            "created_at": _CREATED_AT_OPERATORS,
+        },
+        # Mismo orden visual del menú público (§13).
+        default_sort="sort_order",
+    ),
+)
+
+PRODUCTS = ResourceQuery(
+    name="ProductQuery",
+    model=Product,
+    schema=ProductListItem,
+    options=QueryOptions(
+        # ``category_id`` es el filtro de SCOPING (mismo parámetro que aceptaba el
+        # listado manual); disponibilidad/destacado/estado por igualdad.
+        filter_fields=(
+            "is_active",
+            "is_available",
+            "is_featured",
+            "category_id",
+            "name",
+        ),
+        sort_fields=("sort_order", "name", "money_price_amount", "created_at"),
+        search_fields=("name", "sku"),
+        in_fields=("id",),
+        field_operators={
+            "name": _TEXT_FILTER_OPERATORS,
+            "created_at": _CREATED_AT_OPERATORS,
+        },
+        default_sort="sort_order",
+    ),
+)
+
+MODIFIER_GROUPS = ResourceQuery(
+    name="ModifierGroupQuery",
+    model=ModifierGroup,
+    schema=ModifierGroupListItem,
+    options=QueryOptions(
+        filter_fields=("is_active", "is_required", "name"),
+        sort_fields=("sort_order", "name", "created_at"),
+        search_fields=("name",),
+        in_fields=("id",),
+        field_operators={
+            "name": _TEXT_FILTER_OPERATORS,
+            "created_at": _CREATED_AT_OPERATORS,
+        },
+        default_sort="sort_order",
+    ),
+)
+
+DELIVERY_ZONES = ResourceQuery(
+    name="DeliveryZoneQuery",
+    model=DeliveryZone,
+    schema=DeliveryZoneListItem,
+    options=QueryOptions(
+        filter_fields=("is_active", "code", "name"),
+        sort_fields=("priority", "name", "created_at"),
+        search_fields=("name", "code"),
+        in_fields=("id",),
+        field_operators={"name": _TEXT_FILTER_OPERATORS},
+        # Los solapes se resuelven por prioridad MAYOR: mismo orden del panel.
+        default_sort="-priority",
+    ),
+)
+
+FINANCE_CATEGORIES = ResourceQuery(
+    name="FinancialCategoryQuery",
+    model=FinancialCategory,
+    schema=FinancialCategoryListItem,
+    options=QueryOptions(
+        filter_fields=("direction", "is_active", "name"),
+        sort_fields=("name", "created_at"),
+        search_fields=("name",),
+        in_fields=("id",),
+        field_operators={"name": _TEXT_FILTER_OPERATORS},
+        default_sort="name",
     ),
 )
 
@@ -659,6 +772,223 @@ RESOURCE_REGISTRY: tuple[ResourceDefinition, ...] = (
         api_path="/api/v1/permissions",
         view=ResourceView.GROUPED_CATALOG,
         read_permission=PermissionPermissions.READ,
+    ),
+    # --- Dominio restaurante (Etapa 7 RC) ---
+    ResourceDefinition(
+        name="product_categories",
+        label="Categorías del menú",
+        api_path="/api/v1/catalog/categories",
+        view=ResourceView.TABLE,
+        read_permission=CatalogPermissions.READ,
+        list_query=PRODUCT_CATEGORIES,
+        list_schema=CategoryListItem,
+        create_schema=CategoryCreate,
+        update_schema=CategoryUpdate,
+        create_permission=CatalogPermissions.CREATE,
+        update_permission=CatalogPermissions.UPDATE,
+        detail_url_template="/api/v1/catalog/categories/{id}",
+        actions=(
+            ActionDef(
+                name="activate",
+                label="Activar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/catalog/categories/{id}",
+                scope=ActionScope.ITEM,
+                danger=False,
+                permission=CatalogPermissions.UPDATE,
+                fixed_body={"is_active": True},
+                confirmation=ConfirmationDef(
+                    title="Activar categoría",
+                    message="La categoría volverá a mostrarse en el sitio.",
+                    confirm_label="Activar",
+                    destructive=False,
+                    required=False,
+                ),
+            ),
+            ActionDef(
+                name="deactivate",
+                label="Desactivar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/catalog/categories/{id}",
+                scope=ActionScope.ITEM,
+                danger=True,
+                permission=CatalogPermissions.UPDATE,
+                fixed_body={"is_active": False},
+                confirmation=ConfirmationDef(
+                    title="Desactivar categoría",
+                    message="La categoría se ocultará del sitio; productos e historial se conservan.",
+                    confirm_label="Desactivar",
+                    destructive=True,
+                ),
+            ),
+        ),
+    ),
+    ResourceDefinition(
+        name="products",
+        label="Productos",
+        api_path="/api/v1/catalog/products",
+        view=ResourceView.TABLE,
+        read_permission=CatalogPermissions.READ,
+        list_query=PRODUCTS,
+        list_schema=ProductListItem,
+        create_schema=ProductCreate,
+        update_schema=ProductUpdate,
+        create_permission=CatalogPermissions.CREATE,
+        update_permission=CatalogPermissions.UPDATE,
+        detail_url_template="/api/v1/catalog/products/{id}",
+        # Imágenes, inclusiones y grupos de modificadores del producto se administran
+        # en la pantalla especializada del catálogo (endpoints anidados propios); no
+        # se fuerzan como relations del contrato genérico.
+        actions=(
+            ActionDef(
+                name="activate",
+                label="Activar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/catalog/products/{id}",
+                scope=ActionScope.ITEM,
+                danger=False,
+                permission=CatalogPermissions.UPDATE,
+                fixed_body={"is_active": True},
+                confirmation=ConfirmationDef(
+                    title="Activar producto",
+                    message="El producto volverá a estar disponible para la venta.",
+                    confirm_label="Activar",
+                    destructive=False,
+                    required=False,
+                ),
+            ),
+            ActionDef(
+                name="deactivate",
+                label="Desactivar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/catalog/products/{id}",
+                scope=ActionScope.ITEM,
+                danger=True,
+                permission=CatalogPermissions.UPDATE,
+                fixed_body={"is_active": False},
+                confirmation=ConfirmationDef(
+                    title="Desactivar producto",
+                    message="El producto dejará de venderse; los pedidos pasados no cambian.",
+                    confirm_label="Desactivar",
+                    destructive=True,
+                ),
+            ),
+        ),
+    ),
+    ResourceDefinition(
+        name="modifier_groups",
+        label="Grupos de modificadores",
+        api_path="/api/v1/catalog/modifier-groups",
+        view=ResourceView.TABLE,
+        read_permission=CatalogPermissions.READ,
+        list_query=MODIFIER_GROUPS,
+        list_schema=ModifierGroupListItem,
+        create_schema=ModifierGroupCreate,
+        update_schema=ModifierGroupUpdate,
+        create_permission=CatalogPermissions.CREATE,
+        update_permission=CatalogPermissions.UPDATE,
+        detail_url_template="/api/v1/catalog/modifier-groups/{id}",
+        # Las OPCIONES del grupo viven en endpoints anidados (crear/editar/reordenar
+        # bajo el grupo): pantalla especializada, no contrato tabular propio.
+        actions=(
+            ActionDef(
+                name="activate",
+                label="Activar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/catalog/modifier-groups/{id}",
+                scope=ActionScope.ITEM,
+                danger=False,
+                permission=CatalogPermissions.UPDATE,
+                fixed_body={"is_active": True},
+                confirmation=ConfirmationDef(
+                    title="Activar grupo",
+                    message="El grupo volverá a aplicarse a los productos vinculados.",
+                    confirm_label="Activar",
+                    destructive=False,
+                    required=False,
+                ),
+            ),
+            ActionDef(
+                name="deactivate",
+                label="Desactivar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/catalog/modifier-groups/{id}",
+                scope=ActionScope.ITEM,
+                danger=True,
+                permission=CatalogPermissions.UPDATE,
+                fixed_body={"is_active": False},
+                confirmation=ConfirmationDef(
+                    title="Desactivar grupo",
+                    message="Los productos dejarán de ofrecer estas opciones.",
+                    confirm_label="Desactivar",
+                    destructive=True,
+                ),
+            ),
+        ),
+    ),
+    ResourceDefinition(
+        name="delivery_zones",
+        label="Zonas de reparto",
+        api_path="/api/v1/shipping/zones",
+        view=ResourceView.TABLE,
+        read_permission=ShippingPermissions.READ,
+        list_query=DELIVERY_ZONES,
+        list_schema=DeliveryZoneListItem,
+        # SIN create genérico: crear una zona exige el polígono GeoJSON (pantalla
+        # especializada con mapa). El update genérico edita solo campos simples;
+        # la geometría se edita aparte.
+        update_schema=DeliveryZoneUpdate,
+        update_permission=ShippingPermissions.MANAGE,
+        detail_url_template="/api/v1/shipping/zones/{id}",
+        actions=(
+            ActionDef(
+                name="activate",
+                label="Activar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/shipping/zones/{id}",
+                scope=ActionScope.ITEM,
+                danger=False,
+                permission=ShippingPermissions.MANAGE,
+                fixed_body={"is_active": True},
+                confirmation=ConfirmationDef(
+                    title="Activar zona",
+                    message="La zona volverá a cotizar envíos.",
+                    confirm_label="Activar",
+                    destructive=False,
+                    required=False,
+                ),
+            ),
+            ActionDef(
+                name="deactivate",
+                label="Desactivar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/shipping/zones/{id}",
+                scope=ActionScope.ITEM,
+                danger=True,
+                permission=ShippingPermissions.MANAGE,
+                fixed_body={"is_active": False},
+                confirmation=ConfirmationDef(
+                    title="Desactivar zona",
+                    message="La zona dejará de cotizar envíos; tarifas e historial se conservan.",
+                    confirm_label="Desactivar",
+                    destructive=True,
+                ),
+            ),
+        ),
+    ),
+    ResourceDefinition(
+        name="finance_categories",
+        label="Categorías financieras",
+        api_path="/api/v1/finances/categories",
+        view=ResourceView.TABLE,
+        read_permission=FinancePermissions.READ,
+        list_query=FINANCE_CATEGORIES,
+        list_schema=FinancialCategoryListItem,
+        # Sin update ni acciones: el contrato actual de finanzas solo lista y crea
+        # categorías (no existe PATCH); la jerarquía se corrige creando categorías.
+        create_schema=FinancialCategoryCreate,
+        create_permission=FinancePermissions.RECORD,
+        detail_url_template="/api/v1/finances/categories/{id}",
     ),
 )
 

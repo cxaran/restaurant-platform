@@ -6,22 +6,27 @@ router público (rate-limited, sin sesión).
 """
 
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 from sqlmodel import select
 
 from backend.app.api.resource_actions import (
     api_error,
     commit_or_conflict,
     get_or_404,
+    paginate_resource,
     serialize,
     serialize_many,
 )
 from backend.app.auth.auth_dependencies import CurrentUser
 from backend.app.core.database import SessionDep
 from backend.app.models.shipping import DeliveryZone, ShippingRateRule
+from backend.app.resources.registry import DELIVERY_ZONES
+from backend.app.schemas.pagination import OffsetPage
 from backend.app.schemas.shipping import (
     DeliveryZoneCreate,
+    DeliveryZoneListItem,
     DeliveryZoneRead,
     DeliveryZoneUpdate,
     ShippingRateCreate,
@@ -64,15 +69,24 @@ def _serialize_zone(zone: DeliveryZone) -> DeliveryZoneRead:
     )
 
 
-@router.get("/zones", response_model=list[DeliveryZoneRead])
-def list_zones(session: SessionDep, _: ShippingPermissions.READ.requiere) -> list[DeliveryZoneRead]:
-    zones = session.exec(
-        select(DeliveryZone).order_by(
-            DeliveryZone.priority.desc(),  # pyright: ignore[reportAttributeAccessIssue]
-            DeliveryZone.name,  # pyright: ignore[reportArgumentType]
-        )
-    ).all()
-    return [_serialize_zone(zone) for zone in zones]
+@router.get("/zones", response_model=OffsetPage[DeliveryZoneListItem])
+def list_zones(
+    session: SessionDep,
+    query: Annotated[DELIVERY_ZONES.Query, Query()],  # pyright: ignore[reportInvalidTypeForm]
+    _: ShippingPermissions.READ.requiere,
+) -> OffsetPage[DeliveryZoneListItem]:
+    """Listado genérico (motor de query) con campos simples; el polígono de
+    cobertura y las tarifas viven en el detalle de la zona."""
+    return paginate_resource(DELIVERY_ZONES, session, query)
+
+
+@router.get("/zones/{zone_id}", response_model=DeliveryZoneRead)
+def get_zone(
+    zone_id: uuid.UUID,
+    session: SessionDep,
+    _: ShippingPermissions.READ.requiere,
+) -> DeliveryZoneRead:
+    return _serialize_zone(get_or_404(session, DeliveryZone, zone_id, _ZONE_NOT_FOUND))
 
 
 @router.post("/zones", response_model=DeliveryZoneRead, status_code=status.HTTP_201_CREATED)

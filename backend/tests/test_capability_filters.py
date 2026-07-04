@@ -84,9 +84,10 @@ class LegacyFiltersRemovedTest(unittest.TestCase):
         self.assertIn("email", {f["key"] for f in cap["filterable_fields"]})
 
     def test_permission_filtering_preserved(self) -> None:
+        # El catálogo ahora es un envelope {resources, navigation_modules}.
         with _As("users:read"):
-            names = [r["name"] for r in client.get("/api/v1/resources").json()]
-        self.assertEqual(names, ["users"])
+            body = client.get("/api/v1/resources").json()
+        self.assertEqual([r["name"] for r in body["resources"]], ["users"])
 
 
 class FilterableFieldsTest(unittest.TestCase):

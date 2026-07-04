@@ -2,12 +2,17 @@
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Query, status
 from sqlmodel import select
 
-from backend.app.api.resource_actions import api_error, commit_or_conflict, get_or_404
+from backend.app.api.resource_actions import (
+    api_error,
+    commit_or_conflict,
+    get_or_404,
+    paginate_resource,
+)
 from backend.app.auth.auth_dependencies import CurrentUser
 from backend.app.core.database import SessionDep
 from backend.app.models.finances import (
@@ -17,11 +22,13 @@ from backend.app.models.finances import (
 )
 from backend.app.models.orders import Order
 from backend.app.models.payments import Payment
+from backend.app.resources.registry import FINANCE_CATEGORIES
 from backend.app.schemas.finance import (
     BusinessSummaryRead,
     CreditRefundAllocationRead,
     CreditRefundCreate,
     FinancialCategoryCreate,
+    FinancialCategoryListItem,
     FinancialCategoryRead,
     FinancialEntryAttachmentCreate,
     FinancialEntryAttachmentRead,
@@ -31,6 +38,7 @@ from backend.app.schemas.finance import (
     RefundCreate,
     RefundRead,
 )
+from backend.app.schemas.pagination import OffsetPage
 from backend.app.security.groups.finances import FinancePermissions
 from backend.app.security.groups.payments import PaymentPermissions
 from backend.app.services.file_service import get_active_file
@@ -64,17 +72,24 @@ def _entry_read(entry: FinancialEntry) -> FinancialEntryRead:
     )
 
 
-@router.get("/finances/categories", response_model=list[FinancialCategoryRead])
+@router.get("/finances/categories", response_model=OffsetPage[FinancialCategoryListItem])
 def list_categories(
-    session: SessionDep, _: FinancePermissions.READ.requiere
-) -> list[FinancialCategoryRead]:
-    rows = session.exec(
-        select(FinancialCategory).order_by(
-            FinancialCategory.direction,  # pyright: ignore[reportArgumentType]
-            FinancialCategory.name,  # pyright: ignore[reportArgumentType]
-        )
-    ).all()
-    return [FinancialCategoryRead.model_validate(row, from_attributes=True) for row in rows]
+    session: SessionDep,
+    query: Annotated[FINANCE_CATEGORIES.Query, Query()],  # pyright: ignore[reportInvalidTypeForm]
+    _: FinancePermissions.READ.requiere,
+) -> OffsetPage[FinancialCategoryListItem]:
+    """Listado genérico (motor de query): filtro por dirección/estado y búsqueda."""
+    return paginate_resource(FINANCE_CATEGORIES, session, query)
+
+
+@router.get("/finances/categories/{category_id}", response_model=FinancialCategoryRead)
+def get_finance_category(
+    category_id: uuid.UUID,
+    session: SessionDep,
+    _: FinancePermissions.READ.requiere,
+) -> FinancialCategoryRead:
+    category = get_or_404(session, FinancialCategory, category_id, "Categoría no encontrada")
+    return FinancialCategoryRead.model_validate(category, from_attributes=True)
 
 
 @router.post(

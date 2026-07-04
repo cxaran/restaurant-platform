@@ -17,6 +17,7 @@ from backend.app.api.v1.profiles import router as profiles_router
 from backend.app.api.v1.payments import router as payments_router
 from backend.app.api.v1.permissions import router as permissions_router
 from backend.app.api.v1.public_site import router as public_site_router
+from backend.app.api.v1.reports import router as reports_router
 from backend.app.api.v1.resources import router as resources_router
 from backend.app.api.v1.roles import router as roles_router
 from backend.app.api.v1.shipping import router as shipping_router
@@ -44,6 +45,7 @@ router.include_router(profiles_router)
 router.include_router(payments_router)
 router.include_router(permissions_router)
 router.include_router(public_site_router)
+router.include_router(reports_router)
 router.include_router(resources_router)
 router.include_router(roles_router)
 router.include_router(shipping_router)

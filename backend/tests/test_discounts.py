@@ -86,6 +86,11 @@ class _As:
 
 class DiscountCodesTest(unittest.TestCase):
     def setUp(self) -> None:
+        # El checkout aplica rate limiting (§1.14); en unitarios se apaga.
+        from backend.app.core.settings import settings
+
+        self._previous_rate_limit = settings.rate_limit_enabled
+        settings.rate_limit_enabled = False
         self.engine = create_engine(
             "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
         )
@@ -126,6 +131,9 @@ class DiscountCodesTest(unittest.TestCase):
             session.commit()
 
     def tearDown(self) -> None:
+        from backend.app.core.settings import settings
+
+        settings.rate_limit_enabled = self._previous_rate_limit
         app.dependency_overrides.clear()
 
     # ------------------------------------------------------------------

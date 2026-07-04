@@ -168,6 +168,10 @@ def _policies() -> dict[str, BucketPolicy]:
         "login_verify_ip": parse_policy(settings.rate_limit_login_verify_ip),
         "google_login_ip": parse_policy(settings.rate_limit_google_login_ip),
         "public_quote_ip": parse_policy(settings.rate_limit_public_quote_ip),
+        "checkout_ip": parse_policy(settings.rate_limit_checkout_ip),
+        "checkout_identity": parse_policy(settings.rate_limit_checkout_identity),
+        "discount_quote_ip": parse_policy(settings.rate_limit_discount_quote_ip),
+        "discount_quote_identity": parse_policy(settings.rate_limit_discount_quote_identity),
     }
 
 
@@ -288,3 +292,23 @@ def limit_reset_password(request: Request, token: str) -> None:
 
 def limit_bootstrap_initialize(request: Request) -> None:
     enforce(request, ("bootstrap_ip", client_ip(request)))
+
+
+def limit_checkout(request: Request, user_id: str) -> None:
+    """Checkout web (§1.14): IP + usuario autenticado (la sesión ES la identidad).
+
+    La navegación pública del menú NO se limita; esto protege solo la creación
+    de pedidos y no sustituye la idempotencia ni los constraints."""
+    enforce(
+        request,
+        ("checkout_ip", client_ip(request)),
+        ("checkout_identity", user_id),
+    )
+
+
+def limit_discount_quote(request: Request, user_id: str) -> None:
+    enforce(
+        request,
+        ("discount_quote_ip", client_ip(request)),
+        ("discount_quote_identity", user_id),
+    )

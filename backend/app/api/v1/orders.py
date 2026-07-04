@@ -11,7 +11,9 @@ import uuid
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Request, status
+
+from backend.app.security.rate_limit import limit_checkout
 from sqlmodel import select
 
 from backend.app.api.resource_actions import api_error, commit_or_conflict, get_or_404
@@ -373,10 +375,13 @@ def _apply_discount_code_or_422(session: SessionDep, order, code: str) -> None:
 
 @router.post("", response_model=MyOrderRead, status_code=status.HTTP_201_CREATED)
 def checkout(
+    request: Request,
     payload: CheckoutRequest,
     session: SessionDep,
     current_user: CurrentUser,
 ) -> MyOrderRead:
+    # §1.14: límite moderado por IP + usuario; el menú público NO se limita.
+    limit_checkout(request, str(current_user.id))
     profile = get_business_profile(session)
     settings_row = get_business_settings(session)
     if not profile.is_accepting_orders:
@@ -441,6 +446,11 @@ def checkout(
 
     commit_or_conflict(session, "No fue posible registrar el pedido.")
     session.refresh(order)
+    # Notificación A (§1.13): best-effort DESPUÉS del commit — jamás afecta
+    # la transacción del pedido.
+    from backend.app.services.order_notifications import notify_order_received
+
+    notify_order_received(order)
     return _my_order_read(session, order)
 
 
@@ -652,6 +662,15 @@ def transition(
 
     commit_or_conflict(session, "No fue posible cambiar el estado.")
     session.refresh(order)
+    # Notificaciones C y G (§1.13), best-effort tras el commit.
+    from backend.app.services.order_notifications import (
+        notify_admin_unresolved_refund,
+        notify_order_progress,
+    )
+
+    notify_order_progress(order, payload.new_status)
+    if payload.new_status == "cancelled":
+        notify_admin_unresolved_refund(session, order)
     return _order_read(order)
 
 

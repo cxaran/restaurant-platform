@@ -225,7 +225,9 @@ step("redencion consumida al completar")
 
 # 8) Ticket + bitacora de impresion
 ticket = expect(admin.get(f"/orders/{order['id']}/ticket"), 200, "payload de ticket")
-assert ticket["totals"]["total"] == "460.00", ticket["totals"]
+# Subtotal 460 − código 100 = 360; el descuento aparece como línea propia.
+assert ticket["totals"]["total"] == "360.00", ticket["totals"]
+assert ticket["totals"]["discounts"] == "100.00", ticket["totals"]
 expect(admin.post(f"/orders/{order['id']}/ticket-prints",
                   json={"print_type": "customer_receipt"}), 201, "registrar impresion")
 

@@ -1,12 +1,17 @@
 import Link from "next/link";
 
+import { HighlightBanner } from "@/components/storefront/Highlights";
 import { getSession } from "@/core/auth/session";
+import { getPublicHighlights } from "@/core/restaurant-api/storefront";
 import { CheckoutForm } from "./CheckoutForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage() {
-  const session = await getSession();
+  const [session, highlights] = await Promise.all([
+    getSession(),
+    getPublicHighlights("checkout"),
+  ]);
 
   return (
     <div className="sf-container" style={{ paddingBlock: 24, maxWidth: 620 }}>
@@ -23,6 +28,15 @@ export default async function CheckoutPage() {
           </span>
         </div>
       </div>
+      {/* Chips de confianza (highlight `checkout`): micro-tranquilizadores,
+          nada que distraiga al pagar. */}
+      {highlights.length > 0 ? (
+        <div className="sf-hl-chiprow" style={{ marginBottom: 14 }}>
+          {highlights.map((item) => (
+            <HighlightBanner key={item.id} highlight={item} variant="chip" />
+          ))}
+        </div>
+      ) : null}
       {session ? (
         <CheckoutForm session={session} />
       ) : (

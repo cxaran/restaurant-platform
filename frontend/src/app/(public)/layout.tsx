@@ -11,12 +11,8 @@ import {
   businessFaviconMetadata,
   resolveSafeImagePath,
 } from "@/core/restaurant-api/site-metadata";
-import { getPublicStorefrontPage } from "@/core/restaurant-api/storefront";
+import { getPublicStorefrontSite } from "@/core/restaurant-api/storefront";
 import { FALLBACK_TOKENS } from "@/core/restaurant-api/view-models";
-import {
-  storefrontDemoEnabled,
-  TONY_DEMO_TOKENS,
-} from "@/core/storefront/demo-fixtures";
 
 export const dynamic = "force-dynamic";
 
@@ -31,14 +27,11 @@ const sans = Archivo({ subsets: ["latin"], variable: "--font-sf-sans" });
 const serif = Lora({ subsets: ["latin"], variable: "--font-sf-serif" });
 const rounded = Baloo_2({ subsets: ["latin"], variable: "--font-sf-rounded" });
 
-// Mismo criterio que (storefront)/layout.tsx::resolveTheme — tokens del tema
-// publicado y, si no hay nada publicado, el fallback neutro (jamás marca fija).
+// Mismo criterio que (storefront)/layout.tsx — tokens del tema activo del
+// sitio y, si el backend no responde, el fallback neutro (jamás marca fija).
 async function resolveThemeTokens() {
-  const result = await getPublicStorefrontPage("home");
-  if (result.status === "published" && result.page.theme_tokens) {
-    return result.page.theme_tokens;
-  }
-  return storefrontDemoEnabled() ? TONY_DEMO_TOKENS : FALLBACK_TOKENS;
+  const site = await getPublicStorefrontSite();
+  return site?.theme_tokens ?? FALLBACK_TOKENS;
 }
 
 export async function generateMetadata(): Promise<Metadata> {

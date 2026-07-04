@@ -172,6 +172,16 @@ export function formatClock(iso: string): string {
   return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
+// Fecha + hora corta para la bitácora del detalle (ej. «4 jul, 13:20»).
+export function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString("es-MX", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 // "hace 4 min" para pedidos recientes; después, la hora del día.
 export function relativeSince(iso: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));

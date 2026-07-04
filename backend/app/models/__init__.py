@@ -28,6 +28,7 @@ from .finances import (
     FinancialEntryAttachment,
     OrderLineRefundAllocation,
 )
+from .notification import Notification
 from .orders import (
     Order,
     OrderAdjustment,
@@ -50,13 +51,10 @@ from .setup import PlatformSetup
 from .shipping import DeliveryZone, ShippingRateRule
 from .stored_file import StoredFile
 from .storefront import (
-    StorefrontLayoutRevision,
-    StorefrontPage,
-    StorefrontPageRevision,
-    StorefrontPageSection,
-    StorefrontSectionMedia,
+    StorefrontFooter,
+    StorefrontHero,
+    StorefrontHighlight,
     StorefrontSettings,
-    StorefrontThemeRevision,
 )
 from .system_settings import SystemSettings
 from .user import User, Role, UserRole, RoleAccess
@@ -88,6 +86,7 @@ __all__ = [
     "FinancialEntryAttachment",
     "ModifierGroup",
     "ModifierOption",
+    "Notification",
     "Order",
     "OrderAdjustment",
     "OrderDelivery",
@@ -112,13 +111,10 @@ __all__ = [
     "ShippingRateRule",
     "StaffProfile",
     "StoredFile",
-    "StorefrontLayoutRevision",
-    "StorefrontPage",
-    "StorefrontPageRevision",
-    "StorefrontPageSection",
-    "StorefrontSectionMedia",
+    "StorefrontFooter",
+    "StorefrontHero",
+    "StorefrontHighlight",
     "StorefrontSettings",
-    "StorefrontThemeRevision",
     "SystemSettings",
     "TicketPrintLog",
     "User",

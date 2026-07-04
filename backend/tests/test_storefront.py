@@ -1,4 +1,4 @@
-"""Tests de la etapa 9: plantillas, publicación/rollback y sitio público."""
+"""Tests del storefront plano: contratos, CRUD del editor y sitio público."""
 
 import os
 import unittest
@@ -41,21 +41,27 @@ from sqlmodel import Session, select  # noqa: E402
 from backend.app.core.database import get_db  # noqa: E402
 from backend.app.main import app  # noqa: E402
 from backend.app.models import Base  # noqa: E402
-from backend.app.models.business import BusinessSettings  # noqa: E402
+from backend.app.models.audit_event import AuditEvent  # noqa: E402
+from backend.app.models.business import BusinessPhone, BusinessProfile  # noqa: E402
 from backend.app.models.catalog import Product, ProductCategory  # noqa: E402
-from backend.app.models.storefront import StorefrontPage  # noqa: E402
-from backend.app.services.storefront_service import (  # noqa: E402
-    StorefrontRuleError,
-    get_or_create_draft,
-    public_page_payload,
-    publish_revision,
+from backend.app.models.storefront import (  # noqa: E402
+    StorefrontHero,
+    StorefrontHighlight,
 )
-from backend.app.models.storefront import StorefrontPageSection  # noqa: E402
+from backend.app.services.storefront_service import (  # noqa: E402
+    get_footer_settings,
+    get_storefront_settings,
+    list_highlights,
+    site_public_payload,
+)
 from backend.app.storefront.presets import THEME_PRESETS, build_tokens  # noqa: E402
 from backend.app.storefront.templates import (  # noqa: E402
     TemplateValidationError,
-    validate_section_configs,
+    validate_footer,
+    validate_hero,
+    validate_highlight,
 )
+from backend.app.utils.utc_now import utc_now  # noqa: E402
 
 
 def _engine():
@@ -66,85 +72,85 @@ def _engine():
     return engine
 
 
-HERO_CONTENT = {
-    "slides": [
-        {
-            "variant": "split",
-            "title": "Sabor que te hace volver",
-            "description": "Recién hecho todos los días.",
-            "primary_cta": {"label": "Ver menú", "link_type": "menu_page"},
-        }
-    ]
+HERO_PAYLOAD = {
+    "template": "split",
+    "title": "Sabor que enamora",
+    "title_accent": "enamora",
+    "description": "Recién hecho todos los días.",
+    "primary_cta": {"label": "Ver menú", "link_type": "menu_page"},
 }
 
 
-class TemplateValidationTest(unittest.TestCase):
+class ContractValidationTest(unittest.TestCase):
     def test_valid_hero_passes(self) -> None:
-        validate_section_configs(
-            "storefront.hero", 1,
-            content=HERO_CONTENT, style={"height": "compact"},
-            data_binding={}, behavior={"show_on_mobile": True},
-        )
-
-    def test_unknown_template_and_version(self) -> None:
-        with self.assertRaises(TemplateValidationError) as ctx:
-            validate_section_configs(
-                "storefront.inventada", 1, content={}, style={}, data_binding={}, behavior={}
-            )
-        self.assertEqual(ctx.exception.code, "plantilla_desconocida")
-
-        with self.assertRaises(TemplateValidationError) as ctx:
-            validate_section_configs(
-                "storefront.hero", 99, content=HERO_CONTENT, style={},
-                data_binding={}, behavior={},
-            )
-        self.assertEqual(ctx.exception.code, "plantilla_version_incompatible")
+        hero = validate_hero(HERO_PAYLOAD)
+        self.assertEqual(hero.template, "split")
 
     def test_unknown_keys_are_rejected(self) -> None:
         with self.assertRaises(TemplateValidationError) as ctx:
-            validate_section_configs(
-                "storefront.hero", 1,
-                content={**HERO_CONTENT, "html": "<script>"},
-                style={}, data_binding={}, behavior={},
-            )
+            validate_hero({**HERO_PAYLOAD, "html": "<script>"})
         self.assertEqual(ctx.exception.code, "configuracion_invalida")
+
+    def test_title_accent_must_be_substring(self) -> None:
+        with self.assertRaises(TemplateValidationError):
+            validate_hero({**HERO_PAYLOAD, "title_accent": "no-está"})
+
+    def test_showcase_requires_product(self) -> None:
+        with self.assertRaises(TemplateValidationError):
+            validate_hero({**HERO_PAYLOAD, "template": "showcase"})
+        validate_hero(
+            {**HERO_PAYLOAD, "template": "showcase", "product_id": str(uuid.uuid4())}
+        )
 
     def test_dangerous_links_are_rejected(self) -> None:
         bad = {
-            "slides": [
-                {
-                    "title": "X",
-                    "primary_cta": {
-                        "label": "Click",
-                        "link_type": "external_https",
-                        "target": "javascript:alert(1)",
-                    },
-                }
-            ]
+            **HERO_PAYLOAD,
+            "primary_cta": {
+                "label": "Click",
+                "link_type": "external_https",
+                "target": "javascript:alert(1)",
+            },
         }
         with self.assertRaises(TemplateValidationError):
-            validate_section_configs(
-                "storefront.hero", 1, content=bad, style={}, data_binding={}, behavior={}
-            )
+            validate_hero(bad)
 
     def test_external_link_must_be_https(self) -> None:
         bad = {
-            "slides": [
-                {
-                    "title": "X",
-                    "primary_cta": {
-                        "label": "Sitio",
-                        "link_type": "external_https",
-                        "target": "http://inseguro.com",
-                    },
-                }
-            ]
+            **HERO_PAYLOAD,
+            "secondary_cta": {
+                "label": "Sitio",
+                "link_type": "external_https",
+                "target": "http://inseguro.com",
+            },
         }
         with self.assertRaises(TemplateValidationError) as ctx:
-            validate_section_configs(
-                "storefront.hero", 1, content=bad, style={}, data_binding={}, behavior={}
-            )
+            validate_hero(bad)
         self.assertEqual(ctx.exception.code, "enlace_invalido")
+
+    def test_highlight_window_and_cta(self) -> None:
+        validate_highlight({"surface": "cart", "title": "Te faltan $85"})
+        with self.assertRaises(TemplateValidationError):
+            validate_highlight(
+                {
+                    "surface": "cart",
+                    "title": "X",
+                    "starts_at": "2026-01-02T00:00:00",
+                    "ends_at": "2026-01-01T00:00:00",
+                }
+            )
+        with self.assertRaises(TemplateValidationError):
+            validate_highlight({"surface": "orbita", "title": "X"})
+
+    def test_footer_social_links_https_only(self) -> None:
+        validate_footer(
+            {"social_links": [{"network": "instagram", "url": "https://instagram.com/x"}]}
+        )
+        with self.assertRaises(TemplateValidationError):
+            validate_footer(
+                {"social_links": [{"network": "instagram", "url": "http://inseguro"}]}
+            )
+        with self.assertRaises(TemplateValidationError):
+            validate_footer({"social_links": [{"network": "myspace", "url": "https://x"}]})
 
     def test_presets_are_brand_neutral(self) -> None:
         self.assertNotIn("tony", " ".join(THEME_PRESETS).lower())
@@ -152,164 +158,137 @@ class TemplateValidationTest(unittest.TestCase):
         self.assertEqual(tokens["colors"]["accent"], "#123ABC")
 
 
-class PublishFlowTest(unittest.TestCase):
+class PublicSitePayloadTest(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = _engine()
         with Session(self.engine) as session:
-            session.add(BusinessSettings(id=1, free_shipping_global_from_amount=Decimal("350")))
-            page = StorefrontPage(page_key="home", slug="/", page_type="storefront_home",
-                                  is_system_page=True)
-            session.add(page)
-            category = ProductCategory(name="Boneless")
+            session.add(
+                BusinessProfile(
+                    id=1, trade_name="Tony Tony", slogan="El sabor que enamora",
+                    timezone="America/Mexico_City",
+                    main_address="Blvd. V. Carranza 1200, Saltillo",
+                )
+            )
+            session.add(
+                BusinessPhone(
+                    label="Pedidos", phone="55 1234 5678", phone_normalized="+525512345678",
+                    is_whatsapp=True, is_public=True, is_active=True,
+                )
+            )
+            category = ProductCategory(name="Hamburguesas")
             session.add(category)
             session.flush()
+            self.product_id = uuid.uuid4()
             session.add(
                 Product(
-                    id=uuid.uuid4(), category_id=category.id, name="Orden de boneless",
-                    money_price_amount=Decimal("230"), is_featured=True,
-                    credits_awarded_per_unit=20,
+                    id=self.product_id, category_id=category.id, name="Hamburguesa Tony",
+                    money_price_amount=Decimal("129"), is_featured=True,
+                    credits_awarded_per_unit=10,
                 )
             )
             session.commit()
-            self.page_id = page.id
 
-    def test_draft_publish_edit_rollback_cycle(self) -> None:
+    def test_site_payload_contains_theme_carousel_heros_footer(self) -> None:
         with Session(self.engine) as session:
-            page = session.get(StorefrontPage, self.page_id)
-            assert page is not None
-
-            # v1: hero + productos destacados + barra de envío gratis.
-            draft1 = get_or_create_draft(session, page, created_by=None)
+            settings_row = get_storefront_settings(session)
+            settings_row.theme_preset = "fresco"
+            settings_row.theme_accent = "#123ABC"
+            settings_row.hero_interval_seconds = 8
+            session.add(settings_row)
             session.add_all(
                 [
-                    StorefrontPageSection(
-                        page_revision_id=draft1.id, template_key="storefront.hero",
-                        template_version=1, sort_order=10, content_config=HERO_CONTENT,
+                    StorefrontHero(
+                        template="split", title="Sabor que enamora",
+                        title_accent="enamora", sort_order=20,
                     ),
-                    StorefrontPageSection(
-                        page_revision_id=draft1.id,
-                        template_key="storefront.announcement.free_shipping",
-                        template_version=1, sort_order=5,
+                    StorefrontHero(
+                        template="showcase", title="La favorita",
+                        product_id=self.product_id, sort_order=10,
                     ),
-                    StorefrontPageSection(
-                        page_revision_id=draft1.id,
-                        template_key="storefront.catalog.featured_products",
-                        template_version=1, sort_order=20,
-                        data_binding_config={"source": "featured_products", "max_items": 4},
-                    ),
+                    StorefrontHero(template="minimal", title="Oculto", is_active=False),
                 ]
             )
-            session.flush()
-            session.refresh(draft1)
-            publish_revision(session, page, draft1, actor_id=None)
             session.commit()
-            self.assertEqual(page.published_revision_id, draft1.id)
 
-            payload = public_page_payload(session, "home")
-            keys = [s["template_key"] for s in payload["sections"]]
+            payload = site_public_payload(session)
+
+            self.assertTrue(payload["enabled"])
+            # Tema derivado del preset + acento (nunca CSS libre).
+            self.assertEqual(payload["theme_tokens"]["colors"]["accent"], "#123ABC")
             self.assertEqual(
-                keys,
+                payload["theme_tokens"]["colors"]["brand_primary"],
+                THEME_PRESETS["fresco"]["colors"]["brand_primary"],
+            )
+            self.assertEqual(payload["carousel"]["interval_seconds"], 8)
+            # Solo activos, en orden; el showcase resuelve el producto REAL.
+            self.assertEqual(
+                [hero["title"] for hero in payload["heros"]],
+                ["La favorita", "Sabor que enamora"],
+            )
+            showcase = payload["heros"][0]
+            self.assertEqual(showcase["product"]["name"], "Hamburguesa Tony")
+            self.assertEqual(showcase["product"]["money_price_amount"], "129.00")
+            # Footer con datos reales del negocio (Turno 11: dirección incluida).
+            footer = payload["footer"]
+            self.assertEqual(footer["slogan"], "El sabor que enamora")
+            self.assertEqual(footer["phones"][0]["is_whatsapp"], True)
+            self.assertIsNotNone(footer["schedule"])
+            self.assertTrue(footer["show_links"])
+            self.assertEqual(footer["address"], "Blvd. V. Carranza 1200, Saltillo")
+
+    def test_footer_toggles_hide_business_data(self) -> None:
+        with Session(self.engine) as session:
+            footer = get_footer_settings(session)
+            footer.show_slogan = False
+            footer.show_phones = False
+            footer.show_schedule = False
+            footer.social_links = [
+                {"network": "instagram", "url": "https://instagram.com/tony"}
+            ]
+            session.add(footer)
+            session.commit()
+
+            payload = site_public_payload(session)["footer"]
+            self.assertIsNone(payload["slogan"])
+            self.assertEqual(payload["phones"], [])
+            self.assertIsNone(payload["schedule"])
+            self.assertEqual(payload["social_links"][0]["network"], "instagram")
+
+    def test_footer_note_overrides_slogan(self) -> None:
+        with Session(self.engine) as session:
+            footer = get_footer_settings(session)
+            footer.note = "Hecho en casa desde 1990"
+            session.add(footer)
+            session.commit()
+            self.assertEqual(
+                site_public_payload(session)["footer"]["slogan"],
+                "Hecho en casa desde 1990",
+            )
+
+    def test_highlights_filter_by_surface_window_and_active(self) -> None:
+        from datetime import timedelta
+
+        with Session(self.engine) as session:
+            now = utc_now()
+            session.add_all(
                 [
-                    "storefront.announcement.free_shipping",
-                    "storefront.hero",
-                    "storefront.catalog.featured_products",
-                ],
+                    StorefrontHighlight(surface="cart", title="Vigente"),
+                    StorefrontHighlight(surface="cart", title="Apagado", is_active=False),
+                    StorefrontHighlight(
+                        surface="cart", title="Futuro", starts_at=now + timedelta(days=1)
+                    ),
+                    StorefrontHighlight(
+                        surface="cart", title="Expirado", ends_at=now - timedelta(days=1)
+                    ),
+                    StorefrontHighlight(surface="login", title="Otra superficie"),
+                ]
             )
-            # Data bindings REALES (§51): umbral de envío y catálogo vigente.
-            self.assertEqual(
-                payload["sections"][0]["data"]["free_shipping_from_amount"], "350.00"
-            )
-            products = payload["sections"][2]["data"]["products"]
-            self.assertEqual(products[0]["name"], "Orden de boneless")
-
-            # v2: el borrador CLONA la publicada; publicar archiva la anterior.
-            draft2 = get_or_create_draft(session, page, created_by=None)
-            self.assertEqual(draft2.revision_number, 2)
-            self.assertEqual(len(draft2.sections), 3)  # clonadas
-            for section in draft2.sections:
-                if section.template_key == "storefront.hero":
-                    session.delete(section)
-            session.flush()
-            session.refresh(draft2)
-            publish_revision(session, page, draft2, actor_id=None)
             session.commit()
-            session.refresh(draft1)
-            self.assertEqual(draft1.status, "archived")
-            self.assertEqual(
-                len(public_page_payload(session, "home")["sections"]), 2
-            )
-
-            # Rollback (§48): re-publicar la v1 archivada, nada se sobrescribió.
-            publish_revision(session, page, draft1, actor_id=None)
-            session.commit()
-            self.assertEqual(page.published_revision_id, draft1.id)
-            self.assertEqual(
-                len(public_page_payload(session, "home")["sections"]), 3
-            )
-
-    def test_publish_validates_all_sections(self) -> None:
-        with Session(self.engine) as session:
-            page = session.get(StorefrontPage, self.page_id)
-            assert page is not None
-            draft = get_or_create_draft(session, page, created_by=None)
-            session.add(
-                StorefrontPageSection(
-                    page_revision_id=draft.id, template_key="storefront.hero",
-                    template_version=1, sort_order=10,
-                    content_config={"slides": []},  # inválido: min_length=1
-                )
-            )
-            session.flush()
-            session.refresh(draft)
-            with self.assertRaises(StorefrontRuleError):
-                publish_revision(session, page, draft, actor_id=None)
-
-    def test_unpublished_page_is_not_public(self) -> None:
-        with Session(self.engine) as session:
-            with self.assertRaises(StorefrontRuleError) as ctx:
-                public_page_payload(session, "home")
-            self.assertEqual(ctx.exception.code, "pagina_no_publicada")
+            visible = list_highlights(session, surface="cart", only_active=True)
+            self.assertEqual([row.title for row in visible], ["Vigente"])
 
 
-class StorefrontRoutesTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.engine = _engine()
-
-        def override_db():
-            with Session(self.engine) as session:
-                yield session
-
-        app.dependency_overrides[get_db] = override_db
-        self.client = TestClient(app)
-
-    def tearDown(self) -> None:
-        app.dependency_overrides.clear()
-
-    def test_openapi_exposes_storefront_routes(self) -> None:
-        paths = self.client.get("/api/openapi.json").json()["paths"]
-        for path in (
-            "/api/v1/storefront/templates",
-            "/api/v1/storefront/theme-presets",
-            "/api/v1/storefront/pages/{page_key}/draft",
-            "/api/v1/storefront/pages/{page_key}/publish",
-            "/api/v1/public/storefront/{page_key}",
-        ):
-            self.assertIn(path, paths)
-
-    def test_editor_requires_authentication_public_does_not(self) -> None:
-        self.assertEqual(self.client.get("/api/v1/storefront/templates").status_code, 401)
-        # Público: página inexistente/no publicada → 404, no 401.
-        response = self.client.get("/api/v1/public/storefront/home")
-        self.assertEqual(response.status_code, 404)
-
-
-if __name__ == "__main__":
-    unittest.main()
-
-
-class Phase1Test(unittest.TestCase):
-    """Fase 1 restante: páginas, media por slot, reorder atómico, layout, schemas."""
-
+class EditorRoutesTest(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = _engine()
 
@@ -318,405 +297,226 @@ class Phase1Test(unittest.TestCase):
                 yield session
 
         from backend.app.auth.auth_dependencies import get_current_user
-        from backend.app.core.database import get_db
         from backend.app.schemas.user import SessionUser
 
         app.dependency_overrides[get_db] = override_db
         self._user = SessionUser(
             id=uuid.uuid4(), name="Ed", last_name="Itor", email="ed@example.com",
-            permissions={
-                "storefront:read_draft", "storefront:edit", "storefront:manage_media",
-                "storefront:publish", "storefront:preview", "storefront:manage_navigation",
-            },
+            permissions={"storefront:read", "storefront:edit", "storefront:manage_theme"},
         )
         app.dependency_overrides[get_current_user] = lambda: self._user
         self.client = TestClient(app)
 
         with Session(self.engine) as session:
-            session.add(StorefrontPage(page_key="home", slug="/", page_type="storefront_home",
-                                       is_system_page=True))
-            from backend.app.models.stored_file import StoredFile
-
-            self.image_id = uuid.uuid4()
-            session.add(
-                StoredFile(
-                    id=self.image_id, kind="image", mime_type="image/png",
-                    original_filename="hero.png", byte_size=10,
-                    sha256="a" * 64, file_content=b"x",
-                )
-            )
+            session.add(BusinessProfile(id=1, trade_name="Tony Tony"))
             session.commit()
 
     def tearDown(self) -> None:
         app.dependency_overrides.clear()
 
-    def test_pages_listing_media_reorder_and_layout(self) -> None:
-        # Listado real de páginas (sin listas sembradas en frontend).
-        pages = self.client.get("/api/v1/storefront/pages").json()
-        self.assertEqual([p["page_key"] for p in pages], ["home"])
-        self.assertFalse(pages[0]["has_draft"])
-
-        # Borrador con dos secciones.
-        for key, order in (("storefront.hero", 20), ("storefront.banner.credits", 10)):
-            content = (
-                HERO_CONTENT if key == "storefront.hero" else {"title": "Gana créditos"}
-            )
-            created = self.client.post(
-                "/api/v1/storefront/pages/home/draft/sections",
-                json={"template_key": key, "sort_order": order, "content_config": content},
-            )
-            self.assertEqual(created.status_code, 201, created.text)
-        draft = self.client.get("/api/v1/storefront/pages/home/draft").json()
-        ids = [s["id"] for s in draft["sections"]]  # ordenados por sort_order
-
-        # Reorden ATÓMICO: set incompleto → 422; completo → posiciones nuevas.
-        bad = self.client.post(
-            "/api/v1/storefront/pages/home/draft/sections/sort",
-            json={"section_ids": [ids[0]]},
-        )
-        self.assertEqual(bad.status_code, 422)
-        ok = self.client.post(
-            "/api/v1/storefront/pages/home/draft/sections/sort",
-            json={"section_ids": [ids[1], ids[0]]},
-        )
-        self.assertEqual(ok.status_code, 200, ok.text)
-        self.assertEqual([s["id"] for s in ok.json()], [ids[1], ids[0]])
-
-        # Media por slot: sólo imágenes activas; queda en preview y se clona.
-        hero_id = ids[1]  # el hero quedó primero tras el reorden
-        media = self.client.put(
-            f"/api/v1/storefront/sections/{hero_id}/media/main",
-            json={"desktop_file_id": str(self.image_id), "alt_text": "Boneless"},
-        )
-        self.assertEqual(media.status_code, 200, media.text)
-        self.assertEqual(media.json()["main"]["desktop_file_id"], str(self.image_id))
-        preview = self.client.get("/api/v1/storefront/pages/home/preview").json()
-        hero_preview = next(s for s in preview["sections"] if s["template_key"] == "storefront.hero")
-        self.assertIn("main", hero_preview["media"])
-
-        # Publicar → payload público incluye media y el binding del banner delivery.
-        published = self.client.post("/api/v1/storefront/pages/home/publish")
-        self.assertEqual(published.status_code, 200, published.text)
-        with Session(self.engine) as session:
-            from backend.app.models.business import BusinessSettings
-
-            session.add(BusinessSettings(id=1))
-            session.commit()
-        public = self.client.get("/api/v1/public/storefront/home").json()
-        hero_public = next(s for s in public["sections"] if s["template_key"] == "storefront.hero")
-        self.assertEqual(hero_public["media"]["main"]["desktop_file_id"], str(self.image_id))
-
-        # El siguiente borrador CLONA la media publicada.
-        cloned = self.client.get("/api/v1/storefront/pages/home/draft").json()
-        self.assertEqual(cloned["revision_number"], 2)
-        cloned_hero = next(
-            s for s in self.client.get("/api/v1/storefront/pages/home/preview").json()["sections"]
-            if s["template_key"] == "storefront.hero"
-        )
-        self.assertIn("main", cloned_hero["media"])
-
-        # Layout: CTA peligroso rechazado; válido publica y sale en público.
-        bad_layout = self.client.put(
-            "/api/v1/storefront/layout",
-            json={"header_config": {"nav_links": [
-                {"label": "X", "link_type": "external_https", "target": "javascript:alert(1)"}
-            ]}},
-        )
-        self.assertEqual(bad_layout.status_code, 422)
-        good_layout = self.client.put(
-            "/api/v1/storefront/layout",
-            json={
-                "header_config": {"nav_links": [{"label": "Menú", "link_type": "menu_page"}]},
-                "footer_config": {"note": "Hecho en casa"},
-            },
-        )
-        self.assertEqual(good_layout.status_code, 200, good_layout.text)
-        public2 = self.client.get("/api/v1/public/storefront/home").json()
-        self.assertEqual(
-            public2["layout"]["header"]["nav_links"][0]["label"], "Menú"
-        )
-
-    def test_templates_expose_json_schema_and_new_templates(self) -> None:
-        templates = self.client.get("/api/v1/storefront/templates").json()
-        keys = {t["key"] for t in templates}
-        for expected in (
-            "storefront.catalog.categories",
-            "storefront.banner.credits",
-            "storefront.banner.delivery",
+    def test_openapi_exposes_new_routes_and_drops_versioned_ones(self) -> None:
+        paths = self.client.get("/api/openapi.json").json()["paths"]
+        for path in (
+            "/api/v1/storefront/config",
+            "/api/v1/storefront/heros",
+            "/api/v1/storefront/highlights",
+            "/api/v1/storefront/footer",
+            "/api/v1/storefront/theme",
+            "/api/v1/storefront/settings",
+            "/api/v1/public/storefront/site",
+            "/api/v1/public/storefront/highlights",
         ):
-            self.assertIn(expected, keys)
-        hero = next(t for t in templates if t["key"] == "storefront.hero")
-        self.assertIn("properties", hero["content_schema"])
-        self.assertIn("slides", hero["content_schema"]["properties"])
+            self.assertIn(path, paths)
+        # El ciclo versionado desapareció del contrato.
+        for gone in (
+            "/api/v1/storefront/pages/{page_key}/draft",
+            "/api/v1/storefront/pages/{page_key}/publish",
+            "/api/v1/storefront/pages/{page_key}/schedule",
+            "/api/v1/storefront/templates",
+            "/api/v1/public/storefront/{page_key}",
+        ):
+            self.assertNotIn(gone, paths)
 
-
-class ScheduledPublishTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.engine = _engine()
-        with Session(self.engine) as session:
-            session.add(StorefrontPage(page_key="home", slug="/", page_type="storefront_home"))
-            session.commit()
-
-    def test_schedule_validates_and_tick_publishes_due(self) -> None:
-        from datetime import timedelta
-
-        from backend.app.services.storefront_service import (
-            get_or_create_draft,
-            publish_due_scheduled,
-            schedule_draft,
-        )
-        from backend.app.utils.utc_now import utc_now
-
-        with Session(self.engine) as session:
-            page = session.exec(select(StorefrontPage)).one()
-            draft = get_or_create_draft(session, page, created_by=None)
-            session.add(
-                StorefrontPageSection(
-                    page_revision_id=draft.id, template_key="storefront.hero",
-                    template_version=1, sort_order=10, content_config=HERO_CONTENT,
-                )
-            )
-            session.flush()
-            session.refresh(draft)
-
-            # Fecha pasada -> rechazada; futura -> queda scheduled.
-            with self.assertRaises(StorefrontRuleError):
-                schedule_draft(session, page, publish_at=utc_now() - timedelta(minutes=1),
-                               actor_id=None)
-            scheduled = schedule_draft(
-                session, page, publish_at=utc_now() + timedelta(minutes=5), actor_id=None
-            )
-            session.commit()
-            self.assertEqual(scheduled.status, "scheduled")
-
-            # Aún no vence: el tick no publica nada.
-            self.assertEqual(publish_due_scheduled(session), 0)
-
-            # Vencida: el tick la publica y el puntero de la página apunta a ella.
-            scheduled.scheduled_publish_at = utc_now() - timedelta(seconds=1)
-            session.add(scheduled)
-            session.flush()
-            self.assertEqual(publish_due_scheduled(session), 1)
-            session.commit()
-            session.refresh(page)
-            self.assertEqual(page.published_revision_id, scheduled.id)
-            self.assertEqual(scheduled.status, "published")
-
-    def test_superseded_schedule_is_cancelled_not_published(self) -> None:
-        """§1.9: una publicación posterior a la programación cancela la campaña
-        vieja — jamás pisa los cambios recientes."""
-        from datetime import timedelta
-
-        from backend.app.services.storefront_service import (
-            get_or_create_draft,
-            publish_due_scheduled,
-            publish_revision,
-            schedule_draft,
-        )
-        from backend.app.utils.utc_now import utc_now
-
-        with Session(self.engine) as session:
-            page = session.exec(select(StorefrontPage)).one()
-            draft = get_or_create_draft(session, page, created_by=None)
-            session.add(
-                StorefrontPageSection(
-                    page_revision_id=draft.id, template_key="storefront.hero",
-                    template_version=1, sort_order=10, content_config=HERO_CONTENT,
-                )
-            )
-            session.flush()
-            session.refresh(draft)
-            scheduled = schedule_draft(
-                session, page, publish_at=utc_now() + timedelta(minutes=5), actor_id=None
-            )
-            session.commit()
-
-            # Alguien publica una revisión MÁS RECIENTE después de programar.
-            newer = get_or_create_draft(session, page, created_by=None)
-            session.add(
-                StorefrontPageSection(
-                    page_revision_id=newer.id, template_key="storefront.hero",
-                    template_version=1, sort_order=10, content_config=HERO_CONTENT,
-                )
-            )
-            session.flush()
-            session.refresh(newer)
-            publish_revision(session, page, newer, actor_id=None)
-            session.commit()
-
-            # Vence la programación vieja: NO publica; queda cancelada con razón.
-            scheduled.scheduled_publish_at = utc_now() - timedelta(seconds=1)
-            session.add(scheduled)
-            session.flush()
-            self.assertEqual(publish_due_scheduled(session), 0)
-            session.commit()
-            session.refresh(page)
-            session.refresh(scheduled)
-            self.assertEqual(page.published_revision_id, newer.id)
-            self.assertEqual(scheduled.status, "draft")
-            self.assertIsNone(scheduled.scheduled_publish_at)
-            self.assertIn("más reciente", scheduled.schedule_cancelled_reason or "")
-
-            # Auditoría del evento (nombres de campos, sin valores).
-            from backend.app.models.audit_event import AuditEvent
-
-            events = session.exec(
-                select(AuditEvent).where(AuditEvent.action == "schedule_superseded")
-            ).all()
-            self.assertEqual(len(events), 1)
-
-
-class PreviewLinkTest(unittest.TestCase):
-    """Enlace de preview firmado: read-only, temporal, invalidado al publicar."""
-
-    def setUp(self) -> None:
-        self.engine = _engine()
-        with Session(self.engine) as session:
-            session.add(StorefrontPage(page_key="home", slug="/", page_type="storefront_home"))
-            session.commit()
-
-        def override_db():
-            with Session(self.engine) as session:
-                yield session
-
-        from backend.app.auth.auth_dependencies import get_current_user
-        from backend.app.core.database import get_db
-        from backend.app.schemas.user import SessionUser
-
-        app.dependency_overrides[get_db] = override_db
-        self._user = SessionUser(
-            id=uuid.uuid4(), name="A", last_name="B", email="a@b.mx",
-            permissions={"storefront:preview", "storefront:read_draft"},
-        )
-        app.dependency_overrides[get_current_user] = lambda: self._user
-        self.client = TestClient(app)
-
-    def tearDown(self) -> None:
-        app.dependency_overrides.clear()
-
-    def test_preview_link_lifecycle(self) -> None:
-        # Crear enlace exige permiso; el token resuelve el payload SIN sesión.
-        created = self.client.post("/api/v1/storefront/pages/home/preview-link")
-        self.assertEqual(created.status_code, 200, created.text)
-        body = created.json()
-        self.assertIn("token", body)
-        self.assertTrue(body["url"].startswith("/api/v1/public/storefront/preview/"))
-
+    def test_editor_requires_authentication_public_does_not(self) -> None:
         app.dependency_overrides.pop(
             __import__(
                 "backend.app.auth.auth_dependencies", fromlist=["get_current_user"]
             ).get_current_user,
             None,
         )
-        public = self.client.get(body["url"])
-        self.assertEqual(public.status_code, 200, public.text)
-        payload = public.json()
-        self.assertEqual(payload["page_key"], "home")
-        self.assertIn("sections", payload)
-
-        # Token corrupto → 404 uniforme.
-        broken = self.client.get(body["url"] + "x")
-        self.assertEqual(broken.status_code, 404)
-
-        # Al publicar la revisión, el enlace deja de resolver (invalidación).
-        from backend.app.services.storefront_service import (
-            get_page,
-            get_or_create_draft,
-            publish_revision,
+        self.assertEqual(self.client.get("/api/v1/storefront/config").status_code, 401)
+        self.assertEqual(
+            self.client.get("/api/v1/public/storefront/site").status_code, 200
         )
 
-        with Session(self.engine) as session:
-            page = get_page(session, "home")
-            assert page is not None
-            draft = get_or_create_draft(session, page, created_by=None)
-            session.add(
-                StorefrontPageSection(
-                    page_revision_id=draft.id, template_key="storefront.hero",
-                    template_version=1, sort_order=10, content_config=HERO_CONTENT,
-                )
-            )
-            session.flush()
-            session.refresh(draft)
-            publish_revision(session, page, draft, actor_id=None)
-            session.commit()
-        gone = self.client.get(body["url"])
-        self.assertEqual(gone.status_code, 404)
+    def test_hero_crud_sort_and_public_site(self) -> None:
+        created = self.client.post("/api/v1/storefront/heros", json=HERO_PAYLOAD)
+        self.assertEqual(created.status_code, 201, created.text)
+        hero_id = created.json()["id"]
 
-    def test_preview_link_requires_permission(self) -> None:
-        from backend.app.auth.auth_dependencies import get_current_user
-        from backend.app.schemas.user import SessionUser
-
-        app.dependency_overrides[get_current_user] = lambda: SessionUser(
-            id=uuid.uuid4(), name="A", last_name="B", email="a@b.mx", permissions=set()
+        second = self.client.post(
+            "/api/v1/storefront/heros",
+            json={"template": "minimal", "title": "Abrimos hasta las 11", "sort_order": 5},
         )
-        response = self.client.post("/api/v1/storefront/pages/home/preview-link")
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(second.status_code, 201, second.text)
+        second_id = second.json()["id"]
 
-
-class ContentTemplatesTest(unittest.TestCase):
-    """Plantillas de contenido de la Etapa 6: registradas y con schema."""
-
-    def test_content_templates_registered_with_schema(self) -> None:
-        from backend.app.storefront.templates import (
-            TEMPLATES,
-            TemplateValidationError,
-            validate_section_configs,
-        )
-
-        for key in (
-            "storefront.content.image_text",
-            "storefront.content.info_cards",
-            "storefront.content.faq",
-        ):
-            self.assertIn(key, TEMPLATES)
-
-        # Config válida pasa; CTA peligroso se rechaza vía validación recursiva.
-        validate_section_configs(
-            "storefront.content.info_cards", 1,
-            content={"cards": [{"title": "Envíos", "description": "Zona centro"}]},
-            style={}, data_binding={}, behavior={},
-        )
-        with self.assertRaises(TemplateValidationError):
-            validate_section_configs(
-                "storefront.content.image_text", 1,
-                content={
-                    "title": "Hola", "body": "Texto",
-                    "cta": {
-                        "label": "Ir", "link_type": "external_https",
-                        "target": "http://inseguro.example",
-                    },
+        # CTA peligroso rechazado con código estable.
+        bad = self.client.post(
+            "/api/v1/storefront/heros",
+            json={
+                **HERO_PAYLOAD,
+                "primary_cta": {
+                    "label": "X", "link_type": "external_https",
+                    "target": "javascript:alert(1)",
                 },
-                style={}, data_binding={}, behavior={},
-            )
-        with self.assertRaises(TemplateValidationError):
-            validate_section_configs(
-                "storefront.content.faq", 1,
-                content={"items": [], "html": "<script>"},
-                style={}, data_binding={}, behavior={},
-            )
+            },
+        )
+        self.assertEqual(bad.status_code, 422)
 
+        # Reorden atómico: incompleto → 422; completo → posiciones nuevas.
+        incomplete = self.client.post(
+            "/api/v1/storefront/heros/sort", json={"hero_ids": [hero_id]}
+        )
+        self.assertEqual(incomplete.status_code, 422)
+        ok = self.client.post(
+            "/api/v1/storefront/heros/sort", json={"hero_ids": [hero_id, second_id]}
+        )
+        self.assertEqual(ok.status_code, 200, ok.text)
+        self.assertEqual([item["id"] for item in ok.json()], [hero_id, second_id])
 
-class LayoutSchemaExposureTest(unittest.TestCase):
-    def test_layout_endpoint_exposes_contract_schemas(self) -> None:
-        engine = _engine()
+        # Actualizar y apagar el segundo: el público solo ve el primero.
+        updated = self.client.put(
+            f"/api/v1/storefront/heros/{second_id}",
+            json={"template": "minimal", "title": "Abrimos hasta las 11", "is_active": False},
+        )
+        self.assertEqual(updated.status_code, 200, updated.text)
 
-        def override_db():
-            with Session(engine) as session:
-                yield session
+        site = self.client.get("/api/v1/public/storefront/site").json()
+        self.assertEqual([hero["id"] for hero in site["heros"]], [hero_id])
+        self.assertEqual(site["heros"][0]["title_accent"], "enamora")
 
+        # Config del editor: ambas filas visibles con su estado real.
+        config = self.client.get("/api/v1/storefront/config").json()
+        self.assertEqual(len(config["heros"]), 2)
+        self.assertEqual(len(config["theme_presets"]), len(THEME_PRESETS))
+
+        gone = self.client.delete(f"/api/v1/storefront/heros/{second_id}")
+        self.assertEqual(gone.status_code, 204)
+
+    def test_highlight_crud_and_public_by_surface(self) -> None:
+        created = self.client.post(
+            "/api/v1/storefront/highlights",
+            json={
+                "surface": "cart", "title": "Te faltan $85 para envío gratis",
+                "subtitle": "Agrega algo más", "animation": "shimmer",
+                "color_scheme": "accent", "icon": "💸", "eyebrow": "Envío gratis",
+            },
+        )
+        self.assertEqual(created.status_code, 201, created.text)
+        self.assertEqual(created.json()["eyebrow"], "Envío gratis")
+        row_id = created.json()["id"]
+
+        public = self.client.get(
+            "/api/v1/public/storefront/highlights", params={"surface": "cart"}
+        ).json()
+        self.assertEqual([item["id"] for item in public], [row_id])
+        self.assertEqual(public[0]["animation"], "shimmer")
+
+        empty = self.client.get(
+            "/api/v1/public/storefront/highlights", params={"surface": "login"}
+        ).json()
+        self.assertEqual(empty, [])
+
+        # Superficie inventada → 422 del contrato, no 500.
+        invalid = self.client.get(
+            "/api/v1/public/storefront/highlights", params={"surface": "orbita"}
+        )
+        self.assertEqual(invalid.status_code, 422)
+
+        gone = self.client.delete(f"/api/v1/storefront/highlights/{row_id}")
+        self.assertEqual(gone.status_code, 204)
+
+    def test_footer_theme_settings_patches_and_audit(self) -> None:
+        footer = self.client.patch(
+            "/api/v1/storefront/footer",
+            json={
+                "template": "columnas",
+                "color_scheme": "brand",
+                "show_links": False,
+                "social_links": [
+                    {"network": "instagram", "url": "https://instagram.com/tony"}
+                ],
+            },
+        )
+        self.assertEqual(footer.status_code, 200, footer.text)
+        self.assertEqual(footer.json()["template"], "columnas")
+        self.assertEqual(footer.json()["color_scheme"], "brand")
+        self.assertFalse(footer.json()["show_links"])
+
+        bad_social = self.client.patch(
+            "/api/v1/storefront/footer",
+            json={"social_links": [{"network": "instagram", "url": "http://x"}]},
+        )
+        self.assertEqual(bad_social.status_code, 422)
+
+        theme = self.client.patch(
+            "/api/v1/storefront/theme",
+            json={"theme_preset": "oscuro", "theme_accent": "#22C55E"},
+        )
+        self.assertEqual(theme.status_code, 200, theme.text)
+        self.assertEqual(theme.json()["tokens"]["colors"]["accent"], "#22C55E")
+        self.assertEqual(
+            self.client.patch(
+                "/api/v1/storefront/theme", json={"theme_preset": "inventado"}
+            ).status_code,
+            422,
+        )
+
+        settings_patch = self.client.patch(
+            "/api/v1/storefront/settings",
+            json={"hero_autoplay": False, "hero_interval_seconds": 9, "site_title": "Tony"},
+        )
+        self.assertEqual(settings_patch.status_code, 200, settings_patch.text)
+
+        site = self.client.get("/api/v1/public/storefront/site").json()
+        self.assertEqual(site["carousel"]["autoplay"], False)
+        self.assertEqual(site["carousel"]["interval_seconds"], 9)
+        self.assertEqual(site["meta"]["title"], "Tony")
+        self.assertEqual(site["footer"]["social_links"][0]["network"], "instagram")
+
+        # Auditoría con NOMBRES de campos (nunca valores).
+        with Session(self.engine) as session:
+            events = session.exec(
+                select(AuditEvent).where(AuditEvent.entity_type == "storefront_settings")
+            ).all()
+            self.assertGreaterEqual(len(events), 2)
+
+    def test_maintenance_mode_is_reported_not_erased(self) -> None:
+        patched = self.client.patch(
+            "/api/v1/storefront/settings",
+            json={"storefront_enabled": False, "maintenance_message": "Volvemos pronto"},
+        )
+        self.assertEqual(patched.status_code, 200, patched.text)
+        site = self.client.get("/api/v1/public/storefront/site").json()
+        self.assertFalse(site["enabled"])
+        self.assertEqual(site["maintenance_message"], "Volvemos pronto")
+
+    def test_edit_permission_is_required(self) -> None:
         from backend.app.auth.auth_dependencies import get_current_user
-        from backend.app.core.database import get_db
         from backend.app.schemas.user import SessionUser
 
-        app.dependency_overrides[get_db] = override_db
         app.dependency_overrides[get_current_user] = lambda: SessionUser(
             id=uuid.uuid4(), name="A", last_name="B", email="a@b.mx",
-            permissions={"storefront:read_draft"},
+            permissions={"storefront:read"},
         )
-        try:
-            client = TestClient(app)
-            body = client.get("/api/v1/storefront/layout").json()
-            self.assertIn("nav_links", body["header_schema"]["properties"])
-            self.assertIn("note", body["footer_schema"]["properties"])
-        finally:
-            app.dependency_overrides.clear()
+        denied = self.client.post("/api/v1/storefront/heros", json=HERO_PAYLOAD)
+        self.assertEqual(denied.status_code, 403)
+        denied_theme = self.client.patch(
+            "/api/v1/storefront/theme", json={"theme_preset": "fresco"}
+        )
+        self.assertEqual(denied_theme.status_code, 403)
+
+
+if __name__ == "__main__":
+    unittest.main()

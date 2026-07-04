@@ -1,210 +1,209 @@
-"""Editor del sitio (§46–§48) y página pública del storefront.
+"""Editor plano del sitio + payload público.
 
-Editar borradores no otorga publicar (§52); el sitio público sólo carga
-revisiones publicadas (§47) y los borradores se previsualizan con permiso.
+Guardar es publicar: no hay borradores, revisiones ni programación. Cada
+mutación se valida contra los contratos de ``app/storefront/templates.py``
+(CTAs controlados, claves desconocidas rechazadas) y queda auditada con
+NOMBRES de campos (nunca valores). El sitio público lee lo activo.
 """
 
 import uuid
-from datetime import datetime, timedelta
-from datetime import timezone as dt_timezone
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import APIRouter, Query as FastQuery, Response, status
+from fastapi import APIRouter, Response, status
 from pydantic import Field
-from sqlmodel import select
 
 from backend.app.api.resource_actions import api_error, commit_or_conflict, get_or_404
 from backend.app.auth.auth_dependencies import CurrentUser
 from backend.app.core.database import SessionDep
+from backend.app.models.catalog import Product
 from backend.app.models.storefront import (
-    StorefrontPage,
-    StorefrontPageRevision,
-    StorefrontPageSection,
-    StorefrontSectionMedia,
-    StorefrontThemeRevision,
+    StorefrontHero,
+    StorefrontHighlight,
 )
 from backend.app.schemas.base import ApiPatchSchema, ApiReadSchema, ApiWriteSchema
+from backend.app.schemas.storefront_public import (
+    PublicHighlight,
+    PublicStorefrontSite,
+)
 from backend.app.security.groups.storefront import StorefrontPermissions
 from backend.app.services.config_audit import record_config_change
 from backend.app.services.file_service import get_active_file
-from backend.app.schemas.storefront_public import (
-    PreviewLinkResult,
-    PublicStorefrontPage,
-)
 from backend.app.services.storefront_service import (
-    publish_due_scheduled,
-    revision_preview_payload,
-    schedule_draft,
-    unschedule_revision,
     StorefrontRuleError,
-    active_layout,
-    get_or_create_draft,
-    get_page,
+    get_footer_settings,
     get_storefront_settings,
-    list_pages,
-    public_page_payload,
-    publish_layout,
-    publish_revision,
-    serialize_section_media,
-    templates_catalog,
+    highlight_public_payload,
+    list_heros,
+    list_highlights,
+    resort_heros,
+    site_public_payload,
+    theme_tokens,
 )
-from backend.app.storefront.presets import DEFAULT_PRESET, THEME_PRESETS, build_tokens
+from backend.app.storefront.presets import DEFAULT_PRESET, THEME_PRESETS
 from backend.app.storefront.templates import (
-    FooterConfig,
-    HeaderConfig,
+    HeroWrite,
+    HighlightSurface,
+    HighlightWrite,
+    SocialLink,
     TemplateValidationError,
-    validate_section_configs,
+    validate_ctas,
 )
 from backend.app.utils.utc_now import utc_now
 
 router = APIRouter(tags=["storefront"])
 
-_PAGE_NOT_FOUND = "Página no encontrada"
-_SECTION_NOT_FOUND = "Sección no encontrada"
+_HERO_NOT_FOUND = "Hero no encontrado"
+_HIGHLIGHT_NOT_FOUND = "Destacado no encontrado"
 
-# entity_id determinístico para auditar el singleton (hex con letras a propósito;
+# entity_id determinístico para auditar singletons (hex con letras a propósito;
 # ver business_service.SINGLETON_AUDIT_ID).
 _SETTINGS_AUDIT_ID = uuid.UUID("00000000-0000-4000-a000-5706ef2e7001")
+_FOOTER_AUDIT_ID = uuid.UUID("00000000-0000-4000-a000-5706ef2e7002")
 
 
 # ---------------------------------------------------------------------------
-# Schemas locales del editor
+# Schemas de lectura del editor
 # ---------------------------------------------------------------------------
 
-class SectionInput(ApiWriteSchema):
-    template_key: str
-    template_version: int = 1
-    section_name: Optional[str] = Field(default=None, max_length=180)
-    sort_order: int = 0
-    is_visible: bool = True
-    visible_from: Optional[datetime] = None
-    visible_until: Optional[datetime] = None
-    content_config: dict = Field(default_factory=dict)
-    style_config: dict = Field(default_factory=dict)
-    data_binding_config: dict = Field(default_factory=dict)
-    behavior_config: dict = Field(default_factory=dict)
-
-
-class SectionRead(ApiReadSchema):
+class HeroRead(ApiReadSchema):
     id: uuid.UUID
-    template_key: str
-    template_version: int
-    section_name: Optional[str] = None
+    is_active: bool
     sort_order: int
-    is_visible: bool
-    visible_from: Optional[datetime] = None
-    visible_until: Optional[datetime] = None
-    content_config: dict
-    style_config: dict
-    data_binding_config: dict
-    behavior_config: dict
+    template: str
+    eyebrow: Optional[str] = None
+    title: str
+    title_accent: Optional[str] = None
+    description: Optional[str] = None
+    primary_cta: Optional[dict] = None
+    secondary_cta: Optional[dict] = None
+    product_id: Optional[uuid.UUID] = None
+    desktop_file_id: Optional[uuid.UUID] = None
+    mobile_file_id: Optional[uuid.UUID] = None
+    image_alt: Optional[str] = None
+    focal_x: Optional[float] = None
+    focal_y: Optional[float] = None
+    height: str
+    alignment: str
+    color_scheme: str
+    button_variant: str
+    overlay: str
+    image_position: str
 
 
-class RevisionRead(ApiReadSchema):
+class HighlightRead(ApiReadSchema):
     id: uuid.UUID
-    revision_number: int
-    status: str
-    page_title: Optional[str] = None
-    meta_description: Optional[str] = None
-    sections: list[SectionRead] = Field(default_factory=list)
+    surface: str
+    is_active: bool
+    sort_order: int
+    icon: Optional[str] = None
+    eyebrow: Optional[str] = None
+    title: str
+    subtitle: Optional[str] = None
+    cta: Optional[dict] = None
+    animation: str
+    color_scheme: str
+    starts_at: Optional[str] = None
+    ends_at: Optional[str] = None
 
 
-class RevisionMetaUpdate(ApiPatchSchema):
-    page_title: Optional[str] = Field(default=None, max_length=180)
-    meta_description: Optional[str] = Field(default=None, max_length=300)
-    og_image_file_id: Optional[uuid.UUID] = None
+class FooterRead(ApiReadSchema):
+    template: str
+    show_slogan: bool
+    show_phones: bool
+    show_schedule: bool
+    show_links: bool
+    note: Optional[str] = None
+    color_scheme: str
+    social_links: list[dict] = Field(default_factory=list)
 
 
-class ThemeCreate(ApiWriteSchema):
-    preset: str = DEFAULT_PRESET
-    accent: Optional[str] = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
-    theme_name: Optional[str] = Field(default=None, max_length=120)
-
-
-class SiteMetadataUpdate(ApiPatchSchema):
-    site_title: Optional[str] = Field(default=None, max_length=120)
-    site_description: Optional[str] = Field(default=None, max_length=300)
+class SettingsRead(ApiReadSchema):
+    storefront_enabled: bool
+    maintenance_message: Optional[str] = None
+    site_title: Optional[str] = None
+    site_description: Optional[str] = None
     favicon_file_id: Optional[uuid.UUID] = None
     social_image_file_id: Optional[uuid.UUID] = None
-    storefront_enabled: Optional[bool] = None
-    maintenance_message: Optional[str] = None
+    theme_preset: str
+    theme_accent: Optional[str] = None
+    hero_autoplay: bool
+    hero_interval_seconds: int
+    hero_transition: str
+    hero_show_arrows: bool
+    hero_show_dots: bool
 
 
-def _revision_read(revision: StorefrontPageRevision) -> RevisionRead:
-    return RevisionRead(
-        id=revision.id,
-        revision_number=revision.revision_number,
-        status=revision.status,
-        page_title=revision.page_title,
-        meta_description=revision.meta_description,
-        sections=[
-            SectionRead.model_validate(section, from_attributes=True)
-            for section in sorted(revision.sections, key=lambda s: s.sort_order)
-        ],
+class ThemePresetRead(ApiReadSchema):
+    name: str
+    tokens: dict
+    is_default: bool
+
+
+class StorefrontConfig(ApiReadSchema):
+    """Config completa del editor en UNA llamada (las 4 pestañas)."""
+
+    settings: SettingsRead
+    footer: FooterRead
+    heros: list[HeroRead] = Field(default_factory=list)
+    highlights: list[HighlightRead] = Field(default_factory=list)
+    theme_presets: list[ThemePresetRead] = Field(default_factory=list)
+    active_theme_tokens: dict = Field(default_factory=dict)
+
+
+def _highlight_read(row: StorefrontHighlight) -> HighlightRead:
+    return HighlightRead(
+        id=row.id,
+        surface=row.surface,
+        is_active=row.is_active,
+        sort_order=row.sort_order,
+        icon=row.icon,
+        eyebrow=row.eyebrow,
+        title=row.title,
+        subtitle=row.subtitle,
+        cta=row.cta,
+        animation=row.animation,
+        color_scheme=row.color_scheme,
+        starts_at=row.starts_at.isoformat() if row.starts_at else None,
+        ends_at=row.ends_at.isoformat() if row.ends_at else None,
     )
 
 
-def _page_or_404(session: SessionDep, page_key: str) -> StorefrontPage:
-    page = get_page(session, page_key)
-    if page is None:
-        api_error(status.HTTP_404_NOT_FOUND, "pagina_no_encontrada", _PAGE_NOT_FOUND)
-    return page
+# ---------------------------------------------------------------------------
+# Editor: lectura
+# ---------------------------------------------------------------------------
+
+@router.get("/storefront/config", response_model=StorefrontConfig)
+def read_config(
+    session: SessionDep, _: StorefrontPermissions.READ.requiere
+) -> StorefrontConfig:
+    settings_row = get_storefront_settings(session)
+    footer = get_footer_settings(session)
+    session.commit()
+    return StorefrontConfig(
+        settings=SettingsRead.model_validate(settings_row, from_attributes=True),
+        footer=FooterRead.model_validate(footer, from_attributes=True),
+        heros=[
+            HeroRead.model_validate(hero, from_attributes=True)
+            for hero in list_heros(session)
+        ],
+        highlights=[_highlight_read(row) for row in list_highlights(session)],
+        theme_presets=[
+            ThemePresetRead(name=name, tokens=tokens, is_default=name == DEFAULT_PRESET)
+            for name, tokens in THEME_PRESETS.items()
+        ],
+        active_theme_tokens=theme_tokens(settings_row),
+    )
 
 
 # ---------------------------------------------------------------------------
-# Editor (panel)
+# Heros
 # ---------------------------------------------------------------------------
 
-@router.get("/storefront/templates")
-def list_templates(_: StorefrontPermissions.READ_DRAFT.requiere) -> list[dict]:
-    return templates_catalog()
-
-
-@router.get("/storefront/pages")
-def list_storefront_pages(
-    session: SessionDep, _: StorefrontPermissions.READ_DRAFT.requiere
-) -> list[dict]:
-    """Listado real de páginas con su estado de publicación y borrador (§41)."""
-    return list_pages(session)
-
-
-class SectionMediaUpsert(ApiWriteSchema):
-    """Media por slot (§43): imágenes verificadas del banco de archivos."""
-
-    desktop_file_id: Optional[uuid.UUID] = None
-    mobile_file_id: Optional[uuid.UUID] = None
-    alt_text: Optional[str] = Field(default=None, max_length=255)
-    focal_point_x: Optional[float] = Field(default=None, ge=0, le=1)
-    focal_point_y: Optional[float] = Field(default=None, ge=0, le=1)
-
-
-def _draft_section_or_error(session: SessionDep, section_id: uuid.UUID) -> StorefrontPageSection:
-    section = get_or_404(session, StorefrontPageSection, section_id, _SECTION_NOT_FOUND)
-    if section.revision.status != "draft":
-        api_error(
-            status.HTTP_409_CONFLICT, "revision_publicada",
-            "La media se edita en el borrador; publica una nueva versión (§48).",
-        )
-    return section
-
-
-@router.put("/storefront/sections/{section_id}/media/{slot_key}")
-def upsert_section_media(
-    section_id: uuid.UUID,
-    slot_key: str,
-    payload: SectionMediaUpsert,
-    session: SessionDep,
-    _: StorefrontPermissions.MANAGE_MEDIA.requiere,
-) -> dict:
-    if not slot_key.replace("_", "").replace("-", "").isalnum() or len(slot_key) > 80:
-        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, "slot_invalido", "Slot no válido.")
-    if payload.desktop_file_id is None and payload.mobile_file_id is None:
-        api_error(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "imagen_requerida",
-            "Indica al menos la imagen de escritorio o la de móvil.",
-        )
-    section = _draft_section_or_error(session, section_id)
+def _validate_hero_semantics(session: SessionDep, payload: HeroWrite) -> None:
+    try:
+        validate_ctas(payload)
+    except TemplateValidationError as exc:
+        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
     for file_id in (payload.desktop_file_id, payload.mobile_file_id):
         if file_id is not None:
             stored = get_active_file(session, file_id)
@@ -212,195 +211,284 @@ def upsert_section_media(
                 api_error(
                     status.HTTP_422_UNPROCESSABLE_ENTITY,
                     "archivo_invalido",
-                    "La media de sección debe ser una imagen activa del banco.",
+                    "La imagen del hero debe ser una imagen activa del banco.",
                 )
-    media = session.exec(
-        select(StorefrontSectionMedia).where(
-            StorefrontSectionMedia.section_id == section.id,
-            StorefrontSectionMedia.slot_key == slot_key,
-        )
-    ).first()
-    if media is None:
-        media = StorefrontSectionMedia(section_id=section.id, slot_key=slot_key)
-    for field, value in payload.model_dump().items():
-        setattr(media, field, value)
-    media.updated_at = utc_now()
-    session.add(media)
-    commit_or_conflict(session, "No fue posible guardar la media de la sección.")
-    session.refresh(section)
-    return serialize_section_media(section)
+    if payload.product_id is not None:
+        product = session.get(Product, payload.product_id)
+        if product is None or not product.is_active:
+            api_error(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "producto_invalido",
+                "El producto vinculado no existe o está inactivo.",
+            )
 
 
-@router.delete(
-    "/storefront/sections/{section_id}/media/{slot_key}",
-    status_code=status.HTTP_204_NO_CONTENT,
+@router.post(
+    "/storefront/heros", response_model=HeroRead, status_code=status.HTTP_201_CREATED
 )
-def delete_section_media(
-    section_id: uuid.UUID,
-    slot_key: str,
+def create_hero(
+    payload: HeroWrite,
     session: SessionDep,
-    _: StorefrontPermissions.MANAGE_MEDIA.requiere,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.EDIT.requiere,
+) -> HeroRead:
+    _validate_hero_semantics(session, payload)
+    hero = StorefrontHero(**payload.model_dump(mode="json"))
+    session.add(hero)
+    session.flush()  # asigna el id antes de auditar
+    record_config_change(
+        session, actor_user_id=current_user.id, entity_type="storefront_hero",
+        entity_id=hero.id, action="create", changed_fields=sorted(payload.model_dump()),
+    )
+    commit_or_conflict(session, "No fue posible crear el hero.")
+    session.refresh(hero)
+    return HeroRead.model_validate(hero, from_attributes=True)
+
+
+@router.put("/storefront/heros/{hero_id}", response_model=HeroRead)
+def update_hero(
+    hero_id: uuid.UUID,
+    payload: HeroWrite,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.EDIT.requiere,
+) -> HeroRead:
+    hero = get_or_404(session, StorefrontHero, hero_id, _HERO_NOT_FOUND)
+    _validate_hero_semantics(session, payload)
+    for field, value in payload.model_dump(mode="json").items():
+        setattr(hero, field, value)
+    hero.updated_at = utc_now()
+    session.add(hero)
+    record_config_change(
+        session, actor_user_id=current_user.id, entity_type="storefront_hero",
+        entity_id=hero.id, action="update", changed_fields=sorted(payload.model_dump()),
+    )
+    commit_or_conflict(session, "No fue posible guardar el hero.")
+    session.refresh(hero)
+    return HeroRead.model_validate(hero, from_attributes=True)
+
+
+@router.delete("/storefront/heros/{hero_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_hero(
+    hero_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.EDIT.requiere,
 ) -> None:
-    section = _draft_section_or_error(session, section_id)
-    media = session.exec(
-        select(StorefrontSectionMedia).where(
-            StorefrontSectionMedia.section_id == section.id,
-            StorefrontSectionMedia.slot_key == slot_key,
-        )
-    ).first()
-    if media is None:
-        api_error(status.HTTP_404_NOT_FOUND, "media_no_encontrada", "Slot sin media.")
-    session.delete(media)
-    commit_or_conflict(session, "No fue posible quitar la media.")
+    hero = get_or_404(session, StorefrontHero, hero_id, _HERO_NOT_FOUND)
+    session.delete(hero)
+    record_config_change(
+        session, actor_user_id=current_user.id, entity_type="storefront_hero",
+        entity_id=hero_id, action="delete", changed_fields=[],
+    )
+    commit_or_conflict(session, "No fue posible eliminar el hero.")
 
 
-class SectionsSortRequest(ApiWriteSchema):
-    """Reorden ATÓMICO (§49): el set completo de secciones del borrador."""
+class HerosSortRequest(ApiWriteSchema):
+    """Reorden ATÓMICO: el set completo de heros en una sola llamada."""
 
-    section_ids: list[uuid.UUID] = Field(min_length=1)
+    hero_ids: list[uuid.UUID] = Field(min_length=1)
 
 
-@router.post("/storefront/pages/{page_key}/draft/sections/sort")
-def sort_draft_sections(
-    page_key: str,
-    payload: SectionsSortRequest,
+@router.post("/storefront/heros/sort")
+def sort_heros(
+    payload: HerosSortRequest,
     session: SessionDep,
     current_user: CurrentUser,
     _: StorefrontPermissions.EDIT.requiere,
 ) -> list[dict]:
-    page = _page_or_404(session, page_key)
-    draft = get_or_create_draft(session, page, created_by=current_user.id)
-    existing = {section.id: section for section in draft.sections}
-    if set(payload.section_ids) != set(existing) or len(payload.section_ids) != len(existing):
-        api_error(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "orden_incompleto",
-            "El reorden debe incluir exactamente todas las secciones del borrador.",
-        )
-    now = utc_now()
-    for position, section_id in enumerate(payload.section_ids, start=1):
-        section = existing[section_id]
-        section.sort_order = position * 10
-        section.updated_at = now
-        session.add(section)
-    commit_or_conflict(session, "No fue posible reordenar las secciones.")
-    session.refresh(draft)
-    return [
-        {"id": str(section.id), "sort_order": section.sort_order}
-        for section in sorted(draft.sections, key=lambda s: s.sort_order)
-    ]
-
-
-class LayoutPublishRequest(ApiWriteSchema):
-    """Header/footer (§44): contratos validados en código, versionados."""
-
-    header_config: dict = Field(default_factory=dict)
-    footer_config: dict = Field(default_factory=dict)
-
-
-@router.get("/storefront/layout")
-def read_layout(
-    session: SessionDep, _: StorefrontPermissions.READ_DRAFT.requiere
-) -> dict:
-    layout = active_layout(session)
-    if layout is None:
-        return {
-            "version_number": None,
-            "header_config": {},
-            "footer_config": {},
-            "header_schema": HeaderConfig.model_json_schema(),
-            "footer_schema": FooterConfig.model_json_schema(),
-        }
-    return {
-        "version_number": layout.version_number,
-        "header_config": layout.header_config,
-        "footer_config": layout.footer_config,
-        "header_schema": HeaderConfig.model_json_schema(),
-        "footer_schema": FooterConfig.model_json_schema(),
-    }
-
-
-@router.put("/storefront/layout")
-def update_layout(
-    payload: LayoutPublishRequest,
-    session: SessionDep,
-    current_user: CurrentUser,
-    _: StorefrontPermissions.MANAGE_NAVIGATION.requiere,
-) -> dict:
     try:
-        revision = publish_layout(
-            session,
-            header_config=payload.header_config,
-            footer_config=payload.footer_config,
-            actor_id=current_user.id,
-        )
+        ordered = resort_heros(session, payload.hero_ids)
     except StorefrontRuleError as exc:
         api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
     record_config_change(
-        session, actor_user_id=current_user.id, entity_type="storefront_layout_revisions",
-        entity_id=revision.id, action="publish",
-        changed_fields=["header_config", "footer_config"],
+        session, actor_user_id=current_user.id, entity_type="storefront_hero",
+        entity_id=_SETTINGS_AUDIT_ID, action="sort", changed_fields=["sort_order"],
     )
-    commit_or_conflict(session, "No fue posible publicar el layout.")
+    commit_or_conflict(session, "No fue posible reordenar los heros.")
+    return [{"id": str(hero.id), "sort_order": hero.sort_order} for hero in ordered]
+
+
+# ---------------------------------------------------------------------------
+# Destacados
+# ---------------------------------------------------------------------------
+
+def _validate_highlight_semantics(payload: HighlightWrite) -> None:
+    try:
+        validate_ctas(payload)
+    except TemplateValidationError as exc:
+        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
+
+
+@router.post(
+    "/storefront/highlights",
+    response_model=HighlightRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_highlight(
+    payload: HighlightWrite,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.EDIT.requiere,
+) -> HighlightRead:
+    _validate_highlight_semantics(payload)
+    row = StorefrontHighlight(**payload.model_dump(mode="json", exclude={"starts_at", "ends_at"}),
+                              starts_at=payload.starts_at, ends_at=payload.ends_at)
+    session.add(row)
+    session.flush()  # asigna el id antes de auditar
+    record_config_change(
+        session, actor_user_id=current_user.id, entity_type="storefront_highlight",
+        entity_id=row.id, action="create", changed_fields=sorted(payload.model_dump()),
+    )
+    commit_or_conflict(session, "No fue posible crear el destacado.")
+    session.refresh(row)
+    return _highlight_read(row)
+
+
+@router.put("/storefront/highlights/{highlight_id}", response_model=HighlightRead)
+def update_highlight(
+    highlight_id: uuid.UUID,
+    payload: HighlightWrite,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.EDIT.requiere,
+) -> HighlightRead:
+    row = get_or_404(session, StorefrontHighlight, highlight_id, _HIGHLIGHT_NOT_FOUND)
+    _validate_highlight_semantics(payload)
+    data = payload.model_dump(mode="json", exclude={"starts_at", "ends_at"})
+    for field, value in data.items():
+        setattr(row, field, value)
+    row.starts_at = payload.starts_at
+    row.ends_at = payload.ends_at
+    row.updated_at = utc_now()
+    session.add(row)
+    record_config_change(
+        session, actor_user_id=current_user.id, entity_type="storefront_highlight",
+        entity_id=row.id, action="update", changed_fields=sorted(payload.model_dump()),
+    )
+    commit_or_conflict(session, "No fue posible guardar el destacado.")
+    session.refresh(row)
+    return _highlight_read(row)
+
+
+@router.delete(
+    "/storefront/highlights/{highlight_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_highlight(
+    highlight_id: uuid.UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.EDIT.requiere,
+) -> None:
+    row = get_or_404(session, StorefrontHighlight, highlight_id, _HIGHLIGHT_NOT_FOUND)
+    session.delete(row)
+    record_config_change(
+        session, actor_user_id=current_user.id, entity_type="storefront_highlight",
+        entity_id=highlight_id, action="delete", changed_fields=[],
+    )
+    commit_or_conflict(session, "No fue posible eliminar el destacado.")
+
+
+# ---------------------------------------------------------------------------
+# Footer (singleton)
+# ---------------------------------------------------------------------------
+
+class FooterPatch(ApiPatchSchema):
+    template: Optional[Literal["barra", "columnas", "centrado"]] = None
+    show_slogan: Optional[bool] = None
+    show_phones: Optional[bool] = None
+    show_schedule: Optional[bool] = None
+    show_links: Optional[bool] = None
+    note: Optional[str] = Field(default=None, max_length=200)
+    color_scheme: Optional[Literal["dark", "soft", "brand"]] = None
+    social_links: Optional[list[SocialLink]] = Field(default=None, max_length=6)
+
+
+@router.patch("/storefront/footer", response_model=FooterRead)
+def update_footer(
+    payload: FooterPatch,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.EDIT.requiere,
+) -> FooterRead:
+    footer = get_footer_settings(session)
+    changes = payload.model_dump(exclude_unset=True, mode="json")
+    for field, value in changes.items():
+        setattr(footer, field, value)
+    footer.updated_at = utc_now()
+    session.add(footer)
+    if changes:
+        record_config_change(
+            session, actor_user_id=current_user.id, entity_type="storefront_footer",
+            entity_id=_FOOTER_AUDIT_ID, action="update",
+            changed_fields=sorted(changes.keys()),
+        )
+    commit_or_conflict(session, "No fue posible guardar el footer.")
+    session.refresh(footer)
+    return FooterRead.model_validate(footer, from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Tema y metadatos (singleton settings)
+# ---------------------------------------------------------------------------
+
+class ThemePatch(ApiPatchSchema):
+    theme_preset: Optional[str] = None
+    theme_accent: Optional[str] = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+@router.patch("/storefront/theme")
+def update_theme(
+    payload: ThemePatch,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.MANAGE_THEME.requiere,
+) -> dict:
+    changes = payload.model_dump(exclude_unset=True)
+    if "theme_preset" in changes and changes["theme_preset"] not in THEME_PRESETS:
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "preset_desconocido", "Preset no reconocido."
+        )
+    settings_row = get_storefront_settings(session)
+    for field, value in changes.items():
+        setattr(settings_row, field, value)
+    settings_row.updated_at = utc_now()
+    session.add(settings_row)
+    if changes:
+        record_config_change(
+            session, actor_user_id=current_user.id, entity_type="storefront_settings",
+            entity_id=_SETTINGS_AUDIT_ID, action="theme", changed_fields=sorted(changes),
+        )
+    commit_or_conflict(session, "No fue posible activar el tema.")
+    session.refresh(settings_row)
     return {
-        "version_number": revision.version_number,
-        "header_config": revision.header_config,
-        "footer_config": revision.footer_config,
+        "theme_preset": settings_row.theme_preset,
+        "theme_accent": settings_row.theme_accent,
+        "tokens": theme_tokens(settings_row),
     }
 
 
-@router.get("/storefront/theme-presets")
-def list_theme_presets(_: StorefrontPermissions.MANAGE_THEME.requiere) -> list[dict]:
-    return [
-        {"name": name, "tokens": tokens, "is_default": name == DEFAULT_PRESET}
-        for name, tokens in THEME_PRESETS.items()
-    ]
+class SettingsPatch(ApiPatchSchema):
+    site_title: Optional[str] = Field(default=None, max_length=120)
+    site_description: Optional[str] = Field(default=None, max_length=300)
+    favicon_file_id: Optional[uuid.UUID] = None
+    social_image_file_id: Optional[uuid.UUID] = None
+    storefront_enabled: Optional[bool] = None
+    maintenance_message: Optional[str] = None
+    hero_autoplay: Optional[bool] = None
+    hero_interval_seconds: Optional[int] = Field(default=None, ge=4, le=12)
+    hero_transition: Optional[Literal["slide", "fade"]] = None
+    hero_show_arrows: Optional[bool] = None
+    hero_show_dots: Optional[bool] = None
 
 
-@router.post("/storefront/theme", status_code=status.HTTP_201_CREATED)
-def create_and_activate_theme(
-    payload: ThemeCreate,
+@router.patch("/storefront/settings", response_model=SettingsRead)
+def update_site_settings(
+    payload: SettingsPatch,
     session: SessionDep,
     current_user: CurrentUser,
     _: StorefrontPermissions.MANAGE_THEME.requiere,
-) -> dict:
-    if payload.preset not in THEME_PRESETS:
-        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, "preset_desconocido", "Preset no reconocido.")
-    last = session.exec(
-        select(StorefrontThemeRevision.version_number).order_by(
-            StorefrontThemeRevision.version_number.desc()  # pyright: ignore[reportAttributeAccessIssue]
-        )
-    ).first()
-    theme = StorefrontThemeRevision(
-        version_number=int(last or 0) + 1,
-        status="published",
-        theme_name=payload.theme_name or payload.preset,
-        tokens_json=build_tokens(payload.preset, accent=payload.accent),
-        created_by=current_user.id,
-        published_by=current_user.id,
-        published_at=utc_now(),
-    )
-    session.add(theme)
-    session.flush()
-    settings_row = get_storefront_settings(session)
-    settings_row.active_theme_revision_id = theme.id
-    settings_row.updated_at = utc_now()
-    session.add(settings_row)
-    record_config_change(
-        session, actor_user_id=current_user.id, entity_type="storefront_theme_revisions",
-        entity_id=theme.id, action="publish", changed_fields=["tokens_json"],
-    )
-    commit_or_conflict(session, "No fue posible activar el tema.")
-    return {"id": str(theme.id), "theme_name": theme.theme_name, "tokens": theme.tokens_json}
-
-
-@router.patch("/storefront/settings")
-def update_site_metadata(
-    payload: SiteMetadataUpdate,
-    session: SessionDep,
-    current_user: CurrentUser,
-    _: StorefrontPermissions.MANAGE_THEME.requiere,
-) -> dict:
+) -> SettingsRead:
     changes = payload.model_dump(exclude_unset=True)
     for field in ("favicon_file_id", "social_image_file_id"):
         file_id = changes.get(field)
@@ -425,317 +513,28 @@ def update_site_metadata(
             changed_fields=sorted(changes.keys()),
         )
     commit_or_conflict(session, "No fue posible guardar los metadatos del sitio.")
-    return {"updated": sorted(changes.keys())}
+    session.refresh(settings_row)
+    return SettingsRead.model_validate(settings_row, from_attributes=True)
 
 
-@router.get("/storefront/pages/{page_key}/draft", response_model=RevisionRead)
-def read_draft(
-    page_key: str,
-    session: SessionDep,
-    current_user: CurrentUser,
-    _: StorefrontPermissions.READ_DRAFT.requiere,
-) -> RevisionRead:
-    page = _page_or_404(session, page_key)
-    draft = get_or_create_draft(session, page, created_by=current_user.id)
-    commit_or_conflict(session, "No fue posible preparar el borrador.")
-    session.refresh(draft)
-    return _revision_read(draft)
+# ---------------------------------------------------------------------------
+# Sitio público
+# ---------------------------------------------------------------------------
 
-
-@router.patch("/storefront/pages/{page_key}/draft", response_model=RevisionRead)
-def update_draft_meta(
-    page_key: str,
-    payload: RevisionMetaUpdate,
-    session: SessionDep,
-    current_user: CurrentUser,
-    _: StorefrontPermissions.EDIT.requiere,
-) -> RevisionRead:
-    page = _page_or_404(session, page_key)
-    draft = get_or_create_draft(session, page, created_by=current_user.id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(draft, field, value)
-    draft.updated_at = utc_now()
-    session.add(draft)
-    commit_or_conflict(session, "No fue posible guardar el borrador.")
-    session.refresh(draft)
-    return _revision_read(draft)
-
-
-@router.post(
-    "/storefront/pages/{page_key}/draft/sections",
-    response_model=RevisionRead,
-    status_code=status.HTTP_201_CREATED,
-)
-def add_section(
-    page_key: str,
-    payload: SectionInput,
-    session: SessionDep,
-    current_user: CurrentUser,
-    _: StorefrontPermissions.EDIT.requiere,
-) -> RevisionRead:
-    page = _page_or_404(session, page_key)
-    draft = get_or_create_draft(session, page, created_by=current_user.id)
-    try:
-        validate_section_configs(
-            payload.template_key, payload.template_version,
-            content=payload.content_config, style=payload.style_config,
-            data_binding=payload.data_binding_config, behavior=payload.behavior_config,
-        )
-    except TemplateValidationError as exc:
-        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
-    section = StorefrontPageSection(page_revision_id=draft.id, **payload.model_dump())
-    session.add(section)
-    commit_or_conflict(session, "No fue posible agregar la sección.")
-    session.refresh(draft)
-    return _revision_read(draft)
-
-
-@router.put("/storefront/sections/{section_id}", response_model=SectionRead)
-def update_section(
-    section_id: uuid.UUID,
-    payload: SectionInput,
-    session: SessionDep,
-    _: StorefrontPermissions.EDIT.requiere,
-) -> SectionRead:
-    section = get_or_404(session, StorefrontPageSection, section_id, _SECTION_NOT_FOUND)
-    revision = section.revision
-    if revision.status != "draft":
-        api_error(
-            status.HTTP_409_CONFLICT, "revision_publicada",
-            "Sólo los borradores se editan; publica una nueva versión (§48).",
-        )
-    try:
-        validate_section_configs(
-            payload.template_key, payload.template_version,
-            content=payload.content_config, style=payload.style_config,
-            data_binding=payload.data_binding_config, behavior=payload.behavior_config,
-        )
-    except TemplateValidationError as exc:
-        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
-    for field, value in payload.model_dump().items():
-        setattr(section, field, value)
-    section.updated_at = utc_now()
-    session.add(section)
-    commit_or_conflict(session, "No fue posible guardar la sección.")
-    session.refresh(section)
-    return SectionRead.model_validate(section, from_attributes=True)
-
-
-@router.delete("/storefront/sections/{section_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_section(
-    section_id: uuid.UUID,
-    session: SessionDep,
-    _: StorefrontPermissions.EDIT.requiere,
-) -> None:
-    section = get_or_404(session, StorefrontPageSection, section_id, _SECTION_NOT_FOUND)
-    if section.revision.status != "draft":
-        api_error(status.HTTP_409_CONFLICT, "revision_publicada", "Sólo los borradores se editan.")
-    session.delete(section)
-    commit_or_conflict(session, "No fue posible quitar la sección.")
-
-
-@router.post("/storefront/pages/{page_key}/publish", response_model=RevisionRead)
-def publish_page(
-    page_key: str,
-    session: SessionDep,
-    current_user: CurrentUser,
-    _: StorefrontPermissions.PUBLISH.requiere,
-    revision_id: Optional[uuid.UUID] = None,
-) -> RevisionRead:
-    """Publica el borrador; con ``revision_id`` re-publica una versión (rollback §48,
-    que además requiere el permiso correspondiente)."""
-    page = _page_or_404(session, page_key)
-    if revision_id is not None:
-        if not current_user.access_control(StorefrontPermissions.ROLLBACK.permission):
-            api_error(status.HTTP_403_FORBIDDEN, "forbidden", "Se requiere permiso de rollback.")
-        revision = get_or_404(
-            session, StorefrontPageRevision, revision_id, "Revisión no encontrada"
-        )
-    else:
-        revision = get_or_create_draft(session, page, created_by=current_user.id)
-    try:
-        publish_revision(session, page, revision, actor_id=current_user.id)
-    except StorefrontRuleError as exc:
-        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
-    record_config_change(
-        session, actor_user_id=current_user.id, entity_type="storefront_pages",
-        entity_id=page.id, action="publish", changed_fields=["published_revision_id"],
-    )
-    commit_or_conflict(session, "No fue posible publicar la página.")
-    session.refresh(revision)
-    return _revision_read(revision)
-
-
-class ScheduleRequest(ApiWriteSchema):
-    publish_at: datetime
-
-
-@router.post("/storefront/pages/{page_key}/schedule")
-def schedule_page(
-    page_key: str,
-    payload: ScheduleRequest,
-    session: SessionDep,
-    current_user: CurrentUser,
-    _: StorefrontPermissions.PUBLISH.requiere,
-) -> dict:
-    """Programa la publicación del borrador; la ejecuta la tarea Taskiq."""
-    page = _page_or_404(session, page_key)
-    try:
-        revision = schedule_draft(
-            session, page, publish_at=payload.publish_at, actor_id=current_user.id
-        )
-    except StorefrontRuleError as exc:
-        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
-    commit_or_conflict(session, "No fue posible programar la publicación.")
-    return {
-        "revision_number": revision.revision_number,
-        "status": revision.status,
-        "scheduled_publish_at": revision.scheduled_publish_at.isoformat()
-        if revision.scheduled_publish_at
-        else None,
-    }
-
-
-@router.delete("/storefront/pages/{page_key}/schedule", status_code=status.HTTP_204_NO_CONTENT)
-def unschedule_page(
-    page_key: str,
-    session: SessionDep,
-    _: StorefrontPermissions.PUBLISH.requiere,
-) -> None:
-    page = _page_or_404(session, page_key)
-    revision = session.exec(
-        select(StorefrontPageRevision).where(
-            StorefrontPageRevision.page_id == page.id,
-            StorefrontPageRevision.status == "scheduled",
-        )
-    ).first()
-    if revision is None:
-        api_error(status.HTTP_404_NOT_FOUND, "no_programada", "No hay publicación programada.")
-    try:
-        unschedule_revision(session, revision)
-    except StorefrontRuleError as exc:
-        api_error(status.HTTP_409_CONFLICT, exc.code, exc.message)
-    commit_or_conflict(session, "No fue posible cancelar la programación.")
-
-
-@router.post(
-    "/storefront/pages/{page_key}/preview-link", response_model=PreviewLinkResult
-)
-def create_preview_link(
-    page_key: str,
-    session: SessionDep,
-    current_user: CurrentUser,
-    _: StorefrontPermissions.PREVIEW.requiere,
-    minutes: int = FastQuery(default=60, ge=5, le=1440),
-) -> PreviewLinkResult:
-    """Enlace de preview FIRMADO y temporal (§ Etapa 6.9): token opaco de solo
-    lectura, alcance mínimo (una revisión de una página), expiración ≤ 24 h.
-    Se invalida solo: al publicar/archivar la revisión deja de resolverse."""
-    import jwt as pyjwt
-
-    from backend.app.core.settings import settings
-
-    page = _page_or_404(session, page_key)
-    draft = get_or_create_draft(session, page, created_by=current_user.id)
-    session.commit()
-    expires = datetime.now(dt_timezone.utc) + timedelta(minutes=minutes)
-    token = pyjwt.encode(
-        {
-            "aud": "storefront-preview",
-            "page_key": page.page_key,
-            "revision_id": str(draft.id),
-            "exp": expires,
-        },
-        settings.secret_key.get_secret_value(),
-        algorithm=settings.algorithm,
-    )
-    return PreviewLinkResult(
-        token=token,
-        url=f"/api/v1/public/storefront/preview/{token}",
-        expires_at=expires.isoformat(),
-        revision_number=draft.revision_number,
-    )
+@router.get("/public/storefront/site", response_model=PublicStorefrontSite)
+def public_site(session: SessionDep, response: Response) -> dict:
+    payload = site_public_payload(session)
+    session.commit()  # persiste los singletons creados perezosamente
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return payload
 
 
 @router.get(
-    "/public/storefront/preview/{token}", response_model=PublicStorefrontPage
+    "/public/storefront/highlights", response_model=list[PublicHighlight]
 )
-def public_preview_by_token(token: str, session: SessionDep) -> dict:
-    """Consumo del enlace firmado: SIN sesión, solo lectura, sin datos privados.
-
-    404 uniforme ante token inválido/expirado o revisión ya publicada/archivada
-    (no revela si el enlace existió)."""
-    import jwt as pyjwt
-
-    from backend.app.core.settings import settings
-
-    invalid = ("preview_invalido", "El enlace de preview no es válido o ya expiró.")
-    try:
-        data = pyjwt.decode(
-            token,
-            settings.secret_key.get_secret_value(),
-            algorithms=[settings.algorithm],
-            audience="storefront-preview",
-        )
-        revision_id = uuid.UUID(str(data["revision_id"]))
-    except (pyjwt.PyJWTError, KeyError, ValueError):
-        api_error(status.HTTP_404_NOT_FOUND, *invalid)
-    revision = session.get(StorefrontPageRevision, revision_id)
-    if revision is None or revision.status not in ("draft", "scheduled"):
-        api_error(status.HTTP_404_NOT_FOUND, *invalid)
-    page = session.get(StorefrontPage, revision.page_id)
-    if page is None or page.page_key != data.get("page_key"):
-        api_error(status.HTTP_404_NOT_FOUND, *invalid)
-    return revision_preview_payload(session, page, revision)
-
-
-@router.get("/storefront/pages/{page_key}/preview")
-def preview_draft(
-    page_key: str,
-    session: SessionDep,
-    current_user: CurrentUser,
-    _: StorefrontPermissions.PREVIEW.requiere,
-) -> dict:
-    """Previsualización del BORRADOR (§47): nunca visible sin permiso."""
-    page = _page_or_404(session, page_key)
-    draft = get_or_create_draft(session, page, created_by=current_user.id)
-    session.commit()
-    return {
-        "page_key": page.page_key,
-        "revision_number": draft.revision_number,
-        "sections": [
-            {
-                **SectionRead.model_validate(s, from_attributes=True).model_dump(),
-                "media": serialize_section_media(s),
-            }
-            for s in sorted(draft.sections, key=lambda s: s.sort_order)
-        ],
-    }
-
-
-# ---------------------------------------------------------------------------
-# Sitio público (sólo publicado, §47)
-# ---------------------------------------------------------------------------
-
-@router.get("/public/storefront/{page_key}", response_model=PublicStorefrontPage)
-def public_storefront_page(page_key: str, session: SessionDep, response: Response) -> dict:
-    settings_row = get_storefront_settings(session)
-    if not settings_row.storefront_enabled:
-        api_error(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "sitio_en_mantenimiento",
-            settings_row.maintenance_message or "El sitio está en mantenimiento.",
-        )
-    try:
-        payload = public_page_payload(session, page_key)
-    except StorefrontRuleError as exc:
-        api_error(status.HTTP_404_NOT_FOUND, exc.code, exc.message)
-
-    theme = (
-        session.get(StorefrontThemeRevision, settings_row.active_theme_revision_id)
-        if settings_row.active_theme_revision_id
-        else None
-    )
-    payload["theme_tokens"] = theme.tokens_json if theme else None
+def public_highlights(
+    surface: HighlightSurface, session: SessionDep, response: Response
+) -> list[dict]:
+    rows = list_highlights(session, surface=surface, only_active=True)
     response.headers["Cache-Control"] = "public, max-age=60"
-    return payload
+    return [highlight_public_payload(row) for row in rows]

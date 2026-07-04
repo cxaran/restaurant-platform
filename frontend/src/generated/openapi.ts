@@ -1596,8 +1596,9 @@ export interface paths {
         };
         /**
          * List Orders
-         * @description Tablero interno paginado: filtros por estado/canal/fechas/cliente y
-         *     búsqueda por folio, cliente, quien recibe y dirección (envelope estándar).
+         * @description Tablero interno paginado: filtros por estado/canal/modo/pago/fechas/
+         *     cliente y búsqueda por folio, cliente, quien recibe y dirección; cada fila
+         *     trae aprobador, método de pago y envío (envelope estándar).
          */
         get: operations["list_orders_api_v1_orders_get"];
         put?: never;
@@ -1670,7 +1671,8 @@ export interface paths {
         /**
          * Order Status Counts
          * @description Conteo por estado con los MISMOS filtros del tablero (menos ``status``):
-         *     alimenta los chips «Nuevos · 3» sin traerse los pedidos.
+         *     alimenta los chips «Nuevos · 3» sin traerse los pedidos. Incluye
+         *     ``customer_user_id`` para la ficha de cliente (§8.2).
          */
         get: operations["order_status_counts_api_v1_orders_status_counts_get"];
         put?: never;
@@ -2412,15 +2414,15 @@ export interface paths {
         patch: operations["update_rate_api_v1_shipping_rates__rate_id__patch"];
         trace?: never;
     };
-    "/api/v1/storefront/templates": {
+    "/api/v1/storefront/config": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Templates */
-        get: operations["list_templates_api_v1_storefront_templates_get"];
+        /** Read Config */
+        get: operations["read_config_api_v1_storefront_config_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2429,45 +2431,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/storefront/pages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Storefront Pages
-         * @description Listado real de páginas con su estado de publicación y borrador (§41).
-         */
-        get: operations["list_storefront_pages_api_v1_storefront_pages_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/storefront/sections/{section_id}/media/{slot_key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Upsert Section Media */
-        put: operations["upsert_section_media_api_v1_storefront_sections__section_id__media__slot_key__put"];
-        post?: never;
-        /** Delete Section Media */
-        delete: operations["delete_section_media_api_v1_storefront_sections__section_id__media__slot_key__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/storefront/pages/{page_key}/draft/sections/sort": {
+    "/api/v1/storefront/heros": {
         parameters: {
             query?: never;
             header?: never;
@@ -2476,47 +2440,99 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sort Draft Sections */
-        post: operations["sort_draft_sections_api_v1_storefront_pages__page_key__draft_sections_sort_post"];
+        /** Create Hero */
+        post: operations["create_hero_api_v1_storefront_heros_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/storefront/layout": {
+    "/api/v1/storefront/heros/{hero_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Read Layout */
-        get: operations["read_layout_api_v1_storefront_layout_get"];
-        /** Update Layout */
-        put: operations["update_layout_api_v1_storefront_layout_put"];
+        get?: never;
+        /** Update Hero */
+        put: operations["update_hero_api_v1_storefront_heros__hero_id__put"];
         post?: never;
-        delete?: never;
+        /** Delete Hero */
+        delete: operations["delete_hero_api_v1_storefront_heros__hero_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/storefront/theme-presets": {
+    "/api/v1/storefront/heros/sort": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Theme Presets */
-        get: operations["list_theme_presets_api_v1_storefront_theme_presets_get"];
+        get?: never;
+        put?: never;
+        /** Sort Heros */
+        post: operations["sort_heros_api_v1_storefront_heros_sort_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storefront/highlights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Highlight */
+        post: operations["create_highlight_api_v1_storefront_highlights_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storefront/highlights/{highlight_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Highlight */
+        put: operations["update_highlight_api_v1_storefront_highlights__highlight_id__put"];
+        post?: never;
+        /** Delete Highlight */
+        delete: operations["delete_highlight_api_v1_storefront_highlights__highlight_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storefront/footer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Footer */
+        patch: operations["update_footer_api_v1_storefront_footer_patch"];
         trace?: never;
     };
     "/api/v1/storefront/theme": {
@@ -2528,12 +2544,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create And Activate Theme */
-        post: operations["create_and_activate_theme_api_v1_storefront_theme_post"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Theme */
+        patch: operations["update_theme_api_v1_storefront_theme_patch"];
         trace?: never;
     };
     "/api/v1/storefront/settings": {
@@ -2549,142 +2565,19 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Site Metadata */
-        patch: operations["update_site_metadata_api_v1_storefront_settings_patch"];
+        /** Update Site Settings */
+        patch: operations["update_site_settings_api_v1_storefront_settings_patch"];
         trace?: never;
     };
-    "/api/v1/storefront/pages/{page_key}/draft": {
+    "/api/v1/public/storefront/site": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Read Draft */
-        get: operations["read_draft_api_v1_storefront_pages__page_key__draft_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update Draft Meta */
-        patch: operations["update_draft_meta_api_v1_storefront_pages__page_key__draft_patch"];
-        trace?: never;
-    };
-    "/api/v1/storefront/pages/{page_key}/draft/sections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Add Section */
-        post: operations["add_section_api_v1_storefront_pages__page_key__draft_sections_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/storefront/sections/{section_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Update Section */
-        put: operations["update_section_api_v1_storefront_sections__section_id__put"];
-        post?: never;
-        /** Delete Section */
-        delete: operations["delete_section_api_v1_storefront_sections__section_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/storefront/pages/{page_key}/publish": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Publish Page
-         * @description Publica el borrador; con ``revision_id`` re-publica una versión (rollback §48,
-         *     que además requiere el permiso correspondiente).
-         */
-        post: operations["publish_page_api_v1_storefront_pages__page_key__publish_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/storefront/pages/{page_key}/schedule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Schedule Page
-         * @description Programa la publicación del borrador; la ejecuta la tarea Taskiq.
-         */
-        post: operations["schedule_page_api_v1_storefront_pages__page_key__schedule_post"];
-        /** Unschedule Page */
-        delete: operations["unschedule_page_api_v1_storefront_pages__page_key__schedule_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/storefront/pages/{page_key}/preview-link": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create Preview Link
-         * @description Enlace de preview FIRMADO y temporal (§ Etapa 6.9): token opaco de solo
-         *     lectura, alcance mínimo (una revisión de una página), expiración ≤ 24 h.
-         *     Se invalida solo: al publicar/archivar la revisión deja de resolverse.
-         */
-        post: operations["create_preview_link_api_v1_storefront_pages__page_key__preview_link_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/public/storefront/preview/{token}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Public Preview By Token
-         * @description Consumo del enlace firmado: SIN sesión, solo lectura, sin datos privados.
-         *
-         *     404 uniforme ante token inválido/expirado o revisión ya publicada/archivada
-         *     (no revela si el enlace existió).
-         */
-        get: operations["public_preview_by_token_api_v1_public_storefront_preview__token__get"];
+        /** Public Site */
+        get: operations["public_site_api_v1_public_storefront_site_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2693,35 +2586,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/storefront/pages/{page_key}/preview": {
+    "/api/v1/public/storefront/highlights": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Preview Draft
-         * @description Previsualización del BORRADOR (§47): nunca visible sin permiso.
-         */
-        get: operations["preview_draft_api_v1_storefront_pages__page_key__preview_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/public/storefront/{page_key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Public Storefront Page */
-        get: operations["public_storefront_page_api_v1_public_storefront__page_key__get"];
+        /** Public Highlights */
+        get: operations["public_highlights_api_v1_public_storefront_highlights_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3602,6 +3475,16 @@ export interface components {
              * @description Nombre de la institución (opcional).
              */
             institution_name?: string | null;
+            /**
+             * Customer Session Days
+             * @description Días de sesión del cliente (sin roles). Vacío = default del despliegue. Editable después en Configuración del sistema.
+             */
+            customer_session_days?: number | null;
+            /**
+             * Staff Session Minutes
+             * @description Minutos de sesión del personal (con roles). Vacío = default del despliegue. Editable después en Configuración del sistema.
+             */
+            staff_session_minutes?: number | null;
         };
         /** BootstrapLimitsRead */
         BootstrapLimitsRead: {
@@ -3778,6 +3661,8 @@ export interface components {
             require_registered_user_for_checkout: boolean;
             /** Order Approval Required */
             order_approval_required: boolean;
+            /** Online Orders Require Open Hours */
+            online_orders_require_open_hours: boolean;
             /** Minimum Delivery Order Amount */
             minimum_delivery_order_amount?: string | null;
             /** Free Shipping Global From Amount */
@@ -3803,6 +3688,8 @@ export interface components {
             require_registered_user_for_checkout?: boolean | null;
             /** Order Approval Required */
             order_approval_required?: boolean | null;
+            /** Online Orders Require Open Hours */
+            online_orders_require_open_hours?: boolean | null;
             /** Minimum Delivery Order Amount */
             minimum_delivery_order_amount?: number | string | null;
             /** Free Shipping Global From Amount */
@@ -4099,6 +3986,18 @@ export interface components {
             earned: number;
             /** Redeemed */
             redeemed: number;
+        };
+        /** Cta */
+        Cta: {
+            /** Label */
+            label: string;
+            /**
+             * Link Type
+             * @enum {string}
+             */
+            link_type: "internal_route" | "anchor" | "product" | "category" | "credits_page" | "menu_page" | "whatsapp" | "phone" | "external_https";
+            /** Target */
+            target?: string | null;
         };
         /** CustomerProfileRead */
         CustomerProfileRead: {
@@ -4723,6 +4622,46 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** FooterPatch */
+        FooterPatch: {
+            /** Template */
+            template?: ("barra" | "columnas" | "centrado") | null;
+            /** Show Slogan */
+            show_slogan?: boolean | null;
+            /** Show Phones */
+            show_phones?: boolean | null;
+            /** Show Schedule */
+            show_schedule?: boolean | null;
+            /** Show Links */
+            show_links?: boolean | null;
+            /** Note */
+            note?: string | null;
+            /** Color Scheme */
+            color_scheme?: ("dark" | "soft" | "brand") | null;
+            /** Social Links */
+            social_links?: components["schemas"]["SocialLink"][] | null;
+        };
+        /** FooterRead */
+        FooterRead: {
+            /** Template */
+            template: string;
+            /** Show Slogan */
+            show_slogan: boolean;
+            /** Show Phones */
+            show_phones: boolean;
+            /** Show Schedule */
+            show_schedule: boolean;
+            /** Show Links */
+            show_links: boolean;
+            /** Note */
+            note?: string | null;
+            /** Color Scheme */
+            color_scheme: string;
+            /** Social Links */
+            social_links?: {
+                [key: string]: unknown;
+            }[];
+        };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
             /**
@@ -4766,6 +4705,225 @@ export interface components {
              */
             status: "ok";
         };
+        /** HeroRead */
+        HeroRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /** Template */
+            template: string;
+            /** Eyebrow */
+            eyebrow?: string | null;
+            /** Title */
+            title: string;
+            /** Title Accent */
+            title_accent?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Primary Cta */
+            primary_cta?: {
+                [key: string]: unknown;
+            } | null;
+            /** Secondary Cta */
+            secondary_cta?: {
+                [key: string]: unknown;
+            } | null;
+            /** Product Id */
+            product_id?: string | null;
+            /** Desktop File Id */
+            desktop_file_id?: string | null;
+            /** Mobile File Id */
+            mobile_file_id?: string | null;
+            /** Image Alt */
+            image_alt?: string | null;
+            /** Focal X */
+            focal_x?: number | null;
+            /** Focal Y */
+            focal_y?: number | null;
+            /** Height */
+            height: string;
+            /** Alignment */
+            alignment: string;
+            /** Color Scheme */
+            color_scheme: string;
+            /** Button Variant */
+            button_variant: string;
+            /** Overlay */
+            overlay: string;
+            /** Image Position */
+            image_position: string;
+        };
+        /**
+         * HeroWrite
+         * @description Contrato completo de un hero (create/replace).
+         */
+        HeroWrite: {
+            /**
+             * Template
+             * @default split
+             * @enum {string}
+             */
+            template: "split" | "background" | "card" | "showcase" | "minimal";
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+            /** Eyebrow */
+            eyebrow?: string | null;
+            /** Title */
+            title: string;
+            /** Title Accent */
+            title_accent?: string | null;
+            /** Description */
+            description?: string | null;
+            primary_cta?: components["schemas"]["Cta"] | null;
+            secondary_cta?: components["schemas"]["Cta"] | null;
+            /** Product Id */
+            product_id?: string | null;
+            /** Desktop File Id */
+            desktop_file_id?: string | null;
+            /** Mobile File Id */
+            mobile_file_id?: string | null;
+            /** Image Alt */
+            image_alt?: string | null;
+            /** Focal X */
+            focal_x?: number | null;
+            /** Focal Y */
+            focal_y?: number | null;
+            /**
+             * Height
+             * @default regular
+             * @enum {string}
+             */
+            height: "compact" | "regular" | "tall";
+            /**
+             * Alignment
+             * @default left
+             * @enum {string}
+             */
+            alignment: "left" | "center";
+            /**
+             * Color Scheme
+             * @default surface
+             * @enum {string}
+             */
+            color_scheme: "surface" | "surface_muted" | "brand" | "brand_inverse" | "dark";
+            /**
+             * Button Variant
+             * @default solid
+             * @enum {string}
+             */
+            button_variant: "solid" | "outline";
+            /**
+             * Overlay
+             * @default soft
+             * @enum {string}
+             */
+            overlay: "none" | "soft" | "strong";
+            /**
+             * Image Position
+             * @default right
+             * @enum {string}
+             */
+            image_position: "left" | "right";
+        };
+        /**
+         * HerosSortRequest
+         * @description Reorden ATÓMICO: el set completo de heros en una sola llamada.
+         */
+        HerosSortRequest: {
+            /** Hero Ids */
+            hero_ids: string[];
+        };
+        /** HighlightRead */
+        HighlightRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Surface */
+            surface: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /** Icon */
+            icon?: string | null;
+            /** Eyebrow */
+            eyebrow?: string | null;
+            /** Title */
+            title: string;
+            /** Subtitle */
+            subtitle?: string | null;
+            /** Cta */
+            cta?: {
+                [key: string]: unknown;
+            } | null;
+            /** Animation */
+            animation: string;
+            /** Color Scheme */
+            color_scheme: string;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+        };
+        /** HighlightWrite */
+        HighlightWrite: {
+            /**
+             * Surface
+             * @enum {string}
+             */
+            surface: "global" | "home" | "login" | "register" | "cart" | "checkout" | "account";
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+            /** Icon */
+            icon?: string | null;
+            /** Eyebrow */
+            eyebrow?: string | null;
+            /** Title */
+            title: string;
+            /** Subtitle */
+            subtitle?: string | null;
+            cta?: components["schemas"]["Cta"] | null;
+            /**
+             * Animation
+             * @default fade_in
+             * @enum {string}
+             */
+            animation: "none" | "fade_in" | "slide_down" | "rise" | "pulse" | "shimmer" | "marquee";
+            /**
+             * Color Scheme
+             * @default brand
+             * @enum {string}
+             */
+            color_scheme: "brand" | "soft" | "accent";
+            /** Starts At */
+            starts_at?: string | null;
+            /** Ends At */
+            ends_at?: string | null;
+        };
         /**
          * HttpMethod
          * @enum {string}
@@ -4785,20 +4943,6 @@ export interface components {
             /** Placeholder */
             placeholder: string;
             type: components["schemas"]["FieldValueType"];
-        };
-        /**
-         * LayoutPublishRequest
-         * @description Header/footer (§44): contratos validados en código, versionados.
-         */
-        LayoutPublishRequest: {
-            /** Header Config */
-            header_config?: {
-                [key: string]: unknown;
-            };
-            /** Footer Config */
-            footer_config?: {
-                [key: string]: unknown;
-            };
         };
         /** LocationReportRequest */
         LocationReportRequest: {
@@ -5059,6 +5203,10 @@ export interface components {
             shipping_amount?: string | null;
             /** Shipping Pending Review */
             shipping_pending_review: boolean;
+            /** Shipping Estimated Minutes */
+            shipping_estimated_minutes?: number | null;
+            /** Estimated Delivery At */
+            estimated_delivery_at?: string | null;
             /** Total Money Amount */
             total_money_amount?: string | null;
             /** Credits Earned Total Snapshot */
@@ -5357,8 +5505,20 @@ export interface components {
             customer_name_snapshot?: string | null;
             /** Items Subtotal Amount */
             items_subtotal_amount: string;
+            /** Shipping Total Amount */
+            shipping_total_amount?: string | null;
             /** Total Money Amount */
             total_money_amount?: string | null;
+            /** Approved At */
+            approved_at?: string | null;
+            /** Approved By Name */
+            approved_by_name?: string | null;
+            /** Payment Method Label */
+            payment_method_label?: string | null;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Cancelled At */
+            cancelled_at?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -5428,6 +5588,14 @@ export interface components {
             cancellation_money_resolution?: string | null;
             /** Cancellation Resolution Note */
             cancellation_resolution_note?: string | null;
+            /** Approved At */
+            approved_at?: string | null;
+            /** Approved By Name */
+            approved_by_name?: string | null;
+            /** Completed At */
+            completed_at?: string | null;
+            /** Cancelled At */
+            cancelled_at?: string | null;
             /** Created By */
             created_by?: string | null;
             /**
@@ -5443,6 +5611,8 @@ export interface components {
             delivery?: components["schemas"]["OrderDeliveryRead"] | null;
             /** Visible Notes */
             visible_notes?: components["schemas"]["OrderVisibleNoteRead"][];
+            /** Status History */
+            status_history?: components["schemas"]["OrderStatusHistoryRead"][];
         };
         /**
          * OrderShippingFinalizeRequest
@@ -5478,6 +5648,35 @@ export interface components {
             final_amount?: string | null;
             /** Is Free Shipping */
             is_free_shipping: boolean;
+            /** Estimated Minutes */
+            estimated_minutes?: number | null;
+        };
+        /**
+         * OrderStatusHistoryRead
+         * @description Bitácora INTERNA completa de una transición (§15.4): la ve el equipo en
+         *     el detalle del panel (quién aprobó/preparó/completó, motivo de cancelación,
+         *     notas por transición). Incluye la nota interna — jamás sale a la vista del
+         *     cliente, que sólo recibe ``visible_notes``. ``changed_by_name`` se resuelve
+         *     en el endpoint (join a ``User``).
+         */
+        OrderStatusHistoryRead: {
+            /** Previous Status */
+            previous_status?: string | null;
+            /** New Status */
+            new_status: string;
+            /** Reason Code */
+            reason_code?: string | null;
+            /** Internal Note */
+            internal_note?: string | null;
+            /** Customer Visible Note */
+            customer_visible_note?: string | null;
+            /** Changed By Name */
+            changed_by_name?: string | null;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
         };
         /** OrderTransitionRequest */
         OrderTransitionRequest: {
@@ -5849,20 +6048,6 @@ export interface components {
             order: components["schemas"]["OrderRead"];
             payment: components["schemas"]["PaymentRead"];
         };
-        /**
-         * PreviewLinkResult
-         * @description Enlace de preview firmado y temporal (§ Etapa 6.9 del spec RC).
-         */
-        PreviewLinkResult: {
-            /** Token */
-            token: string;
-            /** Url */
-            url: string;
-            /** Expires At */
-            expires_at: string;
-            /** Revision Number */
-            revision_number: number;
-        };
         /** ProductCreate */
         ProductCreate: {
             /**
@@ -6147,6 +6332,8 @@ export interface components {
             is_accepting_orders: boolean;
             /** Is Open Now */
             is_open_now: boolean;
+            /** Online Orders Require Open Hours */
+            online_orders_require_open_hours: boolean;
             /** Today Slots */
             today_slots: components["schemas"]["PublicDaySlot"][];
             /** Phones */
@@ -6161,6 +6348,34 @@ export interface components {
             minimum_delivery_order_amount?: string | null;
             /** Free Shipping Global From Amount */
             free_shipping_global_from_amount?: string | null;
+        };
+        /** PublicCarousel */
+        PublicCarousel: {
+            /**
+             * Autoplay
+             * @default true
+             */
+            autoplay: boolean;
+            /**
+             * Interval Seconds
+             * @default 6
+             */
+            interval_seconds: number;
+            /**
+             * Transition
+             * @default slide
+             */
+            transition: string;
+            /**
+             * Show Arrows
+             * @default true
+             */
+            show_arrows: boolean;
+            /**
+             * Show Dots
+             * @default true
+             */
+            show_dots: boolean;
         };
         /**
          * PublicCourierInfo
@@ -6182,6 +6397,15 @@ export interface components {
             /** Cash Change Amount */
             cash_change_amount?: string | null;
         };
+        /** PublicCta */
+        PublicCta: {
+            /** Label */
+            label: string;
+            /** Link Type */
+            link_type: string;
+            /** Target */
+            target?: string | null;
+        };
         /** PublicDaySlot */
         PublicDaySlot: {
             /**
@@ -6194,6 +6418,166 @@ export interface components {
              * Format: time
              */
             closes_at: string;
+        };
+        /** PublicFooter */
+        PublicFooter: {
+            /**
+             * Template
+             * @default barra
+             */
+            template: string;
+            /**
+             * Color Scheme
+             * @default dark
+             */
+            color_scheme: string;
+            /** Slogan */
+            slogan?: string | null;
+            /** Phones */
+            phones?: components["schemas"]["PublicFooterPhone"][];
+            schedule?: components["schemas"]["PublicFooterSchedule"] | null;
+            /**
+             * Show Links
+             * @default true
+             */
+            show_links: boolean;
+            /** Address */
+            address?: string | null;
+            /** Social Links */
+            social_links?: components["schemas"]["PublicSocialLink"][];
+        };
+        /** PublicFooterPhone */
+        PublicFooterPhone: {
+            /** Label */
+            label?: string | null;
+            /** Phone */
+            phone: string;
+            /** Phone Normalized */
+            phone_normalized: string;
+            /**
+             * Is Whatsapp
+             * @default false
+             */
+            is_whatsapp: boolean;
+        };
+        /** PublicFooterSchedule */
+        PublicFooterSchedule: {
+            /**
+             * Is Open Now
+             * @default false
+             */
+            is_open_now: boolean;
+            /** Today Slots */
+            today_slots?: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** PublicHero */
+        PublicHero: {
+            /** Id */
+            id: string;
+            /** Template */
+            template: string;
+            /** Eyebrow */
+            eyebrow?: string | null;
+            /** Title */
+            title: string;
+            /** Title Accent */
+            title_accent?: string | null;
+            /** Description */
+            description?: string | null;
+            primary_cta?: components["schemas"]["PublicCta"] | null;
+            secondary_cta?: components["schemas"]["PublicCta"] | null;
+            product?: components["schemas"]["PublicHeroProduct"] | null;
+            image?: components["schemas"]["PublicHeroImage"];
+            /**
+             * Height
+             * @default regular
+             */
+            height: string;
+            /**
+             * Alignment
+             * @default left
+             */
+            alignment: string;
+            /**
+             * Color Scheme
+             * @default surface
+             */
+            color_scheme: string;
+            /**
+             * Button Variant
+             * @default solid
+             */
+            button_variant: string;
+            /**
+             * Overlay
+             * @default soft
+             */
+            overlay: string;
+            /**
+             * Image Position
+             * @default right
+             */
+            image_position: string;
+        };
+        /** PublicHeroImage */
+        PublicHeroImage: {
+            /** Desktop File Id */
+            desktop_file_id?: string | null;
+            /** Mobile File Id */
+            mobile_file_id?: string | null;
+            /** Alt Text */
+            alt_text?: string | null;
+            /** Focal X */
+            focal_x?: number | null;
+            /** Focal Y */
+            focal_y?: number | null;
+        };
+        /**
+         * PublicHeroProduct
+         * @description Binding real del showcase: catálogo vivo, nunca precio manual.
+         */
+        PublicHeroProduct: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Money Price Amount */
+            money_price_amount?: string | null;
+            /** Credit Redemption Price */
+            credit_redemption_price?: number | null;
+            /**
+             * Is Available
+             * @default true
+             */
+            is_available: boolean;
+        };
+        /** PublicHighlight */
+        PublicHighlight: {
+            /** Id */
+            id: string;
+            /** Surface */
+            surface: string;
+            /** Icon */
+            icon?: string | null;
+            /** Eyebrow */
+            eyebrow?: string | null;
+            /** Title */
+            title: string;
+            /** Subtitle */
+            subtitle?: string | null;
+            cta?: components["schemas"]["PublicCta"] | null;
+            /**
+             * Animation
+             * @default fade_in
+             */
+            animation: string;
+            /**
+             * Color Scheme
+             * @default brand
+             */
+            color_scheme: string;
         };
         /** PublicInclusion */
         PublicInclusion: {
@@ -6280,19 +6664,6 @@ export interface components {
             /** Modifier Groups */
             modifier_groups: components["schemas"]["PublicModifierGroup"][];
         };
-        /** PublicSectionMediaSlot */
-        PublicSectionMediaSlot: {
-            /** Desktop File Id */
-            desktop_file_id?: string | null;
-            /** Mobile File Id */
-            mobile_file_id?: string | null;
-            /** Alt Text */
-            alt_text?: string | null;
-            /** Focal Point X */
-            focal_point_x?: number | null;
-            /** Focal Point Y */
-            focal_point_y?: number | null;
-        };
         /** PublicShippingQuoteRequest */
         PublicShippingQuoteRequest: {
             /** Subtotal */
@@ -6315,71 +6686,42 @@ export interface components {
             /** Estimated Minutes */
             estimated_minutes?: number | null;
         };
-        /** PublicStorefrontLayout */
-        PublicStorefrontLayout: {
-            /** Header */
-            header?: {
-                [key: string]: unknown;
-            };
-            /** Footer */
-            footer?: {
-                [key: string]: unknown;
-            };
-        };
-        /** PublicStorefrontMeta */
-        PublicStorefrontMeta: {
+        /** PublicSiteMeta */
+        PublicSiteMeta: {
             /** Title */
             title?: string | null;
             /** Description */
             description?: string | null;
-            /** Og Image File Id */
-            og_image_file_id?: string | null;
             /** Favicon File Id */
             favicon_file_id?: string | null;
+            /** Social Image File Id */
+            social_image_file_id?: string | null;
         };
-        /** PublicStorefrontPage */
-        PublicStorefrontPage: {
-            /** Page Key */
-            page_key: string;
-            /** Slug */
-            slug: string;
-            meta: components["schemas"]["PublicStorefrontMeta"];
-            layout?: components["schemas"]["PublicStorefrontLayout"] | null;
-            /** Sections */
-            sections?: components["schemas"]["PublicStorefrontSection"][];
+        /** PublicSocialLink */
+        PublicSocialLink: {
+            /** Network */
+            network: string;
+            /** Url */
+            url: string;
+        };
+        /** PublicStorefrontSite */
+        PublicStorefrontSite: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Maintenance Message */
+            maintenance_message?: string | null;
+            meta?: components["schemas"]["PublicSiteMeta"];
             /** Theme Tokens */
             theme_tokens?: {
                 [key: string]: unknown;
-            } | null;
-        };
-        /** PublicStorefrontSection */
-        PublicStorefrontSection: {
-            /** Template Key */
-            template_key: string;
-            /** Template Version */
-            template_version: number;
-            /** Sort Order */
-            sort_order: number;
-            /** Content */
-            content?: {
-                [key: string]: unknown;
             };
-            /** Style */
-            style?: {
-                [key: string]: unknown;
-            };
-            /** Behavior */
-            behavior?: {
-                [key: string]: unknown;
-            };
-            /** Data */
-            data?: {
-                [key: string]: unknown;
-            } | null;
-            /** Media */
-            media?: {
-                [key: string]: components["schemas"]["PublicSectionMediaSlot"];
-            };
+            carousel?: components["schemas"]["PublicCarousel"];
+            /** Heros */
+            heros?: components["schemas"]["PublicHero"][];
+            footer?: components["schemas"]["PublicFooter"];
         };
         /** ReadinessRead */
         ReadinessRead: {
@@ -6743,33 +7085,6 @@ export interface components {
          * @enum {string}
          */
         ResourceView: "table" | "grouped_catalog";
-        /** RevisionMetaUpdate */
-        RevisionMetaUpdate: {
-            /** Page Title */
-            page_title?: string | null;
-            /** Meta Description */
-            meta_description?: string | null;
-            /** Og Image File Id */
-            og_image_file_id?: string | null;
-        };
-        /** RevisionRead */
-        RevisionRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Revision Number */
-            revision_number: number;
-            /** Status */
-            status: string;
-            /** Page Title */
-            page_title?: string | null;
-            /** Meta Description */
-            meta_description?: string | null;
-            /** Sections */
-            sections?: components["schemas"]["SectionRead"][];
-        };
         /** RoleCreate */
         RoleCreate: {
             /** Nombre */
@@ -6904,14 +7219,6 @@ export interface components {
             /** Items */
             items: components["schemas"]["SalesByHourItem"][];
         };
-        /** ScheduleRequest */
-        ScheduleRequest: {
-            /**
-             * Publish At
-             * Format: date-time
-             */
-            publish_at: string;
-        };
         /** SearchCapability */
         SearchCapability: {
             /** Enabled */
@@ -6920,110 +7227,6 @@ export interface components {
             min_length?: number | null;
             /** Max Length */
             max_length?: number | null;
-        };
-        /** SectionInput */
-        SectionInput: {
-            /** Template Key */
-            template_key: string;
-            /**
-             * Template Version
-             * @default 1
-             */
-            template_version: number;
-            /** Section Name */
-            section_name?: string | null;
-            /**
-             * Sort Order
-             * @default 0
-             */
-            sort_order: number;
-            /**
-             * Is Visible
-             * @default true
-             */
-            is_visible: boolean;
-            /** Visible From */
-            visible_from?: string | null;
-            /** Visible Until */
-            visible_until?: string | null;
-            /** Content Config */
-            content_config?: {
-                [key: string]: unknown;
-            };
-            /** Style Config */
-            style_config?: {
-                [key: string]: unknown;
-            };
-            /** Data Binding Config */
-            data_binding_config?: {
-                [key: string]: unknown;
-            };
-            /** Behavior Config */
-            behavior_config?: {
-                [key: string]: unknown;
-            };
-        };
-        /**
-         * SectionMediaUpsert
-         * @description Media por slot (§43): imágenes verificadas del banco de archivos.
-         */
-        SectionMediaUpsert: {
-            /** Desktop File Id */
-            desktop_file_id?: string | null;
-            /** Mobile File Id */
-            mobile_file_id?: string | null;
-            /** Alt Text */
-            alt_text?: string | null;
-            /** Focal Point X */
-            focal_point_x?: number | null;
-            /** Focal Point Y */
-            focal_point_y?: number | null;
-        };
-        /** SectionRead */
-        SectionRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Template Key */
-            template_key: string;
-            /** Template Version */
-            template_version: number;
-            /** Section Name */
-            section_name?: string | null;
-            /** Sort Order */
-            sort_order: number;
-            /** Is Visible */
-            is_visible: boolean;
-            /** Visible From */
-            visible_from?: string | null;
-            /** Visible Until */
-            visible_until?: string | null;
-            /** Content Config */
-            content_config: {
-                [key: string]: unknown;
-            };
-            /** Style Config */
-            style_config: {
-                [key: string]: unknown;
-            };
-            /** Data Binding Config */
-            data_binding_config: {
-                [key: string]: unknown;
-            };
-            /** Behavior Config */
-            behavior_config: {
-                [key: string]: unknown;
-            };
-        };
-        /**
-         * SectionsSortRequest
-         * @description Reorden ATÓMICO (§49): el set completo de secciones del borrador.
-         */
-        SectionsSortRequest: {
-            /** Section Ids */
-            section_ids: string[];
         };
         /**
          * SendTestEmailRequest
@@ -7052,6 +7255,60 @@ export interface components {
             email: string;
             /** Permissions */
             permissions?: string[];
+        };
+        /** SettingsPatch */
+        SettingsPatch: {
+            /** Site Title */
+            site_title?: string | null;
+            /** Site Description */
+            site_description?: string | null;
+            /** Favicon File Id */
+            favicon_file_id?: string | null;
+            /** Social Image File Id */
+            social_image_file_id?: string | null;
+            /** Storefront Enabled */
+            storefront_enabled?: boolean | null;
+            /** Maintenance Message */
+            maintenance_message?: string | null;
+            /** Hero Autoplay */
+            hero_autoplay?: boolean | null;
+            /** Hero Interval Seconds */
+            hero_interval_seconds?: number | null;
+            /** Hero Transition */
+            hero_transition?: ("slide" | "fade") | null;
+            /** Hero Show Arrows */
+            hero_show_arrows?: boolean | null;
+            /** Hero Show Dots */
+            hero_show_dots?: boolean | null;
+        };
+        /** SettingsRead */
+        SettingsRead: {
+            /** Storefront Enabled */
+            storefront_enabled: boolean;
+            /** Maintenance Message */
+            maintenance_message?: string | null;
+            /** Site Title */
+            site_title?: string | null;
+            /** Site Description */
+            site_description?: string | null;
+            /** Favicon File Id */
+            favicon_file_id?: string | null;
+            /** Social Image File Id */
+            social_image_file_id?: string | null;
+            /** Theme Preset */
+            theme_preset: string;
+            /** Theme Accent */
+            theme_accent?: string | null;
+            /** Hero Autoplay */
+            hero_autoplay: boolean;
+            /** Hero Interval Seconds */
+            hero_interval_seconds: number;
+            /** Hero Transition */
+            hero_transition: string;
+            /** Hero Show Arrows */
+            hero_show_arrows: boolean;
+            /** Hero Show Dots */
+            hero_show_dots: boolean;
         };
         /**
          * SetupChecklistItemRead
@@ -7141,20 +7398,15 @@ export interface components {
             /** Is Active */
             is_active?: boolean | null;
         };
-        /** SiteMetadataUpdate */
-        SiteMetadataUpdate: {
-            /** Site Title */
-            site_title?: string | null;
-            /** Site Description */
-            site_description?: string | null;
-            /** Favicon File Id */
-            favicon_file_id?: string | null;
-            /** Social Image File Id */
-            social_image_file_id?: string | null;
-            /** Storefront Enabled */
-            storefront_enabled?: boolean | null;
-            /** Maintenance Message */
-            maintenance_message?: string | null;
+        /** SocialLink */
+        SocialLink: {
+            /**
+             * Network
+             * @enum {string}
+             */
+            network: "facebook" | "instagram" | "tiktok" | "whatsapp" | "youtube" | "x";
+            /** Url */
+            url: string;
         };
         /** SortCapability */
         SortCapability: {
@@ -7331,6 +7583,24 @@ export interface components {
             created_at: string;
         };
         /**
+         * StorefrontConfig
+         * @description Config completa del editor en UNA llamada (las 4 pestañas).
+         */
+        StorefrontConfig: {
+            settings: components["schemas"]["SettingsRead"];
+            footer: components["schemas"]["FooterRead"];
+            /** Heros */
+            heros?: components["schemas"]["HeroRead"][];
+            /** Highlights */
+            highlights?: components["schemas"]["HighlightRead"][];
+            /** Theme Presets */
+            theme_presets?: components["schemas"]["ThemePresetRead"][];
+            /** Active Theme Tokens */
+            active_theme_tokens?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
          * SystemSettingsListItem
          * @description Versión de listado del singleton (una fila).
          */
@@ -7386,6 +7656,14 @@ export interface components {
             google_auth_client_secret_configured: boolean;
             /** Password Reset Enabled */
             password_reset_enabled: boolean;
+            /** Customer Session Days */
+            customer_session_days?: number | null;
+            /** Staff Session Minutes */
+            staff_session_minutes?: number | null;
+            /** Customer Session Days Effective */
+            customer_session_days_effective: number;
+            /** Staff Session Minutes Effective */
+            staff_session_minutes_effective: number;
             /** Email Mode */
             email_mode: string;
             /** Email From Address */
@@ -7447,6 +7725,16 @@ export interface components {
              */
             login_verification_mode?: ("disabled" | "code" | "link") | null;
             /**
+             * Sesión del cliente (días)
+             * @description Cuánto dura la sesión de un CLIENTE (usuario sin roles). La renovación deslizante la extiende con la actividad: un cliente que compra una vez al mes no vuelve a iniciar sesión. Vacío = default del despliegue.
+             */
+            customer_session_days?: number | null;
+            /**
+             * Sesión del personal (minutos)
+             * @description Cuánto dura la sesión de un usuario CON roles (panel/admin) sin actividad; con actividad se renueva sola. Vacío = default del despliegue.
+             */
+            staff_session_minutes?: number | null;
+            /**
              * Recuperación de contraseña
              * @description Permitir restablecer contraseña por correo. AVISO: apagarla con el registro cerrado y un solo administrador puede dejar la instalación sin acceso (la salida es el seed del servidor).
              */
@@ -7496,17 +7784,23 @@ export interface components {
              */
             email_resend_api_key?: string | null;
         };
-        /** ThemeCreate */
-        ThemeCreate: {
-            /**
-             * Preset
-             * @default calido
-             */
-            preset: string;
-            /** Accent */
-            accent?: string | null;
-            /** Theme Name */
-            theme_name?: string | null;
+        /** ThemePatch */
+        ThemePatch: {
+            /** Theme Preset */
+            theme_preset?: string | null;
+            /** Theme Accent */
+            theme_accent?: string | null;
+        };
+        /** ThemePresetRead */
+        ThemePresetRead: {
+            /** Name */
+            name: string;
+            /** Tokens */
+            tokens: {
+                [key: string]: unknown;
+            };
+            /** Is Default */
+            is_default: boolean;
         };
         /** TicketBusiness */
         TicketBusiness: {
@@ -11729,6 +12023,8 @@ export interface operations {
                 status?: string | null;
                 source?: string | null;
                 fulfillment_type?: string | null;
+                purchase_mode?: string | null;
+                payment_status?: string | null;
                 q?: string | null;
                 created_from?: string | null;
                 created_to?: string | null;
@@ -11905,9 +12201,12 @@ export interface operations {
             query?: {
                 source?: string | null;
                 fulfillment_type?: string | null;
+                purchase_mode?: string | null;
+                payment_status?: string | null;
                 q?: string | null;
                 created_from?: string | null;
                 created_to?: string | null;
+                customer_user_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -13724,7 +14023,7 @@ export interface operations {
             };
         };
     };
-    list_templates_api_v1_storefront_templates_get: {
+    read_config_api_v1_storefront_config_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -13741,9 +14040,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["StorefrontConfig"];
                 };
             };
             /** @description Validation Error */
@@ -13757,184 +14054,7 @@ export interface operations {
             };
         };
     };
-    list_storefront_pages_api_v1_storefront_pages_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    upsert_section_media_api_v1_storefront_sections__section_id__media__slot_key__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                section_id: string;
-                slot_key: string;
-            };
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SectionMediaUpsert"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_section_media_api_v1_storefront_sections__section_id__media__slot_key__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                section_id: string;
-                slot_key: string;
-            };
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    sort_draft_sections_api_v1_storefront_pages__page_key__draft_sections_sort_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                page_key: string;
-            };
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SectionsSortRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_layout_api_v1_storefront_layout_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_layout_api_v1_storefront_layout_put: {
+    create_hero_api_v1_storefront_heros_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -13945,77 +14065,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LayoutPublishRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_theme_presets_api_v1_storefront_theme_presets_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_and_activate_theme_api_v1_storefront_theme_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ThemeCreate"];
+                "application/json": components["schemas"]["HeroWrite"];
             };
         };
         responses: {
@@ -14025,9 +14075,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["HeroRead"];
                 };
             };
             /** @description Validation Error */
@@ -14041,7 +14089,75 @@ export interface operations {
             };
         };
     };
-    update_site_metadata_api_v1_storefront_settings_patch: {
+    update_hero_api_v1_storefront_heros__hero_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                hero_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeroWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeroRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_hero_api_v1_storefront_heros__hero_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                hero_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sort_heros_api_v1_storefront_heros_sort_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -14052,7 +14168,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SiteMetadataUpdate"];
+                "application/json": components["schemas"]["HerosSortRequest"];
             };
         };
         responses: {
@@ -14064,7 +14180,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    };
+                    }[];
                 };
             };
             /** @description Validation Error */
@@ -14078,90 +14194,18 @@ export interface operations {
             };
         };
     };
-    read_draft_api_v1_storefront_pages__page_key__draft_get: {
+    create_highlight_api_v1_storefront_highlights_post: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                page_key: string;
-            };
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RevisionRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_draft_meta_api_v1_storefront_pages__page_key__draft_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                page_key: string;
-            };
+            path?: never;
             cookie?: {
                 session_token?: string | null;
             };
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RevisionMetaUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RevisionRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_section_api_v1_storefront_pages__page_key__draft_sections_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                page_key: string;
-            };
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SectionInput"];
+                "application/json": components["schemas"]["HighlightWrite"];
             };
         };
         responses: {
@@ -14171,7 +14215,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RevisionRead"];
+                    "application/json": components["schemas"]["HighlightRead"];
                 };
             };
             /** @description Validation Error */
@@ -14185,12 +14229,12 @@ export interface operations {
             };
         };
     };
-    update_section_api_v1_storefront_sections__section_id__put: {
+    update_highlight_api_v1_storefront_highlights__highlight_id__put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                section_id: string;
+                highlight_id: string;
             };
             cookie?: {
                 session_token?: string | null;
@@ -14198,7 +14242,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SectionInput"];
+                "application/json": components["schemas"]["HighlightWrite"];
             };
         };
         responses: {
@@ -14208,7 +14252,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SectionRead"];
+                    "application/json": components["schemas"]["HighlightRead"];
                 };
             };
             /** @description Validation Error */
@@ -14222,12 +14266,12 @@ export interface operations {
             };
         };
     };
-    delete_section_api_v1_storefront_sections__section_id__delete: {
+    delete_highlight_api_v1_storefront_highlights__highlight_id__delete: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                section_id: string;
+                highlight_id: string;
             };
             cookie?: {
                 session_token?: string | null;
@@ -14253,20 +14297,20 @@ export interface operations {
             };
         };
     };
-    publish_page_api_v1_storefront_pages__page_key__publish_post: {
+    update_footer_api_v1_storefront_footer_patch: {
         parameters: {
-            query?: {
-                revision_id?: string | null;
-            };
+            query?: never;
             header?: never;
-            path: {
-                page_key: string;
-            };
+            path?: never;
             cookie?: {
                 session_token?: string | null;
             };
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FooterPatch"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -14274,7 +14318,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RevisionRead"];
+                    "application/json": components["schemas"]["FooterRead"];
                 };
             };
             /** @description Validation Error */
@@ -14288,20 +14332,18 @@ export interface operations {
             };
         };
     };
-    schedule_page_api_v1_storefront_pages__page_key__schedule_post: {
+    update_theme_api_v1_storefront_theme_patch: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                page_key: string;
-            };
+            path?: never;
             cookie?: {
                 session_token?: string | null;
             };
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ScheduleRequest"];
+                "application/json": components["schemas"]["ThemePatch"];
             };
         };
         responses: {
@@ -14327,51 +14369,20 @@ export interface operations {
             };
         };
     };
-    unschedule_page_api_v1_storefront_pages__page_key__schedule_delete: {
+    update_site_settings_api_v1_storefront_settings_patch: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                page_key: string;
-            };
+            path?: never;
             cookie?: {
                 session_token?: string | null;
             };
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsPatch"];
             };
         };
-    };
-    create_preview_link_api_v1_storefront_pages__page_key__preview_link_post: {
-        parameters: {
-            query?: {
-                minutes?: number;
-            };
-            header?: never;
-            path: {
-                page_key: string;
-            };
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -14379,7 +14390,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PreviewLinkResult"];
+                    "application/json": components["schemas"]["SettingsRead"];
                 };
             };
             /** @description Validation Error */
@@ -14393,13 +14404,11 @@ export interface operations {
             };
         };
     };
-    public_preview_by_token_api_v1_public_storefront_preview__token__get: {
+    public_site_api_v1_public_storefront_site_get: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                token: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -14410,62 +14419,18 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PublicStorefrontPage"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["PublicStorefrontSite"];
                 };
             };
         };
     };
-    preview_draft_api_v1_storefront_pages__page_key__preview_get: {
+    public_highlights_api_v1_public_storefront_highlights_get: {
         parameters: {
-            query?: never;
+            query: {
+                surface: "global" | "home" | "login" | "register" | "cart" | "checkout" | "account";
+            };
             header?: never;
-            path: {
-                page_key: string;
-            };
-            cookie?: {
-                session_token?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    public_storefront_page_api_v1_public_storefront__page_key__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                page_key: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -14476,7 +14441,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PublicStorefrontPage"];
+                    "application/json": components["schemas"]["PublicHighlight"][];
                 };
             };
             /** @description Validation Error */

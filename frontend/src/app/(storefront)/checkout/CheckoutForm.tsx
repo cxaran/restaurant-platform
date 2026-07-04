@@ -43,10 +43,16 @@ import {
   type AppliedDiscount,
 } from "@/core/storefront/discount-quote";
 import type { SessionUser } from "@/core/auth/types";
+import {
+  closedBannerText,
+  useBusinessOpenStatus,
+} from "@/core/storefront/useBusinessOpenStatus";
 
 export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
   const router = useRouter();
   const { lines, mode, subtotalHint, clear } = useCart();
+  const openStatus = useBusinessOpenStatus();
+  const closedBySchedule = openStatus?.blockedBySchedule === true;
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup");
   const [name, setName] = useState(`${session.name} ${session.last_name ?? ""}`.trim());
   const [phone, setPhone] = useState("");
@@ -303,6 +309,7 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (missingLocation) return; // la entrega exige un punto de ubicación
+    if (closedBySchedule) return; // cerrado por horario: el backend rechazaría igual
     setError(null);
     setSubmitting(true);
     const payload: CheckoutRequest = {
@@ -697,10 +704,20 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
         </div>
       ) : null}
 
+      {closedBySchedule && openStatus ? (
+        <div
+          role="status"
+          className="sf-card"
+          style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700 }}
+        >
+          🕐 {closedBannerText(openStatus)} No es posible confirmar pedidos por ahora;
+          tu carrito se conserva.
+        </div>
+      ) : null}
       <button
         className="sf-btn"
         type="submit"
-        disabled={submitting || missingLocation}
+        disabled={submitting || missingLocation || closedBySchedule}
         style={{ width: "100%", padding: "15px 18px", justifyContent: "space-between" }}
       >
         {submitting ? (

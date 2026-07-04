@@ -39,26 +39,26 @@ fecha y paginación (PAGE_SIZE 30).
 
 Pendiente (deltas sobre lo anterior):
 
-- [ ] 1.1 `OrderListItem`: enriquecer con datos finales — `approved_at`,
-      `approved_by_name` (join a `User.name`; resolver en el endpoint, no en
-      el schema), `payment_method_label` (snapshot del primer pago `paid`;
-      existe helper en `payment_service.py:232`), `shipping_total_amount`,
-      `completed_at`/`cancelled_at`. Mantener la lista ligera: nada de líneas.
-- [ ] 1.2 Bitácora expuesta al equipo: `OrderStatusHistoryRead`
+- [x] 1.1 `OrderListItem`: enriquecido con datos finales — `approved_at`,
+      `approved_by_name` (join a `User`, resuelto EN LOTE en el endpoint vía
+      `_order_list_items`), `payment_method_label` (snapshot del primer pago
+      `paid`), `shipping_total_amount`, `completed_at`/`cancelled_at`. La lista
+      sigue ligera (sin líneas ni bitácora).
+- [x] 1.2 Bitácora expuesta al equipo: `OrderStatusHistoryRead`
       (previous/new_status, reason_code, internal_note, customer_visible_note,
-      `changed_by_name`, changed_at) como `status_history` en `OrderRead`.
-      La vista del CLIENTE sigue viendo solo `visible_notes` (ya existe).
-- [ ] 1.3 Detalle del panel: línea de tiempo con la bitácora (quién y cuándo
-      aprobó/preparó/completó, motivo de cancelación, notas por transición).
-- [ ] 1.4 Filtros restantes en `GET /orders`: `purchase_mode`,
-      `payment_status`, `customer_user_id` (este último lo necesita la ficha
-      de cliente de la Fase 3).
-- [ ] 1.5 Export CSV del listado filtrado (mismo criterio que el export de la
-      tabla genérica de recursos; si conviene, botón "Exportar" en el tablero
-      que pagine `GET /orders` con los filtros vigentes).
-- [ ] 1.6 Verificar: unittest `test_orders`/`test_order_routes`; en vivo:
-      filtrar por fechas+estado+búsqueda, paginar, ver aprobador/método de
-      pago/envío en la lista y bitácora completa en el detalle.
+      `changed_by_name`, changed_at) como `status_history` en `OrderRead`
+      (`_status_history` resuelve los nombres en lote). El CLIENTE sigue viendo
+      solo `visible_notes`.
+- [x] 1.3 Detalle del panel: «Bitácora interna» en `OrderDetail.tsx` (timeline
+      con estado, quién/cuándo, motivo, nota interna y aclaración visible).
+- [x] 1.4 Filtros restantes en `GET /orders` y `/status-counts`:
+      `purchase_mode`, `payment_status`, `customer_user_id`.
+- [x] 1.5 Export CSV del listado filtrado: botón «Exportar CSV» en el tablero
+      (`orders-export.ts`) que pagina `GET /orders` con los filtros vigentes
+      (tope 5 000 filas, BOM UTF-8).
+- [x] 1.6 Verificado: suite canónica backend 616 tests (563 ok, 53 skip, 0
+      fail); `npm run check:canonical` en verde (incluye build). Falta smoke
+      visual con navegador en el stack e2e (ver 6.3).
 
 ## Fase 2 — Finanzas admin + reembolsos ejecutables
 
@@ -159,7 +159,8 @@ Backend COMPLETO: `GET /profiles/staff`, `PUT /profiles/staff/{user_id}`.
       /panel/entregas y /panel/pedidos, y TODOS los flujos verificados por
       API contra el stack vivo (ver cada fase). Pendiente: smoke visual con
       navegador (clic a clic) cuando la Fase 1 de la sesión B esté cerrada.
-- [ ] 6.4 Al cerrar Fase 1 (deltas): actualizar este plan y docs si aplica.
+- [x] 6.4 Fase 1 (deltas) cerrada: este plan actualizado; `AUDITORIA_BACKEND.md`
+      marcada como histórica (H10 resuelto).
 
 ## Registro de avance
 
@@ -168,3 +169,4 @@ Backend COMPLETO: `GET /profiles/staff`, `PUT /profiles/staff/{user_id}`.
 | 2026-07-04 | A (esta) | Plan creado; análisis de huecos completo |
 | 2026-07-04 | B (paralela) | Fase 1 parcial: OffsetPage + filtros fecha/q + status-counts + tablero con presets |
 | 2026-07-04 | A | Fases 2, 3, 4 y 5 COMPLETAS y verificadas en vivo; filtro `customer_user_id` añadido a GET /orders (parte de 1.4); Fase 6: suites canónicas backend y frontend en verde, stack reconstruido, smoke 200. Pendiente: deltas 1.1–1.3, 1.5 (lista enriquecida, bitácora expuesta, export) y smoke visual final. |
+| 2026-07-04 | C | Fase 1 deltas 1.1–1.6 COMPLETAS (lista enriquecida, `status_history`, timeline en `OrderDetail`, filtros `purchase_mode`/`payment_status`/`customer_user_id`, export CSV); openapi regenerado sin drift. P2: tests CRUD de métodos de pago (`test_payment_method_configs`), auditoría `record_config_change` en `payments.py`, validación storefront `source=category` sin `category_id`. P3: `check:canonical` cubre 9 tests antes omitidos (relation-picker reescrito), a11y de `SchemaForm` (id/name), `AUDITORIA_BACKEND.md` histórica. E2E RC (`restaurant.rc.spec.ts`) realineado con la UI actual en TODOS los escenarios con drift: B/D/E (acciones en el detalle del pedido, cola de reparto por badges, cancelación desde detalle), A (producto configurable abre página de detalle, no diálogo; labels `Recoger`/`Confirmar pedido`/`Finalizar pedido`), C (saldo en `.sf-credits-hero`), F (`Editor del sitio`/`Publicar`/`Vista previa completa`), G (nav `Resumen`). `shipping.rc.spec.ts` ya estaba alineado. Suite backend 616 (0 fail) + `check:canonical` verde. Pendiente real: smoke visual con navegador y correr `test:e2e:rc` contra el stack e2e (no ejecutado en esta sesión; realineación hecha leyendo los componentes). |

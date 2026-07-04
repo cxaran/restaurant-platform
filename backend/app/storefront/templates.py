@@ -1,31 +1,35 @@
-"""Catálogo de plantillas del storefront REGISTRADO EN CÓDIGO (§33).
+"""Contratos del storefront REGISTRADOS EN CÓDIGO.
 
 Mismo espíritu que el catálogo de permisos: el administrador nunca crea
-plantillas; elige una y configura SOLO sus campos declarados. Cada config
-(content/style/data_binding/behavior) es un modelo Pydantic ``extra="forbid"``:
-las claves desconocidas se rechazan (§40) y los CTA usan tipos de enlace
-CONTROLADOS (§50) — jamás javascript:/data:/HTML embebido.
+plantillas ni escribe HTML/CSS/JS; elige una plantilla (hero) o llena un
+formulario (destacado/footer/tema) y TODO se valida contra estos modelos
+Pydantic ``extra="forbid"`` — las claves desconocidas se rechazan y los CTA
+usan tipos de enlace CONTROLADOS (jamás javascript:/data:/HTML embebido).
 
-Los colores de estilo referencian TOKENS del tema (§58.4), nunca hex libres.
+Los colores referencian TOKENS del tema, nunca hex libres (la única
+excepción es el acento del tema, un hex validado por patrón).
 """
 
-from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class _Config(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
-class _Empty(_Config):
-    pass
+class TemplateValidationError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
 
 
 # ---------------------------------------------------------------------------
-# CTA con tipos de enlace controlados (§50)
+# CTA con tipos de enlace controlados
 # ---------------------------------------------------------------------------
 
 class Cta(_Config):
@@ -54,341 +58,13 @@ class Cta(_Config):
             raise ValueError(f"El enlace tipo {self.link_type} requiere target.")
 
 
-# Esquemas de color por sección: referencias a tokens del tema (§58.4).
-ColorScheme = Literal["surface", "surface_muted", "brand", "brand_inverse", "dark"]
-
-
-# ---------------------------------------------------------------------------
-# Plantillas iniciales (§58.1: las del prototipo)
-# ---------------------------------------------------------------------------
-
-class AnnouncementBehavior(_Config):
-    # §35.4: SOLO decide si se muestra; el texto es derivado del umbral de
-    # envío gratis configurado — nunca texto rodante libre.
-    show_free_shipping: bool = True
-    show_service_note: bool = True
-
-
-class HeroSlide(_Config):
-    variant: Literal["split", "background", "minimal"] = "split"
-    eyebrow: Optional[str] = Field(default=None, max_length=60)
-    title: str = Field(min_length=1, max_length=120)
-    description: Optional[str] = Field(default=None, max_length=300)
-    primary_cta: Optional[Cta] = None
-    secondary_cta: Optional[Cta] = None
-    is_active: bool = True
-
-
-class HeroContent(_Config):
-    # §34.1: varios heros activos rotan en carrusel; sin recurrencia semanal.
-    slides: list[HeroSlide] = Field(min_length=1, max_length=8)
-
-
-class HeroStyle(_Config):
-    height: Literal["compact", "regular", "tall"] = "compact"
-    content_alignment: Literal["left", "center"] = "left"
-    color_scheme: ColorScheme = "surface"
-    button_variant: Literal["solid", "outline"] = "solid"
-
-
-class PromoBannerContent(_Config):
-    title: str = Field(min_length=1, max_length=120)
-    description: Optional[str] = Field(default=None, max_length=300)
-    cta: Optional[Cta] = None
-
-
-class PromoBannerStyle(_Config):
-    color_scheme: ColorScheme = "dark"
-
-
-class FeaturedProductsContent(_Config):
-    title: Optional[str] = Field(default=None, max_length=120)
-    description: Optional[str] = Field(default=None, max_length=300)
-
-
-class FeaturedProductsStyle(_Config):
-    layout: Literal["horizontal_cards", "grid"] = "grid"
-    color_scheme: ColorScheme = "surface"
-    show_product_description: bool = True
-    show_credits: bool = True
-
-
-class FeaturedProductsBinding(_Config):
-    # §36.2: fuente REAL del catálogo, nunca productos manuales.
-    source: Literal["featured_products", "category", "credit_products", "newest"] = (
-        "featured_products"
-    )
-    category_id: Optional[UUID] = None
-    max_items: int = Field(default=4, ge=1, le=12)
-
-
-class HoursContent(_Config):
-    title: Optional[str] = Field(default=None, max_length=120)
-    show_today: bool = True
-    show_weekly: bool = True
-
-
-class ContactContent(_Config):
-    title: Optional[str] = Field(default=None, max_length=120)
-    show_whatsapp: bool = True
-    show_map_button: bool = False
-
-
-class SectionBehavior(_Config):
-    show_on_mobile: bool = True
-    show_on_desktop: bool = True
-
-
-# --- Fase 1 restante: plantillas §36.1, §35.2 y §35.3 ---
-
-class CategoriesContent(_Config):
-    title: Optional[str] = Field(default=None, max_length=120)
-
-
-class CategoriesBinding(_Config):
-    # §36.1: SIEMPRE categorías reales visibles del catálogo; sin listas manuales.
-    max_items: int = Field(default=8, ge=1, le=12)
-
-
-class CreditsBannerContent(_Config):
-    # §35.2: invita al programa de créditos; los números salen del backend.
-    title: str = Field(min_length=1, max_length=120)
-    description: Optional[str] = Field(default=None, max_length=300)
-    cta: Optional[Cta] = None
-
-
-class DeliveryBannerContent(_Config):
-    # §35.3: el umbral de envío gratis es DERIVADO (data), nunca texto libre.
-    title: Optional[str] = Field(default=None, max_length=120)
-    description: Optional[str] = Field(default=None, max_length=300)
-
-
-# --- Plantillas de contenido (Etapa 6 RC): texto controlado, jamás HTML ---
-
-class ImageTextContent(_Config):
-    # La imagen llega por el slot de media de la sección (§43), no por config.
-    title: str = Field(min_length=1, max_length=120)
-    body: str = Field(min_length=1, max_length=600)
-    cta: Optional[Cta] = None
-
-
-class ImageTextStyle(_Config):
-    color_scheme: ColorScheme = "surface"
-    image_position: Literal["left", "right"] = "left"
-
-
-class InfoCard(_Config):
-    title: str = Field(min_length=1, max_length=80)
-    description: Optional[str] = Field(default=None, max_length=300)
-    cta: Optional[Cta] = None
-
-
-class InfoCardsContent(_Config):
-    title: Optional[str] = Field(default=None, max_length=120)
-    cards: list[InfoCard] = Field(min_length=1, max_length=6)
-
-
-class InfoCardsStyle(_Config):
-    color_scheme: ColorScheme = "surface_muted"
-
-
-class FaqItem(_Config):
-    question: str = Field(min_length=1, max_length=160)
-    answer: str = Field(min_length=1, max_length=600)
-
-
-class FaqContent(_Config):
-    title: Optional[str] = Field(default=None, max_length=120)
-    items: list[FaqItem] = Field(min_length=1, max_length=12)
-
-
-# ---------------------------------------------------------------------------
-# Layout (§44): header/footer con contratos propios, versionados aparte
-# ---------------------------------------------------------------------------
-
-class HeaderConfig(_Config):
-    nav_links: list[Cta] = Field(default_factory=list, max_length=6)
-    show_status_indicator: bool = True
-    show_cart: bool = True
-
-
-class FooterConfig(_Config):
-    show_phones: bool = True
-    note: Optional[str] = Field(default=None, max_length=200)
-    social_links: list[Cta] = Field(default_factory=list, max_length=6)
-
-
-@dataclass(frozen=True)
-class TemplateDef:
-    key: str
-    version: int
-    label: str
-    content_model: type[BaseModel]
-    style_model: type[BaseModel]
-    data_binding_model: type[BaseModel]
-    behavior_model: type[BaseModel]
-
-
-TEMPLATES: dict[str, TemplateDef] = {
-    template.key: template
-    for template in (
-        TemplateDef(
-            key="storefront.announcement.free_shipping",
-            version=1,
-            label="Barra de envío gratis",
-            content_model=_Empty,
-            style_model=_Empty,
-            data_binding_model=_Empty,
-            behavior_model=AnnouncementBehavior,
-        ),
-        TemplateDef(
-            key="storefront.hero",
-            version=1,
-            label="Hero de portada (con rotación)",
-            content_model=HeroContent,
-            style_model=HeroStyle,
-            data_binding_model=_Empty,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.banner.promo",
-            version=1,
-            label="Banner promocional",
-            content_model=PromoBannerContent,
-            style_model=PromoBannerStyle,
-            data_binding_model=_Empty,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.catalog.featured_products",
-            version=1,
-            label="Grilla de productos",
-            content_model=FeaturedProductsContent,
-            style_model=FeaturedProductsStyle,
-            data_binding_model=FeaturedProductsBinding,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.business.hours",
-            version=1,
-            label="Horarios del negocio",
-            content_model=HoursContent,
-            style_model=_Empty,
-            data_binding_model=_Empty,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.business.contact",
-            version=1,
-            label="Contacto",
-            content_model=ContactContent,
-            style_model=_Empty,
-            data_binding_model=_Empty,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.catalog.categories",
-            version=1,
-            label="Grilla de categorías",
-            content_model=CategoriesContent,
-            style_model=_Empty,
-            data_binding_model=CategoriesBinding,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.banner.credits",
-            version=1,
-            label="Banner del programa de créditos",
-            content_model=CreditsBannerContent,
-            style_model=PromoBannerStyle,
-            data_binding_model=_Empty,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.banner.delivery",
-            version=1,
-            label="Banner de servicio a domicilio",
-            content_model=DeliveryBannerContent,
-            style_model=PromoBannerStyle,
-            data_binding_model=_Empty,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.content.image_text",
-            version=1,
-            label="Imagen y texto",
-            content_model=ImageTextContent,
-            style_model=ImageTextStyle,
-            data_binding_model=_Empty,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.content.info_cards",
-            version=1,
-            label="Tarjetas informativas",
-            content_model=InfoCardsContent,
-            style_model=InfoCardsStyle,
-            data_binding_model=_Empty,
-            behavior_model=SectionBehavior,
-        ),
-        TemplateDef(
-            key="storefront.content.faq",
-            version=1,
-            label="Preguntas frecuentes",
-            content_model=FaqContent,
-            style_model=_Empty,
-            data_binding_model=_Empty,
-            behavior_model=SectionBehavior,
-        ),
-    )
-}
-
-HEADER_TEMPLATE_KEYS = ("storefront.header.default", "storefront.header.compact")
-FOOTER_TEMPLATE_KEYS = ("storefront.footer.default", "storefront.footer.compact")
-
-
-class TemplateValidationError(ValueError):
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
-
-
-def validate_section_configs(
-    template_key: str,
-    template_version: int,
-    *,
-    content: dict,
-    style: dict,
-    data_binding: dict,
-    behavior: dict,
-) -> None:
-    """Valida las cuatro configs contra el contrato de la plantilla (§40)."""
-    template = TEMPLATES.get(template_key)
-    if template is None:
-        raise TemplateValidationError("plantilla_desconocida", "La plantilla no existe.")
-    if template_version != template.version:
-        raise TemplateValidationError(
-            "plantilla_version_incompatible",
-            f"La plantilla «{template_key}» va en la versión {template.version}.",
-        )
-    try:
-        parsed_content = template.content_model.model_validate(content)
-        template.style_model.model_validate(style)
-        template.data_binding_model.model_validate(data_binding)
-        template.behavior_model.model_validate(behavior)
-    except TemplateValidationError:
-        raise
-    except Exception as exc:  # errores Pydantic → mensaje estable
-        raise TemplateValidationError("configuracion_invalida", str(exc))
-
-    # Validación semántica de CTAs (§50), GENERALIZADA: recorre el modelo
-    # completo buscando instancias Cta — una plantilla futura con CTAs en
-    # cualquier estructura queda cubierta sin recordar añadirla aquí.
-    _validate_ctas_recursive(parsed_content)
+def validate_ctas(value: object) -> None:
+    """Alias público de la validación semántica recursiva de CTAs."""
+    _validate_ctas_recursive(value)
 
 
 def _validate_ctas_recursive(value: object) -> None:
+    """Valida semánticamente TODOS los Cta anidados en un modelo (generalizado)."""
     if isinstance(value, Cta):
         try:
             value.validate_by_type()
@@ -404,12 +80,144 @@ def _validate_ctas_recursive(value: object) -> None:
             _validate_ctas_recursive(item)
 
 
-def validate_layout_configs(*, header: dict, footer: dict) -> None:
-    """Valida los contratos del layout (§44) con la misma disciplina."""
+# Esquemas de color por sección: referencias a tokens del tema.
+ColorScheme = Literal["surface", "surface_muted", "brand", "brand_inverse", "dark"]
+
+
+# ---------------------------------------------------------------------------
+# Heros: la pieza de marca. `template` ES la plantilla.
+# ---------------------------------------------------------------------------
+
+HeroTemplate = Literal["split", "background", "card", "showcase", "minimal"]
+
+
+class HeroWrite(_Config):
+    """Contrato completo de un hero (create/replace)."""
+
+    template: HeroTemplate = "split"
+    is_active: bool = True
+    sort_order: int = Field(default=0, ge=0, le=10_000)
+    eyebrow: Optional[str] = Field(default=None, max_length=60)
+    title: str = Field(min_length=1, max_length=120)
+    title_accent: Optional[str] = Field(default=None, max_length=60)
+    description: Optional[str] = Field(default=None, max_length=300)
+    primary_cta: Optional[Cta] = None
+    secondary_cta: Optional[Cta] = None
+    product_id: Optional[UUID] = None
+    desktop_file_id: Optional[UUID] = None
+    mobile_file_id: Optional[UUID] = None
+    image_alt: Optional[str] = Field(default=None, max_length=255)
+    focal_x: Optional[float] = Field(default=None, ge=0, le=1)
+    focal_y: Optional[float] = Field(default=None, ge=0, le=1)
+    height: Literal["compact", "regular", "tall"] = "regular"
+    alignment: Literal["left", "center"] = "left"
+    color_scheme: ColorScheme = "surface"
+    button_variant: Literal["solid", "outline"] = "solid"
+    overlay: Literal["none", "soft", "strong"] = "soft"
+    image_position: Literal["left", "right"] = "right"
+
+    @model_validator(mode="after")
+    def _semantic_rules(self) -> "HeroWrite":
+        # El fragmento resaltado debe existir TAL CUAL dentro del título.
+        if self.title_accent and self.title_accent not in self.title:
+            raise ValueError("title_accent debe ser una subcadena exacta del título.")
+        # El showcase existe para vincular un producto real (precio/stock vivos).
+        if self.template == "showcase" and self.product_id is None:
+            raise ValueError("La plantilla «showcase» requiere elegir un producto.")
+        return self
+
+
+def validate_hero(payload: dict) -> HeroWrite:
+    """Valida el contrato del hero y sus CTAs; errores con código estable."""
     try:
-        parsed_header = HeaderConfig.model_validate(header)
-        parsed_footer = FooterConfig.model_validate(footer)
+        hero = HeroWrite.model_validate(payload)
+    except TemplateValidationError:
+        raise
     except Exception as exc:
         raise TemplateValidationError("configuracion_invalida", str(exc))
-    _validate_ctas_recursive(parsed_header)
-    _validate_ctas_recursive(parsed_footer)
+    _validate_ctas_recursive(hero)
+    return hero
+
+
+# ---------------------------------------------------------------------------
+# Destacados por superficie
+# ---------------------------------------------------------------------------
+
+HighlightSurface = Literal[
+    "global", "home", "login", "register", "cart", "checkout", "account"
+]
+HighlightAnimation = Literal[
+    "none", "fade_in", "slide_down", "rise", "pulse", "shimmer", "marquee"
+]
+HighlightScheme = Literal["brand", "soft", "accent"]
+
+
+class HighlightWrite(_Config):
+    surface: HighlightSurface
+    is_active: bool = True
+    sort_order: int = Field(default=0, ge=0, le=10_000)
+    icon: Optional[str] = Field(default=None, max_length=16)
+    eyebrow: Optional[str] = Field(default=None, max_length=60)
+    title: str = Field(min_length=1, max_length=140)
+    subtitle: Optional[str] = Field(default=None, max_length=200)
+    cta: Optional[Cta] = None
+    animation: HighlightAnimation = "fade_in"
+    color_scheme: HighlightScheme = "brand"
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def _window_is_coherent(self) -> "HighlightWrite":
+        if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
+            raise ValueError("La ventana temporal debe terminar después de empezar.")
+        return self
+
+
+def validate_highlight(payload: dict) -> HighlightWrite:
+    try:
+        highlight = HighlightWrite.model_validate(payload)
+    except TemplateValidationError:
+        raise
+    except Exception as exc:
+        raise TemplateValidationError("configuracion_invalida", str(exc))
+    _validate_ctas_recursive(highlight)
+    return highlight
+
+
+# ---------------------------------------------------------------------------
+# Footer: plantilla + toggles + redes sociales
+# ---------------------------------------------------------------------------
+
+SocialNetwork = Literal["facebook", "instagram", "tiktok", "whatsapp", "youtube", "x"]
+
+
+class SocialLink(_Config):
+    network: SocialNetwork
+    url: str = Field(min_length=1, max_length=300)
+
+    @field_validator("url")
+    @classmethod
+    def _https_only(cls, value: str) -> str:
+        if not value.lower().startswith("https://"):
+            raise ValueError("Las redes sociales requieren enlaces https://.")
+        return value
+
+
+class FooterWrite(_Config):
+    """Contrato completo del footer (el PATCH usa un espejo all-optional)."""
+
+    template: Literal["barra", "columnas", "centrado"] = "barra"
+    show_slogan: bool = True
+    show_phones: bool = True
+    show_schedule: bool = True
+    show_links: bool = True
+    note: Optional[str] = Field(default=None, max_length=200)
+    color_scheme: Literal["dark", "soft", "brand"] = "dark"
+    social_links: list[SocialLink] = Field(default_factory=list, max_length=6)
+
+
+def validate_footer(payload: dict) -> FooterWrite:
+    try:
+        return FooterWrite.model_validate(payload)
+    except Exception as exc:
+        raise TemplateValidationError("configuracion_invalida", str(exc))

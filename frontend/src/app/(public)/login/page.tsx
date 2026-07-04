@@ -7,10 +7,12 @@ import {
   GoogleAuthButton,
   PublicAuthShell,
 } from "@/features/auth/PublicAuthShell";
+import { HighlightBanner } from "@/components/storefront/Highlights";
 import { LoginForm } from "@/features/auth/LoginForm";
 import { getAuthPolicy } from "@/core/auth/policy-client";
 import { getSession } from "@/core/auth/session";
 import { getBootstrapStatus } from "@/core/bootstrap/bootstrap-server";
+import { getPublicHighlights } from "@/core/restaurant-api/storefront";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +34,16 @@ export default async function LoginPage({
   const policy = await getAuthPolicy();
   // Marcador genérico del callback de Google (la causa real queda en los logs).
   const { error } = await searchParams;
+  // Destacado configurable del login (slot fijo sobre el formulario).
+  const highlights = await getPublicHighlights("login");
 
   return (
     <PublicAuthShell title="Iniciar sesión">
+      {highlights.length > 0 ? (
+        <div className="mb-4">
+          <HighlightBanner highlight={highlights[0]} variant="card" />
+        </div>
+      ) : null}
       {error === "google" ? (
         <div className="mb-4">
           <AuthAlert tone="danger">

@@ -51,5 +51,11 @@ app = FastAPI(
 # registre también las solicitudes rechazadas por origen.
 app.add_middleware(MutationOriginGuardMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
+
+# Renovación deslizante de sesión: pasada la mitad de la vida del JWT, la
+# cookie se re-emite con el mismo ttl/jti (ver backend/app/auth/session_refresh.py).
+from backend.app.auth.session_refresh import sliding_session_middleware  # noqa: E402
+
+app.middleware("http")(sliding_session_middleware)
 register_exception_handlers(app)
 app.include_router(api_router)

@@ -55,6 +55,29 @@ class SystemSettingsUpdate(ApiPatchSchema):
             }
         },
     )
+    customer_session_days: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=365,
+        title="Sesión del cliente (días)",
+        description=(
+            "Cuánto dura la sesión de un CLIENTE (usuario sin roles). La renovación "
+            "deslizante la extiende con la actividad: un cliente que compra una vez "
+            "al mes no vuelve a iniciar sesión. Vacío = default del despliegue."
+        ),
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
+    staff_session_minutes: Optional[int] = Field(
+        default=None,
+        ge=5,
+        le=1440,
+        title="Sesión del personal (minutos)",
+        description=(
+            "Cuánto dura la sesión de un usuario CON roles (panel/admin) sin "
+            "actividad; con actividad se renueva sola. Vacío = default del despliegue."
+        ),
+        json_schema_extra={"ui": {"form": True, "widget": "number"}},
+    )
     password_reset_enabled: Optional[bool] = Field(
         default=None,
         title="Recuperación de contraseña",
@@ -189,6 +212,11 @@ class SystemSettingsRead(ApiReadSchema):
     google_auth_client_id: Optional[str] = None
     google_auth_client_secret_configured: bool
     password_reset_enabled: bool
+    # Duración de sesión (None = default del despliegue); efectivos abajo.
+    customer_session_days: Optional[int] = None
+    staff_session_minutes: Optional[int] = None
+    customer_session_days_effective: int
+    staff_session_minutes_effective: int
     # Correo: estado SEGURO (metadata; los secretos jamás se proyectan).
     email_mode: str
     email_from_address: Optional[str] = None

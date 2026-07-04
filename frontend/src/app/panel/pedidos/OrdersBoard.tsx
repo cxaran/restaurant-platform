@@ -20,6 +20,7 @@ import type { components } from "@/generated/openapi";
 import { ApproveDialog } from "./ApproveDialog";
 import { CancelDialog, type CancelResolution } from "./CancelDialog";
 import { OrderDetail } from "./OrderDetail";
+import { downloadOrdersCsv } from "./orders-export";
 import {
   FULFILLMENT_LABELS,
   ORDER_FILTERS,
@@ -234,6 +235,7 @@ export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [approveTarget, setApproveTarget] = useState<OrderListItem | null>(null);
   const [approveError, setApproveError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const [refreshTick, setRefreshTick] = useState(0);
   const load = useCallback(() => setRefreshTick((tick) => tick + 1), []);
@@ -401,6 +403,45 @@ export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>
     }
   }
 
+  // Export CSV (1.5): pagina GET /orders con los MISMOS filtros vigentes (chip
+  // de estado, búsqueda y rango de fechas) y descarga el listado enriquecido.
+  // Tope duro de 5 000 filas para no colgar el navegador con historiales enormes.
+  async function exportCsv() {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const range = dateRangeParams(datePreset, customFrom, customTo);
+      const all: OrderListItem[] = [];
+      const CAP = 5000;
+      const EXPORT_PAGE = 100;
+      let exportOffset = 0;
+      while (all.length < CAP) {
+        const params = new URLSearchParams();
+        params.set("limit", String(EXPORT_PAGE));
+        params.set("offset", String(exportOffset));
+        if (statusesCsv) params.set("status", statusesCsv);
+        if (q) params.set("q", q);
+        if (range.created_from) params.set("created_from", range.created_from);
+        if (range.created_to) params.set("created_to", range.created_to);
+        const page = await browserApi<OrdersPage>(`/api/v1/orders?${params.toString()}`);
+        all.push(...page.items);
+        if (!page.pagination.has_next || page.items.length === 0) break;
+        exportOffset += page.items.length;
+      }
+      if (all.length === 0) {
+        setError("No hay pedidos que exportar con los filtros actuales.");
+        return;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadOrdersCsv(all.slice(0, CAP), `pedidos-${stamp}.csv`);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.body.message : "No fue posible exportar.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -427,6 +468,16 @@ export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>
         })}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <AcceptingOrdersPill canToggle={perms.has("business:update")} />
+          <button
+            type="button"
+            className="tt-btn tt-btn-ghost"
+            onClick={() => void exportCsv()}
+            disabled={exporting}
+            style={{ padding: "8px 14px", fontSize: 13 }}
+            title="Exportar el listado filtrado a CSV"
+          >
+            {exporting ? "Exportando…" : "Exportar CSV"}
+          </button>
           <button
             type="button"
             className="tt-btn tt-btn-ghost"

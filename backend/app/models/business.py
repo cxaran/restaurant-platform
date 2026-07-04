@@ -131,6 +131,17 @@ class BusinessSettings(Base):
         default=True,
         comment="Todos los pedidos pasan por aprobación antes de preparación (§16).",
     )
+    online_orders_require_open_hours: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment=(
+            "Los pedidos WEB sólo se aceptan dentro del horario de atención "
+            "(semanal + fechas especiales). Sin horarios configurados el negocio "
+            "cuenta como cerrado, por eso es opt-in. La captura de staff y el POS "
+            "quedan exentos; el switch «Aceptando pedidos» manda por encima."
+        ),
+    )
     minimum_delivery_order_amount: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(12, 2), nullable=True
     )

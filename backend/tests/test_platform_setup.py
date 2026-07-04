@@ -185,6 +185,8 @@ class PlatformSetupServiceTest(unittest.TestCase):
                 public_registration_enabled=True,
                 password_reset_enabled=False,
                 institution_name="  Empresa Norte  ",
+                customer_session_days=60,
+                staff_session_minutes=480,
             )
             initialize_platform(session, payload)
             session.commit()
@@ -193,6 +195,8 @@ class PlatformSetupServiceTest(unittest.TestCase):
             self.assertTrue(row.public_registration_enabled)
             self.assertFalse(row.password_reset_enabled)
             self.assertEqual(row.institution_name, "Empresa Norte")
+            self.assertEqual(row.customer_session_days, 60)
+            self.assertEqual(row.staff_session_minutes, 480)
 
     def test_sync_system_admin_role_adds_permissions_declared_after_setup(self) -> None:
         engine = self._engine()

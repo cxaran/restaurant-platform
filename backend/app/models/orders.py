@@ -571,6 +571,10 @@ class OrderShipping(Base):
             _in_clause("calculation_source", SHIPPING_CALCULATION_SOURCES),
             name="order_shipping_source",
         ),
+        CheckConstraint(
+            "estimated_minutes IS NULL OR estimated_minutes >= 0",
+            name="order_shipping_minutes_non_negative",
+        ),
         Index("uq_order_shipping_order", "order_id", unique=True),
     )
 
@@ -606,6 +610,14 @@ class OrderShipping(Base):
         comment="Un delivery NO puede aprobarse mientras sea NULL (§17.2).",
     )
     is_free_shipping: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    estimated_minutes: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment=(
+            "Tiempo estimado de entrega (min) CONGELADO de la tarifa de la zona; "
+            "NULL si la tarifa no lo define o el envío fue manual (§10.2/§17.2)."
+        ),
+    )
     manual_override_reason: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=True,

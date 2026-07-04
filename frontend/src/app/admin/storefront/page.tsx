@@ -13,8 +13,8 @@ export default async function StorefrontAdminPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <h1 className="tt-display" style={{ margin: 0, fontSize: 24 }}>Editor del sitio</h1>
         <p style={{ margin: 0, fontSize: 13, color: "var(--tx2)" }}>
-          Banners, heros y elementos por plantilla · los cambios se ven en la vista previa
-          antes de publicar.
+          Heros en carrusel, textos destacados, footer y tema · guardar publica al
+          instante; el único apagador es «activo».
         </p>
       </div>
       <StorefrontAdminView permissions={session.permissions ?? []} />

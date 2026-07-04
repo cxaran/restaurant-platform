@@ -3,6 +3,7 @@
 import os
 import unittest
 import uuid
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 
@@ -44,6 +45,7 @@ from backend.app.main import app  # noqa: E402
 from backend.app.models import Base  # noqa: E402
 from backend.app.models.business import BusinessSettings  # noqa: E402
 from backend.app.models.catalog import Product, ProductCategory  # noqa: E402
+from backend.app.models.shipping import DeliveryZone, ShippingRateRule  # noqa: E402
 from backend.app.schemas.user import SessionUser  # noqa: E402
 
 CUSTOMER_ID = uuid.uuid4()
@@ -162,6 +164,44 @@ class OrderRoutesTest(unittest.TestCase):
             detail = self.client.get(f"/api/v1/orders/mine/{body['id']}")
         self.assertEqual(other, [])
         self.assertEqual(detail.status_code, 404)
+
+    def test_online_orders_require_open_hours_switch(self) -> None:
+        """Switch opt-in: cerrado según horario ⇒ el checkout web se rechaza;
+        apagado (default) el horario es sólo informativo."""
+        from datetime import time as dtime
+
+        from backend.app.models.business import BusinessWeeklyHours
+
+        # Default apagado: sin horarios configurados el checkout procede igual.
+        with _As(CUSTOMER_ID):
+            ok = self.client.post("/api/v1/orders", json=self._checkout_payload())
+        self.assertEqual(ok.status_code, 201, ok.text)
+
+        with Session(self.engine) as session:
+            row = session.get(BusinessSettings, 1)
+            assert row is not None
+            row.online_orders_require_open_hours = True
+            session.commit()
+
+        # Encendido y sin horario configurado = cerrado ⇒ 409 negocio_cerrado.
+        with _As(CUSTOMER_ID):
+            closed = self.client.post("/api/v1/orders", json=self._checkout_payload())
+        self.assertEqual(closed.status_code, 409, closed.text)
+        self.assertEqual(closed.json()["code"], "negocio_cerrado")
+
+        # Con un horario que cubre todo el día, el checkout vuelve a proceder.
+        with Session(self.engine) as session:
+            for day in range(7):
+                session.add(
+                    BusinessWeeklyHours(
+                        day_of_week=day, slot_number=1,
+                        opens_at=dtime(0, 0), closes_at=dtime(23, 59),
+                    )
+                )
+            session.commit()
+        with _As(CUSTOMER_ID):
+            open_again = self.client.post("/api/v1/orders", json=self._checkout_payload())
+        self.assertEqual(open_again.status_code, 201, open_again.text)
 
     def test_internal_list_paginates_searches_and_counts(self) -> None:
         """Tablero interno: envelope paginado, búsqueda (folio/cliente/dirección
@@ -331,12 +371,72 @@ class OrderRoutesTest(unittest.TestCase):
             self.assertEqual(shipping["final_amount"], "35.00")
             self.assertEqual(shipping["calculation_source"], "employee_manual_override")
             self.assertEqual(shipping["calculation_status"], "finalized")
+            # El monto manual no proviene de una tarifa: sin tiempo estimado.
+            self.assertIsNone(shipping["estimated_minutes"])
 
             transition_url = f"/api/v1/orders/{body['id']}/transition"
             self.client.post(transition_url, json={"new_status": "pending_approval"})
             approved = self.client.post(transition_url, json={"new_status": "approved"})
         self.assertEqual(approved.status_code, 200, approved.text)
         self.assertEqual(approved.json()["total_money_amount"], "265.00")  # 230 + 35
+
+    def test_delivery_rate_finalize_snapshots_estimated_minutes_and_eta(self) -> None:
+        """Finalizar con una tarifa CONGELA su tiempo estimado en el pedido y,
+        una vez aprobado, el cliente recibe la hora estimada de entrega."""
+        # Zona + tarifa con tiempo estimado (25 min). En SQLite la geometría es
+        # un BLOB inerte: basta un placeholder (no se ejecuta ST_Covers aquí).
+        with Session(self.engine) as session:
+            zone = DeliveryZone(
+                code="z-rc", name="Zona RC", coverage_geometry=b"placeholder"
+            )
+            session.add(zone)
+            session.flush()
+            rate = ShippingRateRule(
+                delivery_zone_id=zone.id,
+                name="Estándar",
+                base_fee=Decimal("40"),
+                estimated_minutes=25,
+            )
+            session.add(rate)
+            session.commit()
+            rate_id = str(rate.id)
+
+        payload = self._checkout_payload(
+            fulfillment_type="delivery",
+            delivery={"street": "Calle Ejemplo 123", "neighborhood": "Anáhuac"},
+        )
+        with _As(CUSTOMER_ID):
+            created = self.client.post("/api/v1/orders", json=payload)
+        self.assertEqual(created.status_code, 201, created.text)
+        order_id = created.json()["id"]
+
+        url = f"/api/v1/orders/{order_id}/shipping"
+        transition_url = f"/api/v1/orders/{order_id}/transition"
+        with _As(STAFF_ID, "orders:adjust_shipping", "orders:transition", "orders:approve"):
+            finalized = self.client.put(url, json={"shipping_rate_rule_id": rate_id})
+            self.assertEqual(finalized.status_code, 200, finalized.text)
+            shipping = finalized.json()["shipping"]
+            # El tiempo estimado de la tarifa quedó CONGELADO en el envío.
+            self.assertEqual(shipping["estimated_minutes"], 25)
+            self.assertEqual(shipping["calculation_source"], "employee_selected_rate")
+
+            self.client.post(transition_url, json={"new_status": "pending_approval"})
+            approved = self.client.post(transition_url, json={"new_status": "approved"})
+        self.assertEqual(approved.status_code, 200, approved.text)
+        approved_at = approved.json()["approved_at"]
+        self.assertIsNotNone(approved_at)
+
+        # El cliente ve el tiempo estimado y la hora estimada = approved_at + 25.
+        with _As(CUSTOMER_ID):
+            mine = self.client.get(f"/api/v1/orders/mine/{order_id}")
+        self.assertEqual(mine.status_code, 200, mine.text)
+        body = mine.json()
+        self.assertEqual(body["shipping_estimated_minutes"], 25)
+        self.assertIsNotNone(body["estimated_delivery_at"])
+        delta = datetime.fromisoformat(body["estimated_delivery_at"]) - datetime.fromisoformat(
+            approved_at
+        )
+        self.assertEqual(delta, timedelta(minutes=25))
 
 
 if __name__ == "__main__":

@@ -50,6 +50,7 @@ from backend.app.schemas.payment import (
 from backend.app.security.groups.orders import OrderPermissions
 from backend.app.security.groups.payments import PaymentPermissions, TicketPermissions
 from backend.app.services.business_service import get_business_settings
+from backend.app.services.config_audit import record_config_change
 from backend.app.services.file_service import get_active_file
 from backend.app.services.order_service import (
     OrderIdentity,
@@ -176,10 +177,24 @@ def get_payment_method_config(
 def create_payment_method_config(
     payload: PaymentMethodConfigCreate,
     session: SessionDep,
+    current_user: CurrentUser,
     _: PaymentPermissions.MANAGE_METHODS.requiere,
 ) -> PaymentMethodConfigRead:
     method = PaymentMethodConfig(**payload.model_dump())
+    # Id explícito para auditar SIN flush: un flush aquí dispararía el
+    # IntegrityError del código duplicado antes de que commit_or_conflict pueda
+    # traducirlo a 409 (ambos —método y auditoría— comparten la transacción).
+    method.id = uuid.uuid4()
     session.add(method)
+    # Auditoría de configuración (§18.1): SOLO nombres de campos, nunca valores.
+    record_config_change(
+        session,
+        actor_user_id=current_user.id,
+        entity_type="payment_methods",
+        entity_id=method.id,
+        action="create",
+        changed_fields=sorted(payload.model_dump().keys()),
+    )
     commit_or_conflict(session, "Ya existe un método de pago con ese código.")
     session.refresh(method)
     return PaymentMethodConfigRead.model_validate(method, from_attributes=True)
@@ -192,15 +207,27 @@ def update_payment_method_config(
     method_id: uuid.UUID,
     payload: PaymentMethodConfigUpdate,
     session: SessionDep,
+    current_user: CurrentUser,
     _: PaymentPermissions.MANAGE_METHODS.requiere,
 ) -> PaymentMethodConfigRead:
     """PATCH parcial. El ``code`` es inmutable y no existe DELETE: desactivar
     conserva los pagos históricos (FK RESTRICT sobre payments)."""
     method = get_or_404(session, PaymentMethodConfig, method_id, _METHOD_NOT_FOUND)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
         setattr(method, field, value)
     method.updated_at = utc_now()
     session.add(method)
+    if changes:
+        # Auditoría de configuración (§18.1): SOLO nombres de campos modificados.
+        record_config_change(
+            session,
+            actor_user_id=current_user.id,
+            entity_type="payment_methods",
+            entity_id=method.id,
+            action="update",
+            changed_fields=sorted(changes.keys()),
+        )
     commit_or_conflict(session, "No fue posible actualizar el método de pago.")
     session.refresh(method)
     return PaymentMethodConfigRead.model_validate(method, from_attributes=True)
@@ -491,4 +518,4 @@ def pos_sale(
     commit_or_conflict(session, "No fue posible registrar la venta.")
     session.refresh(order)
     session.refresh(payment)
-    return PosSaleResult(order=_order_read(order), payment=_payment_read(payment))
+    return PosSaleResult(order=_order_read(session, order), payment=_payment_read(payment))

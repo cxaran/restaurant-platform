@@ -64,6 +64,9 @@ class BootstrapInitializeInput:
     public_registration_enabled: bool = False
     password_reset_enabled: bool = True
     institution_name: str | None = None
+    # Duración de sesión (None = default del despliegue).
+    customer_session_days: int | None = None
+    staff_session_minutes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -162,6 +165,8 @@ def initialize_platform(session: Session, payload: BootstrapInitializeInput) -> 
         public_registration_enabled=payload.public_registration_enabled,
         institution_name=payload.institution_name,
         password_reset_enabled=payload.password_reset_enabled,
+        customer_session_days=payload.customer_session_days,
+        staff_session_minutes=payload.staff_session_minutes,
     )
     session.flush()
 

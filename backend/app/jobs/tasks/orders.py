@@ -1,6 +1,6 @@
 """Tick de pedidos: expira pedidos web «submitted» abandonados (§1.12).
 
-Como los respaldos y el storefront, el cron sólo consulta trabajo vencido en
+Como los respaldos, el cron sólo consulta trabajo vencido en
 la base cada minuto. Expirar cancela con ``reason_code=expired``: los hooks de
 la transición liberan créditos reservados y códigos de descuento, y el cupo
 diario se libera porque los cancelados no cuentan. Nunca hay reembolso

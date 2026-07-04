@@ -349,6 +349,45 @@ function RolesStep({
           Deshabilitado, las cuentas las crean los administradores. Recomendado dejarlo
           apagado en producción.
         </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="customer-session-days" className="block text-sm font-medium text-[var(--tx)]">
+              Sesión del cliente (días)
+            </label>
+            <input
+              id="customer-session-days"
+              type="number"
+              min={1}
+              max={365}
+              value={draft.customer_session_days}
+              placeholder="Default del despliegue"
+              onChange={(event) => setDraft({ ...draft, customer_session_days: event.target.value })}
+              className="mt-1 w-full rounded-md border border-[var(--border2)] bg-transparent px-3 py-2 text-sm text-[var(--tx)]"
+            />
+            <p className="mt-1 text-xs text-[var(--tx3)]">
+              Un cliente que compra una vez al mes no vuelve a iniciar sesión: la
+              sesión se renueva sola con la actividad.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="staff-session-minutes" className="block text-sm font-medium text-[var(--tx)]">
+              Sesión del personal (minutos)
+            </label>
+            <input
+              id="staff-session-minutes"
+              type="number"
+              min={5}
+              max={1440}
+              value={draft.staff_session_minutes}
+              placeholder="Default del despliegue"
+              onChange={(event) => setDraft({ ...draft, staff_session_minutes: event.target.value })}
+              className="mt-1 w-full rounded-md border border-[var(--border2)] bg-transparent px-3 py-2 text-sm text-[var(--tx)]"
+            />
+            <p className="mt-1 text-xs text-[var(--tx3)]">
+              Con actividad se renueva sola; caduca tras este tiempo de inactividad.
+            </p>
+          </div>
+        </div>
       </section>
       <section className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

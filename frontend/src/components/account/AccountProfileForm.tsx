@@ -86,7 +86,7 @@ export function AccountProfileForm({ profile }: Readonly<{ profile: UserProfileR
     <form
       onSubmit={onSubmit}
       aria-label="Datos de perfil"
-      className="space-y-4 rounded-lg border border-[var(--border)] bg-white p-6"
+      className="space-y-4 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6"
     >
       <h2 className="text-lg font-semibold text-[var(--tx)]">Datos de perfil</h2>
 

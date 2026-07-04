@@ -1,12 +1,12 @@
-import { AccountPasswordForm } from "@/components/account/AccountPasswordForm";
-import { AccountProfileForm } from "@/components/account/AccountProfileForm";
+import { AccountEditor } from "@/components/account/AccountEditor";
 import { requireSession } from "@/core/auth/session";
 import { getProfile } from "@/core/auth/account-client";
 
 /**
  * Mi cuenta: flujo dedicado de identidad autenticada (no es el editor genérico de
  * ``users``). El usuario edita solo campos propios seguros y cambia su contraseña;
- * roles, permisos y estado administrativo no se exponen aquí.
+ * roles, permisos y estado administrativo no se exponen aquí. Comparte el editor
+ * con /cuenta/editar (cliente) y /panel/cuenta (empleado).
  */
 export default async function AccountPage() {
   await requireSession();
@@ -18,8 +18,7 @@ export default async function AccountPage() {
         <h1 className="text-xl font-semibold text-[var(--tx)]">Mi cuenta</h1>
         <p className="mt-1 text-sm text-[var(--tx3)]">Administra tus datos personales y tu contraseña.</p>
       </div>
-      <AccountProfileForm profile={profile} />
-      <AccountPasswordForm />
+      <AccountEditor profile={profile} />
     </div>
   );
 }

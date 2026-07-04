@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 import { getPublicBusiness } from "./business";
 import type { PublicBusiness } from "./contracts";
-import type { StorefrontPageVM } from "./view-models";
+import type { SiteVM } from "./view-models";
 
 // Favicon dinámico SEGURO: solo formatos raster/ico permitidos. Si el backend
 // devuelve SVG (riesgo H8 documentado) u otro tipo, cae al fallback estático
@@ -62,19 +62,19 @@ export async function businessFaviconMetadata(): Promise<Metadata> {
   }
 }
 
-/** Cadena de resolución del head (§45.1): página → sitio → negocio. */
+/** Cadena de resolución del head: sitio → negocio. */
 export async function buildStorefrontMetadata(
   business: PublicBusiness | null,
-  page: StorefrontPageVM | null,
+  site: SiteVM | null,
 ): Promise<Metadata> {
-  const title = page?.meta.title ?? business?.trade_name ?? "Restaurante";
-  const description = page?.meta.description ?? business?.slogan ?? undefined;
-  // Favicon: el de la página publicada y, en su defecto, el logo del negocio.
+  const title = site?.meta.title ?? business?.trade_name ?? "Restaurante";
+  const description = site?.meta.description ?? business?.slogan ?? undefined;
+  // Favicon: el del sitio configurado y, en su defecto, el logo del negocio.
   const favicon =
-    (await resolveSafeFaviconPath(page?.meta.favicon_file_id)) ??
+    (await resolveSafeFaviconPath(site?.meta.favicon_file_id)) ??
     (await resolveSafeFaviconPath(business?.logo_file_id));
-  const ogImage = page?.meta.og_image_file_id
-    ? `/api/v1/public/files/${page.meta.og_image_file_id}`
+  const ogImage = site?.meta.social_image_file_id
+    ? `/api/v1/public/files/${site.meta.social_image_file_id}`
     : undefined;
   return {
     title,

@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 
 import { useShippingQuote } from "@/components/shipping/use-shipping-quote";
 import { CartModeToggle } from "@/components/storefront/CartModeToggle";
+import { SurfaceHighlights } from "@/components/storefront/Highlights";
 import { ProductConfigurator } from "@/components/storefront/ProductConfigurator";
 import { QuantityStepper } from "@/components/storefront/QuantityStepper";
 import { browserApi } from "@/core/api/browser-client";
@@ -28,11 +29,17 @@ import {
   resolveSelectedAddress,
 } from "@/core/storefront/delivery-address";
 import { usePublicSession } from "@/core/storefront/PublicSessionProvider";
+import {
+  closedBannerText,
+  useBusinessOpenStatus,
+} from "@/core/storefront/useBusinessOpenStatus";
 import { useMyCredits } from "@/core/storefront/useMyCredits";
 
 export default function CartPage() {
   const { lines, mode, count, subtotalHint, setQuantity, removeLine } = useCart();
   const session = usePublicSession();
+  const openStatus = useBusinessOpenStatus();
+  const closedBySchedule = openStatus?.blockedBySchedule === true;
   const myCredits = useMyCredits();
   const [catalog, setCatalog] = useState<Map<string, PublicProduct> | null>(null);
   const [editing, setEditing] = useState<CartLine | null>(null);
@@ -113,6 +120,10 @@ export default function CartPage() {
             {count} producto{count === 1 ? "" : "s"}
           </span>
         ) : null}
+      </div>
+      {/* Nudge configurable del carrito (highlight `cart`): slot fijo superior. */}
+      <div style={{ marginBottom: 12 }}>
+        <SurfaceHighlights surface="cart" />
       </div>
       <CartModeToggle
         productsById={catalog}
@@ -311,18 +322,45 @@ export default function CartPage() {
           </div>
 
           <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-            <Link
-              className="sf-btn"
-              href="/checkout"
-              style={{ width: "100%", padding: "15px 18px" }}
-            >
-              Finalizar pedido ·{" "}
-              {credits
-                ? totalLabel
-                : totalWithShipping !== null
-                  ? formatMoney(totalWithShipping)
-                  : `${totalLabel} + envío`}
-            </Link>
+            {closedBySchedule && openStatus ? (
+              <div
+                role="status"
+                className="sf-card"
+                style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700 }}
+              >
+                🕐 {closedBannerText(openStatus)} Tu carrito se conserva para cuando
+                abramos.
+              </div>
+            ) : null}
+            {closedBySchedule ? (
+              <button
+                type="button"
+                className="sf-btn"
+                disabled
+                aria-disabled="true"
+                style={{ width: "100%", padding: "15px 18px", opacity: 0.55, cursor: "not-allowed" }}
+              >
+                Cerrado por ahora ·{" "}
+                {credits
+                  ? totalLabel
+                  : totalWithShipping !== null
+                    ? formatMoney(totalWithShipping)
+                    : `${totalLabel} + envío`}
+              </button>
+            ) : (
+              <Link
+                className="sf-btn"
+                href="/checkout"
+                style={{ width: "100%", padding: "15px 18px" }}
+              >
+                Finalizar pedido ·{" "}
+                {credits
+                  ? totalLabel
+                  : totalWithShipping !== null
+                    ? formatMoney(totalWithShipping)
+                    : `${totalLabel} + envío`}
+              </Link>
+            )}
             {!session ? (
               <div className="sf-cart-authlinks">
                 <Link href="/login?next=/checkout">Iniciar sesión</Link>

@@ -84,47 +84,45 @@ bbq = expect(admin.post(f"/catalog/modifier-groups/{salsas['id']}/options",
 expect(admin.put(f"/catalog/products/{bone['id']}/modifier-groups",
                  json={"groups": [{"modifier_group_id": salsas["id"]}]}), 200, "vincular Salsas a boneless")
 
-# 4) Storefront: draft home + secciones + media + layout + publicar
-pages = expect(admin.get("/storefront/pages"), 200, "listar paginas")
-assert any(p["page_key"] == "home" for p in pages)
-draft = expect(admin.get("/storefront/pages/home/draft"), 200, "obtener borrador home")
-for old in draft["sections"]:
-    admin.delete(f"/storefront/sections/{old['id']}")
-step("borrador limpio (idempotencia)", extra=f"({len(draft['sections'])} previas)")
-hero_draft = expect(admin.post("/storefront/pages/home/draft/sections", json={
-    "template_key": "storefront.hero", "sort_order": 10,
-    "content_config": {"slides": [{
-        "variant": "split", "title": "Sabor que te hace volver",
-        "description": "Recién hecho todos los días.",
-        "primary_cta": {"label": "Pedir ahora", "link_type": "menu_page"},
-    }]},
-}), 201, "agregar hero")
-expect(admin.post("/storefront/pages/home/draft/sections", json={
-    "template_key": "storefront.catalog.featured_products", "sort_order": 20,
-    "content_config": {"title": "Los más pedidos"},
-}), 201, "agregar grilla destacados")
-hero_id = next(s["id"] for s in admin.get("/storefront/pages/home/draft").json()["sections"]
-               if s["template_key"] == "storefront.hero")
+# 4) Storefront plano: hero con imagen + destacado + footer — en vivo al guardar
+config = expect(admin.get("/storefront/config"), 200, "config del editor")
+for old in config["heros"]:
+    admin.delete(f"/storefront/heros/{old['id']}")
+for old in config["highlights"]:
+    admin.delete(f"/storefront/highlights/{old['id']}")
+step("editor limpio (idempotencia)",
+     extra=f"({len(config['heros'])} heros, {len(config['highlights'])} destacados previos)")
 img = expect(admin.post("/files", files={"file": ("hero.png", PNG, "image/png")},
                         data={"kind": "image"}), 201, "subir imagen al banco")
-media = expect(admin.put(f"/storefront/sections/{hero_id}/media/main",
-                         json={"desktop_file_id": img["id"], "alt_text": "Boneless"}),
-               200, "media del hero (slot main)")
-assert media["main"]["desktop_file_id"] == img["id"]
-expect(admin.put("/storefront/layout", json={
-    "header_config": {"nav_links": [{"label": "Menú", "link_type": "menu_page"}]},
-    "footer_config": {"note": "Hecho en casa"},
-}), 200, "publicar layout")
-expect(admin.post("/storefront/pages/home/publish"), 200, "publicar home")
-public_home = expect(admin.get("/public/storefront/home"), 200, "GET publico home")
-assert public_home["theme_tokens"]["colors"]["brand_primary"]
-assert public_home["layout"]["header"]["nav_links"][0]["label"] == "Menú"
-hero_pub = next(s for s in public_home["sections"] if s["template_key"] == "storefront.hero")
-assert hero_pub["media"]["main"]["desktop_file_id"] == img["id"]
-featured = next(s for s in public_home["sections"]
-                if s["template_key"] == "storefront.catalog.featured_products")
-assert any(p["name"] == "Orden de boneless" for p in featured["data"]["products"])
-step("payload publico completo (tema+layout+media+binding)")
+hero = expect(admin.post("/storefront/heros", json={
+    "template": "split", "title": "Sabor que te hace volver",
+    "title_accent": "volver", "description": "Recién hecho todos los días.",
+    "primary_cta": {"label": "Pedir ahora", "link_type": "menu_page"},
+    "desktop_file_id": img["id"], "image_alt": "Boneless", "sort_order": 10,
+}), 201, "crear hero split con imagen")
+expect(admin.post("/storefront/heros", json={
+    "template": "showcase", "title": "La favorita de la casa",
+    "product_id": bone["id"], "sort_order": 20,
+}), 201, "crear hero showcase (producto real)")
+expect(admin.post("/storefront/highlights", json={
+    "surface": "home", "title": "Gana 20 créditos por cada orden",
+    "animation": "shimmer", "color_scheme": "accent", "icon": "+20",
+}), 201, "crear destacado de la franja home")
+expect(admin.patch("/storefront/footer", json={
+    "template": "columnas", "note": "Hecho en casa",
+    "social_links": [{"network": "instagram", "url": "https://instagram.com/tony"}],
+}), 200, "configurar footer")
+expect(admin.patch("/storefront/theme", json={"theme_preset": "calido"}), 200, "activar tema")
+site = expect(admin.get("/public/storefront/site"), 200, "GET publico site")
+assert site["theme_tokens"]["colors"]["brand_primary"]
+assert site["heros"][0]["image"]["desktop_file_id"] == img["id"]
+showcase = next(h for h in site["heros"] if h["template"] == "showcase")
+assert showcase["product"]["name"] == "Orden de boneless"
+assert site["footer"]["slogan"] == "Hecho en casa"
+franja = expect(admin.get("/public/storefront/highlights?surface=home"), 200,
+                "GET publico destacados home")
+assert franja[0]["title"].startswith("Gana 20")
+step("payload publico completo (tema+heros+binding+footer+destacados)")
 
 # 5) Cliente + creditos iniciales
 cust_user = expect(admin.post("/users", json={

@@ -450,7 +450,7 @@ class NavigationModulesTest(unittest.TestCase):
         self.assertEqual(modules["pedidos"]["required_permissions"], ["orders:read"])
 
     def test_any_of_permissions_is_enough(self) -> None:
-        # storefront declara anyOf(read_draft, edit): con solo edit ya es visible.
+        # storefront declara anyOf(read, edit): con solo edit ya es visible.
         with _As("storefront:edit"):
             body = client.get("/api/v1/resources").json()
         self.assertEqual(

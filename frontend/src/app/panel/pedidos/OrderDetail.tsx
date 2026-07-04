@@ -32,6 +32,7 @@ import {
   STATUS_BADGE_CLASS,
   STATUS_LABELS,
   formatClock,
+  formatTimestamp,
 } from "./order-meta";
 
 type OrderShippingFinalizeRequest = components["schemas"]["OrderShippingFinalizeRequest"];
@@ -626,6 +627,8 @@ export function OrderDetail({
                 <span style={{ fontSize: 14, fontWeight: 700 }}>
                   {shipping.is_free_shipping ? "Gratis" : formatMoney(shippingAmount)}
                   {shippingName ? ` · ${shippingName}` : ""}
+                  {/* Tiempo estimado de entrega de la tarifa; nulo = no se muestra. */}
+                  {shipping.estimated_minutes != null ? ` · ~${shipping.estimated_minutes} min` : ""}
                   {shipping.final_amount == null && !shipping.is_free_shipping ? " (estimado)" : ""}
                 </span>
               </div>
@@ -672,6 +675,48 @@ export function OrderDetail({
                   «{note.note}»
                 </p>
               ))}
+            </div>
+          ) : null}
+
+          {(detail.status_history ?? []).length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span className="tt-label">Bitácora interna</span>
+              <ol
+                style={{
+                  listStyle: "none", margin: 0, padding: 0,
+                  display: "flex", flexDirection: "column", gap: 10,
+                  borderLeft: "2px solid var(--border2)", paddingLeft: 12,
+                }}
+              >
+                {(detail.status_history ?? []).map((entry, index) => (
+                  <li key={index} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 13, fontWeight: 800 }}>
+                        {STATUS_LABELS[entry.new_status] ?? entry.new_status}
+                      </span>
+                      <span style={{ fontSize: 12, color: "var(--tx3)" }}>
+                        {formatTimestamp(entry.changed_at)}
+                        {entry.changed_by_name ? ` · ${entry.changed_by_name}` : ""}
+                      </span>
+                    </span>
+                    {entry.reason_code ? (
+                      <span style={{ fontSize: 12, color: "var(--tx2)" }}>
+                        Motivo: {entry.reason_code}
+                      </span>
+                    ) : null}
+                    {entry.internal_note ? (
+                      <span style={{ fontSize: 12, color: "var(--tx2)" }}>
+                        {entry.internal_note}
+                      </span>
+                    ) : null}
+                    {entry.customer_visible_note ? (
+                      <span style={{ fontSize: 12, color: "var(--muted-btn-tx)" }}>
+                        Aclaración visible: «{entry.customer_visible_note}»
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
             </div>
           ) : null}
         </div>

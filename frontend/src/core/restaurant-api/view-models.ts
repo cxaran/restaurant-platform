@@ -1,21 +1,24 @@
-// ViewModels del payload público del storefront.
+// ViewModels del payload público del storefront plano.
 //
-// CONTRATO CERRADO: GET /api/v1/public/storefront/{page_key} ya está tipado en
-// OpenAPI como `PublicStorefrontPage` (meta, layout, sections con media por
-// slot y theme_tokens). Aquí NO se vuelve a declarar la forma del payload a
-// mano: los tipos VM son aliases/derivaciones del tipo generado, y el único
-// adaptador (`toStorefrontPageVM`) se limita a normalizar opcionales
-// (defaults + orden de secciones). `theme_tokens` sigue siendo un dict de
-// tokens en el contrato, así que conserva su parseo allowlist
+// CONTRATO CERRADO: GET /api/v1/public/storefront/site ya está tipado en
+// OpenAPI como `PublicStorefrontSite` (meta, theme_tokens, carousel, heros y
+// footer) y GET /public/storefront/highlights como `PublicHighlight[]`. Aquí
+// NO se re-declara la forma del payload: los VM son derivaciones del tipo
+// generado y el adaptador solo normaliza opcionales. `theme_tokens` sigue
+// siendo un dict en el contrato, así que conserva su parseo allowlist
 // (`parseThemeTokens`: solo hex de 6 dígitos, jamás CSS arbitrario).
 
 import type { components } from "@/generated/openapi";
 
-export type PublicStorefrontPage = components["schemas"]["PublicStorefrontPage"];
-export type PublicStorefrontSection = components["schemas"]["PublicStorefrontSection"];
-export type PublicSectionMediaSlot = components["schemas"]["PublicSectionMediaSlot"];
-export type PublicStorefrontMeta = components["schemas"]["PublicStorefrontMeta"];
-export type PublicStorefrontLayout = components["schemas"]["PublicStorefrontLayout"];
+export type PublicStorefrontSite = components["schemas"]["PublicStorefrontSite"];
+export type PublicHero = components["schemas"]["PublicHero"];
+export type PublicHeroProduct = components["schemas"]["PublicHeroProduct"];
+export type PublicCarousel = components["schemas"]["PublicCarousel"];
+export type PublicFooter = components["schemas"]["PublicFooter"];
+export type PublicFooterPhone = components["schemas"]["PublicFooterPhone"];
+export type PublicSocialLink = components["schemas"]["PublicSocialLink"];
+export type PublicHighlight = components["schemas"]["PublicHighlight"];
+export type PublicCta = components["schemas"]["PublicCta"];
 
 export type ThemeTokens = {
   colors: Record<string, string>;
@@ -25,26 +28,32 @@ export type ThemeTokens = {
 };
 
 // VM = contrato generado con los opcionales resueltos (la UI no repite `??`).
-export type SectionMediaSlotVM = Required<PublicSectionMediaSlot>;
-
-export type StorefrontSectionVM = Omit<
-  Required<PublicStorefrontSection>,
-  "data" | "media"
-> & {
-  data: Record<string, unknown> | null;
-  media: Record<string, SectionMediaSlotVM>;
+export type HeroVM = Required<Omit<PublicHero, "image" | "product">> & {
+  image: Required<NonNullable<PublicHero["image"]>>;
+  product: PublicHeroProduct | null;
 };
 
-export type StorefrontLayoutVM = Required<PublicStorefrontLayout> | null;
+export type CarouselVM = Required<PublicCarousel>;
 
-export type StorefrontPageVM = Omit<
-  Required<PublicStorefrontPage>,
-  "layout" | "meta" | "sections" | "theme_tokens"
-> & {
-  layout: StorefrontLayoutVM;
-  meta: Required<PublicStorefrontMeta>;
-  sections: StorefrontSectionVM[];
+export type FooterVM = Omit<Required<PublicFooter>, "schedule"> & {
+  schedule: { is_open_now: boolean; today_slots: { opens_at?: string; closes_at?: string }[] } | null;
+};
+
+export type HighlightVM = Required<PublicHighlight>;
+
+export type SiteVM = {
+  enabled: boolean;
+  maintenance_message: string | null;
+  meta: {
+    title: string | null;
+    description: string | null;
+    favicon_file_id: string | null;
+    social_image_file_id: string | null;
+  };
   theme_tokens: ThemeTokens | null;
+  carousel: CarouselVM;
+  heros: HeroVM[];
+  footer: FooterVM;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -70,63 +79,98 @@ export function parseThemeTokens(value: unknown): ThemeTokens | null {
   };
 }
 
-function toMediaSlotVM(slot: PublicSectionMediaSlot): SectionMediaSlotVM {
+export function toHeroVM(hero: PublicHero): HeroVM {
   return {
-    desktop_file_id: slot.desktop_file_id ?? null,
-    mobile_file_id: slot.mobile_file_id ?? null,
-    alt_text: slot.alt_text ?? null,
-    focal_point_x: slot.focal_point_x ?? null,
-    focal_point_y: slot.focal_point_y ?? null,
+    id: hero.id,
+    template: hero.template ?? "split",
+    eyebrow: hero.eyebrow ?? null,
+    title: hero.title,
+    title_accent: hero.title_accent ?? null,
+    description: hero.description ?? null,
+    primary_cta: hero.primary_cta ?? null,
+    secondary_cta: hero.secondary_cta ?? null,
+    product: hero.product ?? null,
+    image: {
+      desktop_file_id: hero.image?.desktop_file_id ?? null,
+      mobile_file_id: hero.image?.mobile_file_id ?? null,
+      alt_text: hero.image?.alt_text ?? null,
+      focal_x: hero.image?.focal_x ?? null,
+      focal_y: hero.image?.focal_y ?? null,
+    },
+    height: hero.height ?? "regular",
+    alignment: hero.alignment ?? "left",
+    color_scheme: hero.color_scheme ?? "surface",
+    button_variant: hero.button_variant ?? "solid",
+    overlay: hero.overlay ?? "soft",
+    image_position: hero.image_position ?? "right",
   };
 }
 
-function toSectionVM(section: PublicStorefrontSection): StorefrontSectionVM {
-  const media: Record<string, SectionMediaSlotVM> = {};
-  for (const [slot, raw] of Object.entries(section.media ?? {})) {
-    media[slot] = toMediaSlotVM(raw);
-  }
+export function toHighlightVM(row: PublicHighlight): HighlightVM {
   return {
-    template_key: section.template_key,
-    template_version: section.template_version,
-    sort_order: section.sort_order,
-    content: section.content ?? {},
-    style: section.style ?? {},
-    behavior: section.behavior ?? {},
-    data: section.data ?? null,
-    media,
+    id: row.id,
+    surface: row.surface,
+    icon: row.icon ?? null,
+    eyebrow: row.eyebrow ?? null,
+    title: row.title,
+    subtitle: row.subtitle ?? null,
+    cta: row.cta ?? null,
+    animation: row.animation ?? "fade_in",
+    color_scheme: row.color_scheme ?? "brand",
+  };
+}
+
+function toFooterVM(footer: PublicFooter | undefined): FooterVM {
+  return {
+    template: footer?.template ?? "barra",
+    color_scheme: footer?.color_scheme ?? "dark",
+    slogan: footer?.slogan ?? null,
+    phones: footer?.phones ?? [],
+    schedule: footer?.schedule
+      ? {
+          is_open_now: footer.schedule.is_open_now ?? false,
+          today_slots: footer.schedule.today_slots ?? [],
+        }
+      : null,
+    show_links: footer?.show_links ?? true,
+    address: footer?.address ?? null,
+    social_links: footer?.social_links ?? [],
   };
 }
 
 /** Adapter type-safe del contrato generado al VM que consume la UI. */
-export function toStorefrontPageVM(page: PublicStorefrontPage): StorefrontPageVM {
-  const sections = (page.sections ?? []).map(toSectionVM);
-  sections.sort((a, b) => a.sort_order - b.sort_order);
+export function toSiteVM(site: PublicStorefrontSite): SiteVM {
   return {
-    page_key: page.page_key,
-    slug: page.slug,
-    layout: page.layout
-      ? { header: page.layout.header ?? {}, footer: page.layout.footer ?? {} }
-      : null,
+    enabled: site.enabled ?? true,
+    maintenance_message: site.maintenance_message ?? null,
     meta: {
-      title: page.meta.title ?? null,
-      description: page.meta.description ?? null,
-      og_image_file_id: page.meta.og_image_file_id ?? null,
-      favicon_file_id: page.meta.favicon_file_id ?? null,
+      title: site.meta?.title ?? null,
+      description: site.meta?.description ?? null,
+      favicon_file_id: site.meta?.favicon_file_id ?? null,
+      social_image_file_id: site.meta?.social_image_file_id ?? null,
     },
-    sections,
-    theme_tokens: parseThemeTokens(page.theme_tokens),
+    theme_tokens: parseThemeTokens(site.theme_tokens),
+    carousel: {
+      autoplay: site.carousel?.autoplay ?? true,
+      interval_seconds: site.carousel?.interval_seconds ?? 6,
+      transition: site.carousel?.transition ?? "slide",
+      show_arrows: site.carousel?.show_arrows ?? true,
+      show_dots: site.carousel?.show_dots ?? true,
+    },
+    heros: (site.heros ?? []).map(toHeroVM),
+    footer: toFooterVM(site.footer),
   };
 }
 
 // Espejo del preset neutro `calido` del backend (app/storefront/presets.py):
-// fallback de arranque cuando aún no hay tema publicado. NO es Tony-Tony.
+// fallback de arranque cuando el sitio aún no responde. NO es Tony-Tony.
 export const FALLBACK_TOKENS: ThemeTokens = {
   colors: {
     brand_primary: "#C2410C",
     brand_secondary: "#1C1917",
     accent: "#F59E0B",
-    surface: "#FFFBF5",
-    surface_muted: "#F5EFE6",
+    surface: "#F6EEDD",
+    surface_muted: "#F1E7D2",
     text_primary: "#1C1917",
     text_inverse: "#FFFBF5",
     success: "#15803D",

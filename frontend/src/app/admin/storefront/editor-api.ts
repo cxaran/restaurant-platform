@@ -1,199 +1,104 @@
 "use client";
 
-// Cliente del editor del storefront: envuelve los endpoints reales del
-// backend (nunca inventa contratos) sobre browserApi (cookie de sesión).
+// Cliente TIPADO del editor plano del storefront. Todos los tipos salen de
+// src/generated/openapi.ts (contratos Pydantic reales) — sin espejos a mano.
+// Guardar es publicar: no hay borradores, revisiones ni programación.
 
-import { ApiRequestError } from "@/core/api/api-error";
 import { browserApi } from "@/core/api/browser-client";
 import type { components } from "@/generated/openapi";
-import type { JsonSchema } from "./SchemaForm";
 
-export type PageSummary = {
-  page_key: string;
-  slug: string;
-  published_revision_number: number | null;
-  published_at: string | null;
-  has_draft: boolean;
-  draft_revision_number: number | null;
-  // Estado de programación real del backend (publicación diferida).
-  scheduled_publish_at?: string | null;
-  schedule_cancelled_reason?: string | null;
-};
+export type StorefrontConfig = components["schemas"]["StorefrontConfig"];
+export type SettingsRead = components["schemas"]["SettingsRead"];
+export type FooterRead = components["schemas"]["FooterRead"];
+export type HeroRead = components["schemas"]["HeroRead"];
+export type HighlightRead = components["schemas"]["HighlightRead"];
+export type ThemePresetRead = components["schemas"]["ThemePresetRead"];
+export type HeroWrite = components["schemas"]["HeroWrite"];
+export type HighlightWrite = components["schemas"]["HighlightWrite"];
+export type FooterPatch = components["schemas"]["FooterPatch"];
+export type ThemePatch = components["schemas"]["ThemePatch"];
+export type SettingsPatch = components["schemas"]["SettingsPatch"];
+export type SocialLink = components["schemas"]["SocialLink"];
+export type Cta = components["schemas"]["Cta"];
 
-// Enlace de preview firmado y temporal (contrato generado, no espejo).
-export type PreviewLinkResult = components["schemas"]["PreviewLinkResult"];
+export type StoredFileRead = components["schemas"]["StoredFileRead"];
 
-export type TemplateInfo = {
-  key: string;
-  version: number;
-  label: string;
-  content_schema: JsonSchema;
-  style_schema: JsonSchema;
-  data_binding_schema: JsonSchema;
-  behavior_schema: JsonSchema;
-};
-
-export type DraftSection = {
-  id: string;
-  template_key: string;
-  template_version: number;
-  section_name: string | null;
-  sort_order: number;
-  is_visible: boolean;
-  visible_from: string | null;
-  visible_until: string | null;
-  content_config: Record<string, unknown>;
-  style_config: Record<string, unknown>;
-  data_binding_config: Record<string, unknown>;
-  behavior_config: Record<string, unknown>;
-};
-
-export type DraftRevision = {
-  id: string;
-  revision_number: number;
-  status: string;
-  page_title: string | null;
-  meta_description: string | null;
-  sections: DraftSection[];
-};
-
-export type MediaSlots = Record<
-  string,
-  {
-    desktop_file_id: string | null;
-    mobile_file_id: string | null;
-    alt_text: string | null;
-  }
->;
-
-export type LayoutConfig = {
-  version_number: number | null;
-  header_config: Record<string, unknown>;
-  footer_config: Record<string, unknown>;
-  header_schema?: JsonSchema;
-  footer_schema?: JsonSchema;
-};
-
-export type ThemePreset = { name: string; tokens: Record<string, unknown>; is_default: boolean };
-
-export const getPages = () => browserApi<PageSummary[]>("/api/v1/storefront/pages");
-export const getTemplates = () => browserApi<TemplateInfo[]>("/api/v1/storefront/templates");
-export const getDraft = (pageKey: string) =>
-  browserApi<DraftRevision>(`/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/draft`);
-
-export const patchDraftMeta = (pageKey: string, meta: { page_title?: string | null; meta_description?: string | null }) =>
-  browserApi<DraftRevision>(`/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/draft`, {
-    method: "PATCH",
-    body: meta,
-  });
-
-export type SectionInput = {
-  template_key: string;
-  template_version: number;
-  section_name?: string | null;
-  sort_order: number;
-  is_visible: boolean;
-  visible_from?: string | null;
-  visible_until?: string | null;
-  content_config: Record<string, unknown>;
-  style_config: Record<string, unknown>;
-  data_binding_config: Record<string, unknown>;
-  behavior_config: Record<string, unknown>;
-};
-
-export const addSection = (pageKey: string, section: SectionInput) =>
-  browserApi<DraftRevision>(
-    `/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/draft/sections`,
-    { method: "POST", body: section },
-  );
-
-export const updateSection = (sectionId: string, section: SectionInput) =>
-  browserApi<DraftSection>(`/api/v1/storefront/sections/${sectionId}`, {
-    method: "PUT",
-    body: section,
-  });
-
-export const deleteSection = (sectionId: string) =>
-  browserApi<void>(`/api/v1/storefront/sections/${sectionId}`, { method: "DELETE" });
-
-export const sortSections = (pageKey: string, sectionIds: string[]) =>
-  browserApi<{ id: string; sort_order: number }[]>(
-    `/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/draft/sections/sort`,
-    { method: "POST", body: { section_ids: sectionIds } },
-  );
-
-export const publishPage = (pageKey: string) =>
-  browserApi(`/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/publish`, {
-    method: "POST",
-  });
-
-// Espejo del perfil "image" del backend (FILE_PROFILES, 5 MB): validar antes de
-// enviar evita que un proxy corte la subida con un error de red ilegible.
-const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
-
-export async function uploadImage(file: File): Promise<string> {
-  if (file.size > IMAGE_MAX_BYTES) {
-    throw new ApiRequestError(413, {
-      code: "archivo_demasiado_grande",
-      message: "La imagen supera el máximo de 5 MB; reduce su tamaño e intenta de nuevo.",
-    });
-  }
-  const form = new FormData();
-  form.append("file", file);
-  form.append("kind", "image");
-  const stored = await browserApi<{ id: string }>("/api/v1/files", {
-    method: "POST",
-    body: form,
-  });
-  return stored.id;
+export function getConfig(): Promise<StorefrontConfig> {
+  return browserApi<StorefrontConfig>("/api/v1/storefront/config");
 }
 
-export const upsertMedia = (
-  sectionId: string,
-  slot: string,
-  body: { desktop_file_id?: string | null; mobile_file_id?: string | null; alt_text?: string | null },
-) =>
-  browserApi<MediaSlots>(`/api/v1/storefront/sections/${sectionId}/media/${slot}`, {
-    method: "PUT",
-    body,
-  });
+/** Sube una imagen al banco de archivos (perfil `image`: magic bytes + tamaño
+ * validados en backend, SVG bloqueado por H8) y devuelve su registro. El hero
+ * guarda el id — al subir una nueva, la referencia se REEMPLAZA al guardar. */
+export function uploadImage(file: File): Promise<StoredFileRead> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("kind", "image");
+  return browserApi<StoredFileRead>("/api/v1/files", { method: "POST", body });
+}
 
-export const deleteMedia = (sectionId: string, slot: string) =>
-  browserApi<void>(`/api/v1/storefront/sections/${sectionId}/media/${slot}`, {
-    method: "DELETE",
-  });
-
-export const getLayout = () => browserApi<LayoutConfig>("/api/v1/storefront/layout");
-export const putLayout = (header: Record<string, unknown>, footer: Record<string, unknown>) =>
-  browserApi<LayoutConfig>("/api/v1/storefront/layout", {
-    method: "PUT",
-    body: { header_config: header, footer_config: footer },
-  });
-
-export const getThemePresets = () => browserApi<ThemePreset[]>("/api/v1/storefront/theme-presets");
-export const applyTheme = (preset: string, accent?: string) =>
-  browserApi("/api/v1/storefront/theme", {
+export function createHero(payload: HeroWrite): Promise<HeroRead> {
+  return browserApi<HeroRead>("/api/v1/storefront/heros", {
     method: "POST",
-    body: { preset, ...(accent ? { accent } : {}) },
+    body: payload,
   });
+}
 
-export const schedulePublish = (pageKey: string, publishAt: string) =>
-  browserApi(`/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/schedule`, {
-    method: "POST",
-    body: { publish_at: publishAt },
+export function updateHero(id: string, payload: HeroWrite): Promise<HeroRead> {
+  return browserApi<HeroRead>(`/api/v1/storefront/heros/${id}`, {
+    method: "PUT",
+    body: payload,
   });
+}
 
-export const unschedulePublish = (pageKey: string) =>
-  browserApi(`/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/schedule`, {
-    method: "DELETE",
-  });
+export function deleteHero(id: string): Promise<void> {
+  return browserApi<void>(`/api/v1/storefront/heros/${id}`, { method: "DELETE" });
+}
 
-// Enlace de preview firmado (requiere storefront:preview). Solo lectura,
-// expira y se invalida al publicar.
-export const createPreviewLink = (pageKey: string, minutes?: number) =>
-  browserApi<PreviewLinkResult>(
-    `/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/preview-link${
-      minutes ? `?minutes=${minutes}` : ""
-    }`,
-    { method: "POST" },
+export function sortHeros(heroIds: string[]): Promise<{ id: string; sort_order: number }[]> {
+  return browserApi<{ id: string; sort_order: number }[]>(
+    "/api/v1/storefront/heros/sort",
+    { method: "POST", body: { hero_ids: heroIds } },
   );
+}
+
+export function createHighlight(payload: HighlightWrite): Promise<HighlightRead> {
+  return browserApi<HighlightRead>("/api/v1/storefront/highlights", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updateHighlight(
+  id: string,
+  payload: HighlightWrite,
+): Promise<HighlightRead> {
+  return browserApi<HighlightRead>(`/api/v1/storefront/highlights/${id}`, {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function deleteHighlight(id: string): Promise<void> {
+  return browserApi<void>(`/api/v1/storefront/highlights/${id}`, { method: "DELETE" });
+}
+
+export function patchFooter(payload: FooterPatch): Promise<FooterRead> {
+  return browserApi<FooterRead>("/api/v1/storefront/footer", {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function patchTheme(
+  payload: ThemePatch,
+): Promise<{ theme_preset: string; theme_accent: string | null; tokens: Record<string, unknown> }> {
+  return browserApi("/api/v1/storefront/theme", { method: "PATCH", body: payload });
+}
+
+export function patchSettings(payload: SettingsPatch): Promise<SettingsRead> {
+  return browserApi<SettingsRead>("/api/v1/storefront/settings", {
+    method: "PATCH",
+    body: payload,
+  });
+}

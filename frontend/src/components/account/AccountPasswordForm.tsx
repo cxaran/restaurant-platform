@@ -74,7 +74,7 @@ export function AccountPasswordForm() {
     <form
       onSubmit={onSubmit}
       aria-label="Cambiar contraseña"
-      className="space-y-4 rounded-lg border border-[var(--border)] bg-white p-6"
+      className="space-y-4 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6"
     >
       <h2 className="text-lg font-semibold text-[var(--tx)]">Cambiar contraseña</h2>
       <p className="text-sm text-[var(--tx3)]">Al cambiar la contraseña se cerrará tu sesión actual.</p>

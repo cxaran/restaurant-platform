@@ -1,12 +1,14 @@
 "use client";
 
 // Cola de conciliación H5: pedidos cancelados con cobro cuya devolución sigue
-// abierta. Solo se monta si la sesión tiene payments:read (lo decide la page);
-// el backend vuelve a validar el permiso en el endpoint. Con payments:refund
-// cada pendiente se puede RESOLVER aquí mismo (expandir → reembolsar); al
-// cubrir el monto, el pedido sale de la cola.
+// abierta. Vive como ICONO DE ALERTA con contador en la barra del título del
+// módulo Pedidos (no roba espacio al tablero); el detalle se abre en un
+// diálogo accesible. Solo se monta con payments:read (lo decide PanelShell);
+// el backend revalida el permiso en el endpoint. Con payments:refund cada
+// pendiente se puede RESOLVER en el diálogo (expandir → reembolsar); al
+// cubrir el monto, el pedido sale de la cola y el contador baja.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ApiRequestError } from "@/core/api/api-error";
 import { browserApi } from "@/core/api/browser-client";
@@ -24,9 +26,12 @@ const RESOLUTION_LABELS: Record<string, string> = {
   retain: "Pago retenido",
 };
 
-export function PendingRefunds({ canRefund = false }: Readonly<{ canRefund?: boolean }>) {
+export function PendingRefundsAlert({
+  canRefund = false,
+}: Readonly<{ canRefund?: boolean }>) {
   const [items, setItems] = useState<CancelledWithPaymentItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -55,37 +60,134 @@ export function PendingRefunds({ canRefund = false }: Readonly<{ canRefund?: boo
     };
   }, [tick]);
 
-  if (error) {
-    return (
-      <p role="alert" style={{ margin: 0, color: "var(--accent)", fontSize: 13, fontWeight: 700 }}>
-        {error}
-      </p>
-    );
-  }
-  if (items.length === 0) return null;
+  // Sin pendientes ni error no hay nada que avisar: cero cromo extra.
+  if (error === null && items.length === 0) return null;
 
   return (
-    <section
-      aria-label="Cancelados con cobro pendiente de devolver"
+    <>
+      <button
+        type="button"
+        aria-label={`Cancelados con cobro pendiente de devolver: ${items.length}`}
+        title="Cancelados con cobro pendiente de devolver"
+        onClick={() => {
+          setTick((value) => value + 1); // refresca la cola al abrir
+          setOpen(true);
+        }}
+        style={{
+          position: "relative", display: "inline-flex", alignItems: "center",
+          justifyContent: "center", width: 38, height: 38, borderRadius: 12,
+          border: "2px solid var(--accent)", background: "transparent",
+          color: "var(--accent)", fontSize: 17, cursor: "pointer", flexShrink: 0,
+        }}
+      >
+        <span aria-hidden>⚠</span>
+        <span
+          aria-hidden
+          style={{
+            position: "absolute", top: -7, right: -7, minWidth: 19, height: 19,
+            borderRadius: 999, background: "var(--accent)", color: "var(--on-accent, #fff)",
+            fontSize: 11, fontWeight: 900, display: "inline-flex", alignItems: "center",
+            justifyContent: "center", padding: "0 5px", lineHeight: 1,
+          }}
+        >
+          {error ? "!" : items.length}
+        </span>
+      </button>
+
+      {open ? (
+        <PendingRefundsDialog
+          items={items}
+          error={error}
+          canRefund={canRefund}
+          onClose={() => setOpen(false)}
+          onResolved={() => setTick((value) => value + 1)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function PendingRefundsDialog({
+  items,
+  error,
+  canRefund,
+  onClose,
+  onResolved,
+}: Readonly<{
+  items: CancelledWithPaymentItem[];
+  error: string | null;
+  canRefund: boolean;
+  onClose: () => void;
+  onResolved: () => void;
+}>) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+
+  return (
+    <div
       style={{
-        border: "2px solid var(--accent)", borderRadius: 16, padding: "14px 18px",
-        background: "var(--panel)", display: "flex", flexDirection: "column", gap: 8,
+        position: "fixed", inset: 0, background: "rgba(28,21,18,0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 16, zIndex: 50,
       }}
+      onClick={onClose}
     >
-      <h2 style={{ margin: 0, fontSize: 15, color: "var(--accent)" }}>
-        Cancelados con cobro pendiente de devolver ({items.length})
-      </h2>
-      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-        {items.map((item) => (
-          <PendingRefundItem
-            key={item.order_id}
-            item={item}
-            canRefund={canRefund}
-            onResolved={() => setTick((value) => value + 1)}
-          />
-        ))}
-      </ul>
-    </section>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Cancelados con cobro pendiente de devolver"
+        tabIndex={-1}
+        className="tt-card"
+        style={{
+          width: "min(680px, 100%)", maxHeight: "min(80dvh, 640px)", overflowY: "auto",
+          padding: "18px 20px", display: "flex", flexDirection: "column", gap: 10,
+          outline: "none",
+        }}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onClose();
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 16, color: "var(--accent)", flex: 1 }}>
+            ⚠ Cancelados con cobro pendiente de devolver ({items.length})
+          </h2>
+          <button
+            type="button"
+            className="tt-btn tt-btn-ghost"
+            style={{ padding: "4px 10px", fontSize: 12 }}
+            onClick={onClose}
+          >
+            Cerrar
+          </button>
+        </div>
+
+        {error ? (
+          <p role="alert" style={{ margin: 0, color: "var(--accent)", fontSize: 13, fontWeight: 700 }}>
+            {error}
+          </p>
+        ) : items.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: "var(--tx3)" }}>
+            Sin devoluciones pendientes: la cola quedó al día.
+          </p>
+        ) : (
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+            {items.map((item) => (
+              <PendingRefundItem
+                key={item.order_id}
+                item={item}
+                canRefund={canRefund}
+                onResolved={onResolved}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 

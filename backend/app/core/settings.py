@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     email_token_expire_minutes: int
     trys_before_lock: int
 
+    # Sesión del CLIENTE (usuario sin roles): larga, en días — un cliente que
+    # compra una vez al mes no debe volver a iniciar sesión. El personal (con
+    # roles RBAC) conserva la sesión corta de access_token_expire_minutes.
+    # Ambas se extienden con la renovación deslizante mientras haya actividad;
+    # rotar User.token (contraseña/correo/forzar logout) las mata al instante.
+    customer_session_expire_days: int = 90
+
     # Allowlist explícita de orígenes de navegador confiables (CSV) para mutaciones
     # autenticadas por cookie. Dev: localhost. Producción: debe definirse por env.
     trusted_browser_origins: str = "http://localhost:3000"

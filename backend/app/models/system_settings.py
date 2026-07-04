@@ -38,6 +38,14 @@ class SystemSettings(Base):
     __table_args__ = (
         CheckConstraint("singleton_key = true", name="system_settings_singleton"),
         CheckConstraint(
+            "customer_session_days IS NULL OR customer_session_days > 0",
+            name="system_settings_customer_session_days_positive",
+        ),
+        CheckConstraint(
+            "staff_session_minutes IS NULL OR staff_session_minutes > 0",
+            name="system_settings_staff_session_minutes_positive",
+        ),
+        CheckConstraint(
             "email_mode in ('environment', 'smtp', 'resend')",
             name="system_settings_email_mode",
         ),
@@ -109,6 +117,25 @@ class SystemSettings(Base):
             "Recuperación de contraseña por correo. Sin candado de despliegue (bajo "
             "riesgo); apagarla con registro cerrado y un solo admin puede dejar la "
             "instalación sin acceso (salida: seed CLI)."
+        ),
+    )
+
+    # -- Duración de sesión (política editable; NULL = default del despliegue) ------
+    customer_session_days: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment=(
+            "Días de sesión del CLIENTE (usuario sin roles). NULL = usar el default "
+            "del despliegue (CUSTOMER_SESSION_EXPIRE_DAYS). La renovación deslizante "
+            "extiende la sesión con la actividad."
+        ),
+    )
+    staff_session_minutes: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment=(
+            "Minutos de sesión del PERSONAL (usuario con roles). NULL = usar el "
+            "default del despliegue (ACCESS_TOKEN_EXPIRE_MINUTES)."
         ),
     )
 

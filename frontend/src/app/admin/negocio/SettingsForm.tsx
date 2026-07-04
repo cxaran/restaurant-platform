@@ -22,7 +22,8 @@ type ToggleKey =
   | "allow_counter_sales"
   | "allow_customer_registration"
   | "require_registered_user_for_checkout"
-  | "order_approval_required";
+  | "order_approval_required"
+  | "online_orders_require_open_hours";
 
 const TOGGLES: ReadonlyArray<{ key: ToggleKey; label: string; description: string }> = [
   {
@@ -60,6 +61,14 @@ const TOGGLES: ReadonlyArray<{ key: ToggleKey; label: string; description: strin
     label: "Aprobación manual de pedidos",
     description: "Los pedidos en línea requieren aprobación antes de prepararse.",
   },
+  {
+    key: "online_orders_require_open_hours",
+    label: "Pedidos web solo en horario de atención",
+    description:
+      "El checkout del sitio se bloquea fuera del horario (semanal + fechas especiales). " +
+      "Requiere horarios configurados: sin horarios el negocio cuenta como cerrado. " +
+      "El POS y la captura del panel no se ven afectados.",
+  },
 ];
 
 export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
@@ -74,6 +83,7 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
     allow_customer_registration: false,
     require_registered_user_for_checkout: false,
     order_approval_required: false,
+    online_orders_require_open_hours: false,
   });
   const [minimumDelivery, setMinimumDelivery] = useState("");
   const [freeShippingFrom, setFreeShippingFrom] = useState("");
@@ -94,6 +104,7 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
       allow_customer_registration: data.allow_customer_registration,
       require_registered_user_for_checkout: data.require_registered_user_for_checkout,
       order_approval_required: data.order_approval_required,
+      online_orders_require_open_hours: data.online_orders_require_open_hours,
     });
     setMinimumDelivery(data.minimum_delivery_order_amount ?? "");
     setFreeShippingFrom(data.free_shipping_global_from_amount ?? "");

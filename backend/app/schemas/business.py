@@ -80,6 +80,7 @@ class BusinessSettingsRead(ApiReadSchema):
     allow_customer_registration: bool
     require_registered_user_for_checkout: bool
     order_approval_required: bool
+    online_orders_require_open_hours: bool
     minimum_delivery_order_amount: Optional[Decimal] = None
     free_shipping_global_from_amount: Optional[Decimal] = None
     ticket_footer_text: Optional[str] = None
@@ -94,6 +95,7 @@ class BusinessSettingsUpdate(ApiPatchSchema):
     allow_customer_registration: Optional[bool] = None
     require_registered_user_for_checkout: Optional[bool] = None
     order_approval_required: Optional[bool] = None
+    online_orders_require_open_hours: Optional[bool] = None
     minimum_delivery_order_amount: Optional[Decimal] = Field(default=None, ge=0)
     free_shipping_global_from_amount: Optional[Decimal] = Field(default=None, ge=0)
     ticket_footer_text: Optional[str] = None
@@ -228,6 +230,9 @@ class PublicBusinessRead(ApiReadSchema):
     timezone: str
     is_accepting_orders: bool
     is_open_now: bool
+    # Con el switch encendido, «cerrado» BLOQUEA el checkout web (no es solo
+    # informativo): el carrito lo usa para avisar y deshabilitar el pago.
+    online_orders_require_open_hours: bool
     today_slots: list[PublicDaySlot]
     phones: list[PublicBusinessPhone]
     allow_online_orders: bool

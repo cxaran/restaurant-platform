@@ -7,32 +7,14 @@ import { useCart } from "@/core/storefront/cart";
 import type { PublicBusiness } from "@/core/restaurant-api/contracts";
 import { formatMoney } from "@/core/restaurant-api/theme";
 import { BrandLockup } from "./BrandLockup";
-import { ctaHref } from "./SectionRenderer";
-import type { StorefrontLayoutVM } from "@/core/restaurant-api/view-models";
 
 export function StorefrontHeader({
   business,
   logoUrl = null,
-  layout = null,
 }: Readonly<{
   business: PublicBusiness | null;
   logoUrl?: string | null;
-  layout?: StorefrontLayoutVM;
 }>) {
-  // Navegación del layout PUBLICADO (§44); fallback a los enlaces base.
-  const navLinks = (
-    Array.isArray(layout?.header?.nav_links) ? layout.header.nav_links : []
-  )
-    .map((cta) => ({
-      label:
-        typeof (cta as { label?: string }).label === "string"
-          ? ((cta as { label: string }).label)
-          : null,
-      href: ctaHref(cta),
-    }))
-    .filter((link): link is { label: string; href: string } =>
-      Boolean(link.label && link.href),
-    );
   const session = usePublicSession();
   const { count, subtotalHint, mode } = useCart();
   const isOpen = business?.is_open_now ?? false;
@@ -55,27 +37,14 @@ export function StorefrontHeader({
         >
           <BrandLockup business={business} logoUrl={logoUrl} compact />
         </Link>
+        {/* Navegación FIJA del sitio (la portada es composición en código). */}
         <nav aria-label="Navegación del sitio" className="sf-header-nav">
-          {navLinks.length > 0 ? (
-            navLinks.map((link) => (
-              <Link
-                key={`${link.label}-${link.href}`}
-                href={link.href}
-                style={{ color: "inherit", textDecoration: "none" }}
-              >
-                {link.label}
-              </Link>
-            ))
-          ) : (
-            <>
-              <Link href="/menu" style={{ color: "inherit", textDecoration: "none" }}>
-                Menú
-              </Link>
-              <Link href="/pedidos" style={{ color: "inherit", textDecoration: "none" }}>
-                Mis pedidos
-              </Link>
-            </>
-          )}
+          <Link href="/menu" style={{ color: "inherit", textDecoration: "none" }}>
+            Menú
+          </Link>
+          <Link href="/pedidos" style={{ color: "inherit", textDecoration: "none" }}>
+            Rastrear pedido
+          </Link>
         </nav>
         <span
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 }}
@@ -103,7 +72,8 @@ export function StorefrontHeader({
         ) : (
           <Link
             href="/login?next=/"
-            style={{ fontSize: 14, fontWeight: 700, color: "inherit", whiteSpace: "nowrap" }}
+            className="sf-btn-outline"
+            style={{ padding: "8px 16px", fontSize: 14, whiteSpace: "nowrap" }}
           >
             Iniciar sesión
           </Link>
@@ -112,7 +82,7 @@ export function StorefrontHeader({
           href="/carrito"
           aria-label={`Carrito, ${count} productos`}
           style={{
-            background: "var(--sf-brand-2)",
+            background: "var(--sf-brand)",
             color: "var(--sf-text-inverse)",
             borderRadius: "var(--sf-radius-button)",
             padding: "10px 16px",
@@ -128,7 +98,7 @@ export function StorefrontHeader({
           Carrito
           <span
             aria-hidden
-            style={{ background: "var(--sf-brand)", borderRadius: 999, padding: "1px 8px", fontSize: 12 }}
+            style={{ background: "color-mix(in srgb, black 22%, transparent)", borderRadius: 999, padding: "1px 8px", fontSize: 12 }}
           >
             {count}
           </span>

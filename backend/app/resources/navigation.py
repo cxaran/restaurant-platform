@@ -70,7 +70,7 @@ NAVIGATION_REGISTRY: tuple[NavigationModuleDef, ...] = (
         label="Editor del sitio",
         href="/admin/storefront",
         section="admin",
-        permissions=(StorefrontPermissions.READ_DRAFT, StorefrontPermissions.EDIT),
+        permissions=(StorefrontPermissions.READ, StorefrontPermissions.EDIT),
     ),
     NavigationModuleDef(
         name="zona-entrega",

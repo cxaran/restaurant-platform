@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { logout } from "@/core/auth/account-mutation-client";
 
@@ -33,7 +33,11 @@ function LogoutIcon() {
  */
 export function AccountMenu() {
   const router = useRouter();
+  const pathname = usePathname();
   const [pending, setPending] = useState(false);
+  // Cada superficie edita la identidad en SU shell: el empleado en /panel/cuenta,
+  // el admin en /admin/account (mismo editor compartido detrás).
+  const accountHref = pathname.startsWith("/panel") ? "/panel/cuenta" : "/admin/account";
 
   async function onLogout() {
     if (pending) return;
@@ -50,7 +54,7 @@ export function AccountMenu() {
   return (
     <div className="flex items-center gap-1">
       <Link
-        href="/admin/account"
+        href={accountHref}
         title="Mi cuenta"
         aria-label="Mi cuenta"
         className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--side-border)] text-[var(--side-tx)] transition hover:bg-white/10 hover:text-[var(--side-strong)]"

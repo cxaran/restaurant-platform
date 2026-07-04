@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { requireSession } from "@/core/auth/session";
 import { OrdersBoard } from "./OrdersBoard";
-import { PendingRefunds } from "./PendingRefunds";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +20,11 @@ export default async function PanelOrdersPage() {
       </div>
     );
   }
+  // La cola de conciliación H5 (cancelados con cobro pendiente) vive ahora en
+  // la barra del título del módulo (PanelShell → PendingRefundsAlert): icono
+  // con contador + diálogo, sin robar espacio al tablero.
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {permissions.includes("payments:read") ? (
-        <PendingRefunds canRefund={permissions.includes("payments:refund")} />
-      ) : null}
       <OrdersBoard permissions={permissions} />
     </div>
   );

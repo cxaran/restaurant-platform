@@ -95,6 +95,24 @@ class BootstrapInitializeRequest(ApiWriteSchema):
         max_length=200,
         description="Nombre de la institución (opcional).",
     )
+    customer_session_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=365,
+        description=(
+            "Días de sesión del cliente (sin roles). Vacío = default del "
+            "despliegue. Editable después en Configuración del sistema."
+        ),
+    )
+    staff_session_minutes: int | None = Field(
+        default=None,
+        ge=5,
+        le=1440,
+        description=(
+            "Minutos de sesión del personal (con roles). Vacío = default del "
+            "despliegue. Editable después en Configuración del sistema."
+        ),
+    )
 
 
 class BootstrapInitializeRead(ApiReadSchema):

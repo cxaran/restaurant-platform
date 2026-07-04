@@ -6,9 +6,11 @@ import {
   GoogleAuthButton,
   PublicAuthShell,
 } from "@/features/auth/PublicAuthShell";
+import { HighlightBanner } from "@/components/storefront/Highlights";
 import { RequestTokenForm } from "@/features/auth/RequestTokenForm";
 import { getAuthPolicy } from "@/core/auth/policy-client";
 import { getSession } from "@/core/auth/session";
+import { getPublicHighlights } from "@/core/restaurant-api/storefront";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,8 @@ export default async function RegisterPage() {
   if (!policy.registration_enabled) {
     redirect("/login");
   }
+  // Destacado configurable del registro (slot fijo sobre el formulario).
+  const highlights = await getPublicHighlights("register");
 
   return (
     <PublicAuthShell
@@ -39,6 +43,11 @@ export default async function RegisterPage() {
         </>
       }
     >
+      {highlights.length > 0 ? (
+        <div className="mb-4">
+          <HighlightBanner highlight={highlights[0]} variant="card" />
+        </div>
+      ) : null}
       {policy.google_login_enabled ? (
         <>
           <GoogleAuthButton />

@@ -8,7 +8,7 @@ bitácora (§17.3).
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
@@ -30,7 +30,9 @@ from backend.app.models.orders import (
     OrderShipping,
     OrderShippingHistory,
 )
+from backend.app.models.payments import Payment
 from backend.app.models.shipping import ShippingRateRule
+from backend.app.models.user import User
 from backend.app.schemas.address import GeoPoint
 from backend.app.schemas.order import (
     CancelledWithPaymentItem,
@@ -48,6 +50,7 @@ from backend.app.schemas.order import (
     OrderRead,
     OrderShippingFinalizeRequest,
     OrderShippingRead,
+    OrderStatusHistoryRead,
     OrderTransitionRequest,
     OrderVisibleNoteRead,
 )
@@ -57,6 +60,7 @@ from backend.app.security.groups.payments import PaymentPermissions
 from backend.app.services.business_service import (
     get_business_profile,
     get_business_settings,
+    is_open_now,
 )
 from backend.app.services.order_service import (
     OrderIdentity,
@@ -209,6 +213,8 @@ def _compose_delivery_and_shipping(
                 # puede ajustarla después con bitácora (§17.3).
                 final_amount=quote.amount,
                 is_free_shipping=quote.is_free_shipping,
+                # Tiempo estimado congelado de la tarifa (§10.2); NULL si no lo define.
+                estimated_minutes=quote.estimated_minutes,
             )
         )
     else:
@@ -275,14 +281,51 @@ def _visible_notes(order: Order) -> list[OrderVisibleNoteRead]:
     ]
 
 
-def _order_read(order: Order) -> OrderRead:
+def _resolve_user_names(
+    session: SessionDep, user_ids
+) -> dict[uuid.UUID, str]:
+    """Resuelve «Nombre Apellido» por id en UNA consulta (evita N+1 en la lista
+    y la bitácora). Ignora ids nulos y no encontrados."""
+    ids = {uid for uid in user_ids if uid is not None}
+    if not ids:
+        return {}
+    rows = session.exec(
+        select(User.id, User.name, User.last_name).where(User.id.in_(ids))  # pyright: ignore[reportAttributeAccessIssue]
+    ).all()
+    return {row[0]: f"{row[1]} {row[2]}".strip() for row in rows}  # pyright: ignore[reportReturnType]
+
+
+def _status_history(session: SessionDep, order: Order) -> list[OrderStatusHistoryRead]:
+    """Bitácora INTERNA completa en orden cronológico, con el nombre de quien
+    hizo cada transición resuelto (§15.4)."""
+    entries = sorted(order.status_history, key=lambda h: h.changed_at)
+    names = _resolve_user_names(session, [entry.changed_by for entry in entries])
+    return [
+        OrderStatusHistoryRead(
+            previous_status=entry.previous_status,
+            new_status=entry.new_status,
+            reason_code=entry.reason_code,
+            internal_note=entry.internal_note,
+            customer_visible_note=entry.customer_visible_note,
+            changed_by_name=names.get(entry.changed_by),
+            changed_at=entry.changed_at,
+        )
+        for entry in entries
+    ]
+
+
+def _order_read(session: SessionDep, order: Order) -> OrderRead:
+    names = _resolve_user_names(session, [order.approved_by])
+    computed = {"approved_by_name", "status_history", "lines", "adjustments",
+                "shipping", "delivery", "visible_notes"}
     data = {
         field: getattr(order, field)
         for field in OrderRead.model_fields
-        if field not in {"lines", "adjustments", "shipping", "delivery", "visible_notes"}
+        if field not in computed
     }
     return OrderRead(
         **data,
+        approved_by_name=names.get(order.approved_by),
         lines=[_line_read(line) for line in sorted(order.lines, key=lambda l: l.sort_order)],
         adjustments=[
             OrderAdjustmentRead.model_validate(adj, from_attributes=True)
@@ -295,6 +338,7 @@ def _order_read(order: Order) -> OrderRead:
         ),
         delivery=_delivery_read(order.delivery),
         visible_notes=_visible_notes(order),
+        status_history=_status_history(session, order),
     )
 
 
@@ -308,10 +352,21 @@ def _my_order_read(session: SessionDep, order: Order) -> MyOrderRead:
     shipping = order.shipping
     shipping_amount = order.shipping_total_amount
     pending_review = False
+    estimated_minutes: Optional[int] = None
     if shipping is not None:
         if shipping_amount is None:
             shipping_amount = shipping.final_amount or shipping.estimated_amount
         pending_review = shipping.final_amount is None
+        estimated_minutes = shipping.estimated_minutes
+    # Hora estimada de entrega: sólo con el reloj ya corriendo (aprobado) y en
+    # un estado activo de entrega; el cliente deriva el «tiempo restante».
+    estimated_delivery_at: Optional[datetime] = None
+    if (
+        estimated_minutes is not None
+        and order.approved_at is not None
+        and order.status not in ("completed", "cancelled")
+    ):
+        estimated_delivery_at = order.approved_at + timedelta(minutes=estimated_minutes)
     return MyOrderRead(
         id=order.id,
         public_code=order.public_code,
@@ -331,6 +386,8 @@ def _my_order_read(session: SessionDep, order: Order) -> MyOrderRead:
         ),
         shipping_amount=shipping_amount,
         shipping_pending_review=pending_review,
+        shipping_estimated_minutes=estimated_minutes,
+        estimated_delivery_at=estimated_delivery_at,
         total_money_amount=order.total_money_amount,
         credits_earned_total_snapshot=order.credits_earned_total_snapshot,
         credits_redeemed_total=order.credits_redeemed_total,
@@ -416,6 +473,16 @@ def checkout(
         api_error(status.HTTP_409_CONFLICT, "no_aceptamos_pedidos", "Por ahora no aceptamos pedidos.")
     if not settings_row.allow_online_orders:
         api_error(status.HTTP_409_CONFLICT, "pedidos_web_deshabilitados", "Los pedidos web están deshabilitados.")
+    # Switch opt-in: con horario obligatorio, el checkout web sólo procede con
+    # el negocio ABIERTO (horario semanal + fechas especiales, tz del negocio).
+    # Staff/POS quedan exentos (capturan por otros endpoints).
+    if settings_row.online_orders_require_open_hours and not is_open_now(session):
+        api_error(
+            status.HTTP_409_CONFLICT,
+            "negocio_cerrado",
+            "Estamos cerrados en este momento. Consulta nuestro horario e "
+            "inténtalo dentro del horario de atención.",
+        )
     if payload.fulfillment_type == "delivery" and not settings_row.allow_delivery:
         api_error(status.HTTP_409_CONFLICT, "entrega_deshabilitada", "La entrega a domicilio está deshabilitada.")
     if payload.fulfillment_type == "pickup" and not settings_row.allow_pickup:
@@ -553,7 +620,7 @@ def capture_order(
 
     commit_or_conflict(session, "No fue posible registrar el pedido.")
     session.refresh(order)
-    return _order_read(order)
+    return _order_read(session, order)
 
 
 def _apply_order_list_filters(
@@ -566,12 +633,15 @@ def _apply_order_list_filters(
     created_from: Optional[datetime],
     created_to: Optional[datetime],
     customer_user_id: Optional[uuid.UUID] = None,
+    purchase_mode: Optional[str] = None,
+    payment_status: Optional[str] = None,
 ):
     """Filtros compartidos del tablero interno (lista y conteos por estado).
 
     ``q`` busca por folio, cliente/teléfono del pedido y, vía la entrega,
     por quien recibe y la dirección (calle/colonia). ``statuses`` acepta uno
-    o varios estados separados por coma.
+    o varios estados separados por coma. ``purchase_mode`` (money/credits) y
+    ``payment_status`` filtran el modo del pedido y su estado de cobro.
     """
     if statuses:
         parsed = [s.strip() for s in statuses.split(",") if s.strip()]
@@ -581,6 +651,10 @@ def _apply_order_list_filters(
         stmt = stmt.where(Order.source == source)
     if fulfillment_type:
         stmt = stmt.where(Order.fulfillment_type == fulfillment_type)
+    if purchase_mode:
+        stmt = stmt.where(Order.purchase_mode == purchase_mode)
+    if payment_status:
+        stmt = stmt.where(Order.payment_status == payment_status)
     # Ficha de cliente (§8.2): sus pedidos por cuenta registrada.
     if customer_user_id is not None:
         stmt = stmt.where(Order.customer_user_id == customer_user_id)
@@ -604,6 +678,47 @@ def _apply_order_list_filters(
     return stmt
 
 
+def _order_list_items(session: SessionDep, orders: list[Order]) -> list[OrderListItem]:
+    """Enriquece la lista del explorador con datos finales resueltos EN LOTE
+    (sin N+1): aprobador (join a ``User``) y método de pago (snapshot del primer
+    pago ``paid`` del pedido). La lista sigue LIGERA: sin líneas ni bitácora."""
+    names = _resolve_user_names(session, [order.approved_by for order in orders])
+    labels: dict[uuid.UUID, str] = {}
+    order_ids = [order.id for order in orders]
+    if order_ids:
+        payments = session.exec(
+            select(Payment).where(
+                Payment.order_id.in_(order_ids),  # pyright: ignore[reportAttributeAccessIssue]
+                Payment.status == "paid",
+            )
+        ).all()
+        # El primer pago cobrado (por fecha) fija la etiqueta del método.
+        for payment in sorted(payments, key=lambda p: p.created_at):
+            labels.setdefault(payment.order_id, payment.payment_method_name_snapshot)
+    return [
+        OrderListItem(
+            id=order.id,
+            public_code=order.public_code,
+            source=order.source,
+            fulfillment_type=order.fulfillment_type,
+            purchase_mode=order.purchase_mode,
+            status=order.status,
+            payment_status=order.payment_status,
+            customer_name_snapshot=order.customer_name_snapshot,
+            items_subtotal_amount=order.items_subtotal_amount,
+            shipping_total_amount=order.shipping_total_amount,
+            total_money_amount=order.total_money_amount,
+            approved_at=order.approved_at,
+            approved_by_name=names.get(order.approved_by),  # pyright: ignore[reportArgumentType]
+            payment_method_label=labels.get(order.id),
+            completed_at=order.completed_at,
+            cancelled_at=order.cancelled_at,
+            created_at=order.created_at,
+        )
+        for order in orders
+    ]
+
+
 @router.get("", response_model=OffsetPage[OrderListItem])
 def list_orders(
     session: SessionDep,
@@ -615,6 +730,8 @@ def list_orders(
     ),
     source: Optional[str] = Query(default=None),
     fulfillment_type: Optional[str] = Query(default=None),
+    purchase_mode: Optional[str] = Query(default=None),
+    payment_status: Optional[str] = Query(default=None),
     q: Optional[str] = Query(default=None, max_length=120),
     created_from: Optional[datetime] = Query(default=None),
     created_to: Optional[datetime] = Query(default=None),
@@ -622,8 +739,9 @@ def list_orders(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> OffsetPage[OrderListItem]:
-    """Tablero interno paginado: filtros por estado/canal/fechas/cliente y
-    búsqueda por folio, cliente, quien recibe y dirección (envelope estándar)."""
+    """Tablero interno paginado: filtros por estado/canal/modo/pago/fechas/
+    cliente y búsqueda por folio, cliente, quien recibe y dirección; cada fila
+    trae aprobador, método de pago y envío (envelope estándar)."""
     stmt = _apply_order_list_filters(
         select(Order),
         statuses=status_filter,
@@ -633,6 +751,8 @@ def list_orders(
         created_from=created_from,
         created_to=created_to,
         customer_user_id=customer_user_id,
+        purchase_mode=purchase_mode,
+        payment_status=payment_status,
     )
     subq = stmt.subquery()
     total = int(
@@ -644,7 +764,7 @@ def list_orders(
         .limit(limit)
     ).all()
     return OffsetPage(
-        items=[OrderListItem.model_validate(order, from_attributes=True) for order in rows],
+        items=_order_list_items(session, list(rows)),
         pagination=OffsetPagination(
             limit=limit,
             offset=offset,
@@ -660,12 +780,16 @@ def order_status_counts(
     _: OrderPermissions.READ.requiere,
     source: Optional[str] = Query(default=None),
     fulfillment_type: Optional[str] = Query(default=None),
+    purchase_mode: Optional[str] = Query(default=None),
+    payment_status: Optional[str] = Query(default=None),
     q: Optional[str] = Query(default=None, max_length=120),
     created_from: Optional[datetime] = Query(default=None),
     created_to: Optional[datetime] = Query(default=None),
+    customer_user_id: Optional[uuid.UUID] = Query(default=None),
 ) -> dict[str, int]:
     """Conteo por estado con los MISMOS filtros del tablero (menos ``status``):
-    alimenta los chips «Nuevos · 3» sin traerse los pedidos."""
+    alimenta los chips «Nuevos · 3» sin traerse los pedidos. Incluye
+    ``customer_user_id`` para la ficha de cliente (§8.2)."""
     stmt = _apply_order_list_filters(
         select(Order.status, sa_func.count(sa_func.distinct(Order.id))),  # pyright: ignore[reportArgumentType]
         statuses=None,
@@ -674,6 +798,9 @@ def order_status_counts(
         q=q,
         created_from=created_from,
         created_to=created_to,
+        customer_user_id=customer_user_id,
+        purchase_mode=purchase_mode,
+        payment_status=payment_status,
     ).group_by(Order.status)  # pyright: ignore[reportArgumentType]
     return {status_value: int(count) for status_value, count in session.exec(stmt).all()}
 
@@ -747,7 +874,7 @@ def get_order(
     session: SessionDep,
     _: OrderPermissions.READ.requiere,
 ) -> OrderRead:
-    return _order_read(get_or_404(session, Order, order_id, _NOT_FOUND))
+    return _order_read(session, get_or_404(session, Order, order_id, _NOT_FOUND))
 
 
 @router.post("/{order_id}/transition", response_model=OrderRead)
@@ -804,7 +931,7 @@ def transition(
     notify_order_progress(order, payload.new_status)
     if payload.new_status == "cancelled":
         notify_admin_unresolved_refund(session, order)
-    return _order_read(order)
+    return _order_read(session, order)
 
 
 @router.put("/{order_id}/shipping", response_model=OrderRead)
@@ -853,6 +980,8 @@ def finalize_shipping(
         shipping.final_amount = rate.base_fee
         shipping.is_free_shipping = False
         shipping.calculation_source = "employee_selected_rate"
+        # La tarifa elegida trae su propio tiempo estimado (o NULL).
+        shipping.estimated_minutes = rate.estimated_minutes
     elif payload.final_amount is not None:
         if not (payload.reason or "").strip():
             api_error(
@@ -864,6 +993,8 @@ def finalize_shipping(
         shipping.is_free_shipping = payload.final_amount == Decimal("0")
         shipping.calculation_source = "employee_manual_override"
         shipping.manual_override_reason = payload.reason
+        # El monto manual no proviene de una tarifa: sin tiempo estimado.
+        shipping.estimated_minutes = None
     elif lonlat is not None:
         # Recotización por polígono con el pin del empleado: el backend decide
         # zona y tarifa (PostGIS); fuera de zona o sin tarifa aplicable se pide
@@ -893,6 +1024,7 @@ def finalize_shipping(
         shipping.estimated_amount = quote.amount
         shipping.final_amount = quote.amount
         shipping.is_free_shipping = quote.is_free_shipping
+        shipping.estimated_minutes = quote.estimated_minutes
         shipping.calculation_source = (
             "free_shipping_rule" if quote.is_free_shipping else "polygon_auto"
         )
@@ -924,7 +1056,7 @@ def finalize_shipping(
     )
     commit_or_conflict(session, "No fue posible ajustar el envío.")
     session.refresh(order)
-    return _order_read(order)
+    return _order_read(session, order)
 
 
 @router.post(
@@ -958,4 +1090,4 @@ def add_adjustment(
     )
     commit_or_conflict(session, "No fue posible registrar el ajuste.")
     session.refresh(order)
-    return _order_read(order)
+    return _order_read(session, order)

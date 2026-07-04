@@ -72,33 +72,6 @@ function clearRateLimitKeys() {
   );
 }
 
-// Normaliza el estado del storefront entre corridas: programar una revisión
-// la saca de "draft" (el editor auto-crea OTRO borrador) y cancelar la
-// programación la regresa a "draft" — quedan borradores huérfanos de corridas
-// previas. Se archivan para que el borrador que la preparación edita y publica
-// sea siempre el único vigente.
-function archiveStaleStorefrontDrafts() {
-  execFileSync(
-    "docker",
-    [
-      "compose",
-      "-f",
-      composeFile,
-      "exec",
-      "-T",
-      "postgres",
-      "psql",
-      "-U",
-      "platform",
-      "-d",
-      "restaurant_platform_e2e_test",
-      "-c",
-      "update storefront_page_revisions set status='archived', scheduled_publish_at=null where status in ('draft','scheduled');",
-    ],
-    { cwd: repoRoot, encoding: "utf8" },
-  );
-}
-
 // Payloads del backend consumidos de forma dinámica en el arnés E2E.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function expectStatus(response: APIResponse, status: number): Promise<any> {
@@ -342,62 +315,34 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
       );
     });
 
-    await test.step("Storefront: borrador home con hero + featured, layout y publicación", async () => {
-      archiveStaleStorefrontDrafts();
-      const draft = await expectStatus(
-        await admin.get("/api/v1/storefront/pages/home/draft"),
-        200,
-      );
-      for (const section of draft.sections ?? []) {
-        await admin.delete(`/api/v1/storefront/sections/${section.id}`);
+    await test.step("Storefront plano: hero en carrusel + footer, en vivo al guardar", async () => {
+      // Limpieza idempotente: heros de corridas anteriores fuera.
+      const config = await expectStatus(await admin.get("/api/v1/storefront/config"), 200);
+      for (const hero of config.heros ?? []) {
+        await admin.delete(`/api/v1/storefront/heros/${hero.id}`);
       }
       await expectStatus(
-        await admin.post("/api/v1/storefront/pages/home/draft/sections", {
+        await admin.post("/api/v1/storefront/heros", {
           data: {
-            template_key: "storefront.hero",
+            template: "split",
+            title: heroTitle,
+            description: "Recién hecho todos los días.",
+            primary_cta: { label: "Pedir ahora", link_type: "menu_page" },
             sort_order: 10,
-            content_config: {
-              slides: [
-                {
-                  variant: "split",
-                  title: heroTitle,
-                  description: "Recién hecho todos los días.",
-                  primary_cta: { label: "Pedir ahora", link_type: "menu_page" },
-                },
-              ],
-            },
           },
         }),
         201,
       );
       await expectStatus(
-        await admin.post("/api/v1/storefront/pages/home/draft/sections", {
-          data: {
-            template_key: "storefront.catalog.featured_products",
-            sort_order: 20,
-            content_config: { title: "Los más pedidos" },
-          },
-        }),
-        201,
-      );
-      await expectStatus(
-        await admin.put("/api/v1/storefront/layout", {
-          data: {
-            header_config: { nav_links: [{ label: "Menú", link_type: "menu_page" }] },
-            footer_config: { note: "Hecho en casa RC" },
-          },
+        await admin.patch("/api/v1/storefront/footer", {
+          data: { template: "barra", note: "Hecho en casa RC" },
         }),
         200,
       );
-      await expectStatus(await admin.post("/api/v1/storefront/pages/home/publish"), 200);
-      const publicHome = await expectStatus(
-        await admin.get("/api/v1/public/storefront/home"),
-        200,
-      );
-      const hero = publicHome.sections.find(
-        (section: { template_key: string }) => section.template_key === "storefront.hero",
-      );
-      expect(hero.content.slides[0].title).toBe(heroTitle);
+      // Sin publicar ni programar: guardar ES en vivo.
+      const site = await expectStatus(await admin.get("/api/v1/public/storefront/site"), 200);
+      expect(site.heros[0].title).toBe(heroTitle);
+      expect(site.footer.slogan).toBe("Hecho en casa RC");
     });
 
     await test.step("Cliente con +100 créditos y código de descuento", async () => {
@@ -520,19 +465,23 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
       await expect(page.getByRole("heading", { level: 1, name: heroTitle })).toBeVisible();
     });
 
-    await test.step("El producto con grupo requerido abre el configurador", async () => {
+    await test.step("El producto con grupo requerido se configura en su página de detalle", async () => {
       await page.goto("/menu");
       await expect(page.getByRole("heading", { name: "Menú" })).toBeVisible();
       const burgerCard = page.locator("article").filter({ hasText: burgerName });
-      await burgerCard.getByRole("button", { name: "Agregar" }).click();
-      const dialog = page.getByRole("dialog", { name: burgerName });
-      await expect(dialog).toBeVisible();
-      await dialog.getByRole("radio", { name: "Media" }).check();
-      await dialog.getByRole("button", { name: /Agregar al carrito/ }).click();
-      await expect(dialog).toBeHidden();
+      // Con grupo requerido, «Agregar» es un ENLACE a la página de detalle (1b);
+      // el configurador en diálogo hoy solo edita líneas ya en el carrito.
+      await burgerCard.getByRole("link", { name: `Agregar ${burgerName}` }).click();
+      await page.waitForURL(/\/menu\/[0-9a-f-]{36}$/);
+      await expect(page.getByRole("heading", { level: 1, name: burgerName })).toBeVisible();
+      await page.getByRole("radio", { name: "Media" }).check();
+      await page.getByRole("button", { name: /Agregar al carrito/ }).click();
+      // Agregar desde el detalle redirige al carrito.
+      await page.waitForURL(/\/carrito$/);
     });
 
-    await test.step("El producto simple se agrega directo", async () => {
+    await test.step("El producto simple se agrega directo desde el menú", async () => {
+      await page.goto("/menu");
       const waterCard = page.locator("article").filter({ hasText: waterName });
       await waterCard.getByRole("button", { name: "Agregar" }).click();
       await expect(page.getByRole("link", { name: /Carrito, 2 productos/ })).toBeVisible();
@@ -545,7 +494,7 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
       await expect(lines).toHaveCount(2);
       await expect(lines.filter({ hasText: burgerName })).toContainText("Media");
       await expect(lines.filter({ hasText: waterName })).toBeVisible();
-      await page.getByRole("link", { name: "Continuar" }).click();
+      await page.getByRole("link", { name: /Finalizar pedido/ }).click();
     });
 
     await test.step("Checkout exige sesión y el carrito sobrevive al login", async () => {
@@ -561,7 +510,7 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
 
     await test.step("Aplicar RCPROMO muestra el descuento de $50", async () => {
       await expect(
-        page.getByRole("button", { name: "Recoger en tienda", pressed: true }),
+        page.getByRole("button", { name: "Recoger", pressed: true }),
       ).toBeVisible();
       await page.getByLabel("Teléfono").fill("5550001111");
       await page.getByLabel("¿Tienes un código de descuento?").fill(discountCode);
@@ -570,11 +519,12 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
       await expect(page.getByText(/descuento de\s*\$\s*50/)).toBeVisible();
     });
 
-    await test.step("Enviar pedido pickup redirige al seguimiento con el descuento", async () => {
-      await page.getByRole("button", { name: /Enviar pedido/ }).click();
+    await test.step("Confirmar pedido pickup redirige al seguimiento con el descuento", async () => {
+      await page.getByRole("button", { name: /Confirmar pedido/ }).click();
       await page.waitForURL(/\/pedidos\/[0-9a-f-]{36}$/);
       orderAId = page.url().split("/pedidos/")[1];
-      await expect(page.getByRole("heading", { name: /Pedido / })).toBeVisible();
+      // El seguimiento muestra el folio como h1 y el estado público inicial.
+      await expect(page.getByText("Pedido", { exact: true })).toBeVisible();
       await expect(page.getByText("Pedido recibido")).toBeVisible();
       // Línea de descuento visible (signo menos Unicode U+2212).
       await expect(page.getByText(/−\s*\$\s*50/)).toBeVisible();
@@ -598,32 +548,46 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
     await loginContext(cocinaContext, cocinaEmail, cocinaPassword);
     cocinaPage = await cocinaContext.newPage();
 
-    const cajeroCard = cajeroPage.getByRole("listitem").filter({ hasText: orderACode });
-    const cocinaCard = cocinaPage.getByRole("listitem").filter({ hasText: orderACode });
+    // Las acciones viven en el DETALLE del pedido (panel derecho), no en la
+    // tarjeta de la lista: se selecciona la tarjeta y se opera en el detalle.
+    // El chip «Todos» garantiza ver el pedido aunque ya no esté «activo».
+    async function openDetail(page: Page) {
+      await page.goto("/panel/pedidos");
+      await expect(page.getByRole("heading", { name: "Pedidos" })).toBeVisible();
+      await page.getByRole("button", { name: /^Todos/ }).click();
+      const card = page.getByRole("listitem").filter({ hasText: orderACode });
+      await expect(card.first()).toBeVisible();
+      await card.first().getByRole("button").click();
+      const detail = page.getByRole("region", { name: `Detalle del pedido ${orderACode}` });
+      await expect(detail).toBeVisible();
+      return { card: card.first(), detail };
+    }
 
-    await test.step("Cajero: Tomar y Aprobar", async () => {
-      await cajeroPage.goto("/panel/pedidos");
-      await expect(cajeroPage.getByRole("heading", { name: "Pedidos" })).toBeVisible();
-      await expect(cajeroCard).toContainText("Nuevo");
-      await cajeroCard.getByRole("button", { name: "Tomar" }).click();
-      await expect(cajeroCard).toContainText("Por aprobar");
-      await cajeroCard.getByRole("button", { name: "Aprobar" }).click();
-      await expect(cajeroCard).toContainText("Aprobado");
+    await test.step("Cajero: Revisar pedido y Aprobar pedido", async () => {
+      const { card, detail } = await openDetail(cajeroPage);
+      await expect(card).toContainText(/Nuevo/i);
+      await detail.getByRole("button", { name: "Revisar pedido" }).click();
+      await expect(card).toContainText(/Por aprobar/i);
+      await detail.getByRole("button", { name: "Aprobar pedido" }).click();
+      const dialog = cajeroPage.getByRole("dialog", { name: `Aprobar pedido ${orderACode}` });
+      await expect(dialog).toBeVisible();
+      await dialog.getByTestId("approve-confirm").click();
+      await expect(dialog).toBeHidden();
+      await expect(card).toContainText(/Aprobado/i);
     });
 
-    await test.step("Cocina: A cocina y Listo", async () => {
-      await cocinaPage.goto("/panel/pedidos");
-      await expect(cocinaPage.getByRole("heading", { name: "Pedidos" })).toBeVisible();
-      await cocinaCard.getByRole("button", { name: "A cocina" }).click();
-      await expect(cocinaCard).toContainText("En preparación");
-      await cocinaCard.getByRole("button", { name: "Listo" }).click();
-      await expect(cocinaCard).toContainText(/Listo/);
+    await test.step("Cocina: En preparación y Listo", async () => {
+      const { card, detail } = await openDetail(cocinaPage);
+      await detail.getByRole("button", { name: "En preparación" }).click();
+      await expect(card).toContainText(/En preparación/i);
+      await detail.getByRole("button", { name: "Listo" }).click();
+      await expect(card).toContainText(/Listo/i);
     });
 
     await test.step("Cajero: Entregado (pickup) y el cliente lo ve Entregado", async () => {
-      await cajeroPage.goto("/panel/pedidos");
-      await cajeroCard.getByRole("button", { name: "Entregado" }).click();
-      await expect(cajeroCard).toContainText("Entregado");
+      const { card, detail } = await openDetail(cajeroPage);
+      await detail.getByRole("button", { name: "Entregado" }).click();
+      await expect(card).toContainText(/Entregado/i);
 
       await customerPage.goto(`/pedidos/${orderAId}`);
       await expect(customerPage.getByText("Entregado")).toBeVisible();
@@ -708,10 +672,10 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
 
       await page.goto("/creditos");
       await expect(page.getByRole("heading", { name: "Mis créditos" })).toBeVisible();
-      const availableCard = page
-        .locator(".sf-card")
-        .filter({ hasText: "Disponibles" });
-      await expect(availableCard).toHaveText(new RegExp(`^\\s*${expected}\\s*Disponibles\\s*$`));
+      // El saldo vive en la tarjeta de héroe de créditos: etiqueta + número grande.
+      const hero = page.locator(".sf-credits-hero");
+      await expect(hero.getByText("Créditos disponibles")).toBeVisible();
+      await expect(hero.locator(".sf-display")).toHaveText(String(expected));
     });
 
     await test.step("Mezcla money+credits → 422 modo_compra_mixto", async () => {
@@ -798,20 +762,23 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
       await page.getByRole("button", { name: "Ponerme disponible" }).click();
       await expect(page.getByRole("button", { name: "Disponible", pressed: true })).toBeVisible();
 
-      const queueItem = page
-        .locator("section", { has: page.getByRole("heading", { name: "Listos para salir" }) })
-        .locator("div")
-        .filter({ hasText: orderDCode });
-      await expect(queueItem.first()).toBeVisible();
-      await page.getByRole("button", { name: "Tomar" }).click();
-      await expect(page.getByText(`${orderDCode} · Asignada`)).toBeVisible();
+      // El envío listo aparece como tarjeta en la cola «Listos para salir».
+      const queueCard = page.locator("article").filter({ hasText: orderDCode });
+      await expect(queueCard.first()).toBeVisible();
+      await queueCard.first().getByRole("button", { name: /Tomar/ }).click();
+      // «Mi envío en curso» muestra el badge de estado ASIGNADA · POR SALIR.
+      await expect(page.getByText("ASIGNADA · POR SALIR")).toBeVisible();
+      await expect(page.locator("article").filter({ hasText: orderDCode }).first()).toBeVisible();
       await page.getByRole("button", { name: "Salir a entregar" }).click();
-      await expect(page.getByText(`${orderDCode} · En camino`)).toBeVisible();
+      await expect(page.getByText("EN CAMINO")).toBeVisible();
     });
 
     await test.step("La entrega en curso sobrevive a la recarga (endpoint real)", async () => {
       await repartidorPage.reload();
-      await expect(repartidorPage.getByText(`${orderDCode} · En camino`)).toBeVisible();
+      await expect(repartidorPage.getByText("EN CAMINO")).toBeVisible();
+      await expect(
+        repartidorPage.locator("article").filter({ hasText: orderDCode }).first(),
+      ).toBeVisible();
     });
 
     await test.step("Cobro en efectivo registrado y entrega completada", async () => {
@@ -825,10 +792,13 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
       );
       const page = repartidorPage;
       await page.getByPlaceholder("¿Quién recibió? (opcional)").fill("Cliente RC");
-      await page.getByRole("button", { name: "Marcar como entregado" }).click();
-      await expect(page.getByText(`${orderDCode} · En camino`)).toHaveCount(0);
-      await expect(page.getByText("Sin envíos en cola.")).toBeVisible();
-      await expect(page.getByText("entregas hoy")).toBeVisible();
+      await page.getByRole("button", { name: "Marcar entregado" }).click();
+      await expect(page.getByText("EN CAMINO")).toHaveCount(0);
+      await expect(
+        page.getByText("No tienes un envío en curso. Toma uno de la lista."),
+      ).toBeVisible();
+      // Resumen del día: la entrega recién completada cuenta en «Hoy».
+      await expect(page.getByText(/Hoy:/)).toBeVisible();
 
       const order = await expectStatus(await admin.get(`/api/v1/orders/${orderDId}`), 200);
       expect(order.status).toBe("completed");
@@ -837,7 +807,9 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
     await test.step("Cajero ve la cola de entregas vacía", async () => {
       await cajeroPage.goto("/panel/entregas");
       await expect(cajeroPage.getByRole("heading", { name: "Entregas" })).toBeVisible();
-      await expect(cajeroPage.getByText("Sin envíos esperando repartidor.")).toBeVisible();
+      await expect(
+        cajeroPage.getByText("Los pedidos aparecen aquí cuando cocina los marca como «Listo»."),
+      ).toBeVisible();
     });
   });
 
@@ -927,12 +899,21 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
     });
 
     await test.step("UI cajero: pagado y Aprobado; cancelar exige resolución (H5)", async () => {
+      // Las acciones viven en el detalle: se selecciona la tarjeta y se cancela
+      // desde el panel derecho (la tarjeta ya no lleva botones de transición).
       await cajeroPage.goto("/panel/pedidos");
+      await cajeroPage.getByRole("button", { name: /^Todos/ }).click();
       const card = cajeroPage.getByRole("listitem").filter({ hasText: orderECaptureCode });
-      await expect(card).toContainText("Pago: paid");
-      await expect(card).toContainText("Aprobado");
+      await expect(card.first()).toBeVisible();
+      await card.first().getByRole("button").click();
+      const detail = cajeroPage.getByRole("region", {
+        name: `Detalle del pedido ${orderECaptureCode}`,
+      });
+      await expect(detail).toBeVisible();
+      await expect(detail).toContainText(/Pagado/i);
+      await expect(detail).toContainText(/Aprobado/i);
 
-      await card.getByRole("button", { name: "Cancelar", exact: true }).click();
+      await detail.getByRole("button", { name: /Cancelar/ }).click();
       const dialog = cajeroPage.getByRole("dialog", {
         name: `Cancelar pedido ${orderECaptureCode}`,
       });
@@ -944,9 +925,8 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
       await dialog.getByRole("button", { name: "Cancelar pedido" }).click();
       await expect(dialog).toBeHidden();
 
-      // El cancelado sale de "Activos"; en "Todos" aparece como Cancelado.
-      await cajeroPage.getByRole("button", { name: "Todos" }).click();
-      await expect(card).toContainText("Cancelado");
+      // El cancelado aparece como Cancelado en la tarjeta (seguimos en "Todos").
+      await expect(card.first()).toContainText(/Cancelado/i);
     });
 
     await test.step("El bloque «Cancelados con cobro» muestra el pedido", async () => {
@@ -963,7 +943,7 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
     });
   });
 
-  test("F. Storefront admin: editar hero, publicar, preview firmado y programación", async ({
+  test("F. Storefront admin: editar hero en vivo desde el editor plano", async ({
     browser,
   }) => {
     test.setTimeout(240_000);
@@ -972,80 +952,41 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
     adminPage = await adminContext.newPage();
     const page = adminPage;
 
-    await test.step("Cambiar el título del hero, guardar y publicar", async () => {
+    await test.step("Cambiar el título del hero y guardar (en vivo, sin publicar)", async () => {
       await page.goto("/admin/storefront");
-      await expect(page.getByRole("heading", { name: "Sitio público" })).toBeVisible();
-      await page.getByRole("button", { name: "Hero de portada (con rotación)" }).click();
-      // El formulario se genera del JSON Schema del backend: el campo del
-      // título del slide se titula "Title" y contiene el valor publicado.
-      const titleInput = page.getByLabel("Title", { exact: true });
+      await expect(page.getByRole("heading", { name: "Editor del sitio" })).toBeVisible();
+      // Lista de heros: seleccionar el creado en la preparación.
+      await page.getByRole("button", { name: heroTitle }).click();
+      const titleInput = page
+        .locator(".sfe-field", { hasText: "Título" })
+        .first()
+        .locator("input");
       await expect(titleInput).toHaveValue(heroTitle);
       await titleInput.fill(heroTitleV2);
-      // El guardado y la publicación se sincronizan con sus respuestas HTTP:
-      // el estado busy de React no alcanza a deshabilitar el botón antes del
-      // siguiente click y publicaría el borrador sin el cambio.
       const [saveResponse] = await Promise.all([
         page.waitForResponse(
           (response) =>
-            response.url().includes("/api/v1/storefront/sections/") &&
+            response.url().includes("/api/v1/storefront/heros/") &&
             response.request().method() === "PUT",
         ),
-        page.getByRole("button", { name: "Guardar sección" }).click(),
+        page.getByRole("button", { name: "Guardar cambios" }).click(),
       ]);
       expect(saveResponse.ok()).toBeTruthy();
-      const [publishResponse] = await Promise.all([
-        page.waitForResponse(
-          (response) =>
-            response.url().includes("/api/v1/storefront/pages/home/publish") &&
-            response.request().method() === "POST",
-        ),
-        page.getByRole("button", { name: "Publicar ahora" }).click(),
-      ]);
-      expect(publishResponse.ok()).toBeTruthy();
       await expect(
-        page.getByText("Revisión publicada: el sitio ya la muestra."),
+        page.getByText("Hero guardado: el sitio ya lo muestra."),
       ).toBeVisible();
     });
 
-    await test.step("El sitio público refleja el nuevo hero", async () => {
+    await test.step("El sitio público refleja el nuevo hero al instante", async () => {
+      const site = await expectStatus(
+        await admin.get("/api/v1/public/storefront/site"),
+        200,
+      );
+      expect(site.heros[0].title).toBe(heroTitleV2);
       await customerPage.goto("/");
       await expect(
         customerPage.getByRole("heading", { level: 1, name: heroTitleV2 }),
       ).toBeVisible();
-    });
-
-    await test.step("Enlace de preview firmado accesible SIN sesión (JSON 200)", async () => {
-      await page.getByRole("button", { name: "Enlace de preview" }).click();
-      const codeElement = page.locator("code");
-      await expect(codeElement).toBeVisible();
-      const previewUrl = (await codeElement.textContent())!.trim();
-      expect(previewUrl).toContain("/api/v1/public/storefront/preview/");
-
-      const anonymous = await pwRequest.newContext();
-      const response = await anonymous.get(previewUrl);
-      expect(response.status()).toBe(200);
-      const payload = await response.json();
-      expect(payload.page_key).toBe("home");
-      expect(Array.isArray(payload.sections)).toBe(true);
-      await anonymous.dispose();
-    });
-
-    await test.step("Programar publicación (+10 min), ver Programada y cancelarla", async () => {
-      // Tras publicar, el editor recarga y auto-crea el borrador siguiente.
-      await expect(page.getByText(/Borrador · revisión #/)).toBeVisible();
-      const publishAt = new Date(Date.now() + 10 * 60_000).toISOString().slice(0, 16);
-      await page.getByLabel("Programar publicación").fill(publishAt);
-      await page.getByRole("button", { name: "Programar", exact: true }).click();
-      await expect(
-        page.getByText("Publicación programada: la ejecutará el servidor a la hora indicada."),
-      ).toBeVisible();
-      await expect(page.getByText(/Programada para /)).toBeVisible();
-
-      await page.getByRole("button", { name: "Cancelar prog." }).click();
-      await expect(page.getByText("Programación cancelada.", { exact: true })).toBeVisible();
-      await expect(page.getByText(/Programada para /)).toHaveCount(0);
-      // El borrador sigue ahí, sin programación (estado de borrador).
-      await expect(page.getByText(/Borrador · revisión #/)).toBeVisible();
     });
   });
 
@@ -1064,7 +1005,7 @@ test.describe.serial("Release Candidate: dominio de restaurante end-to-end", () 
 
     await test.step("Cliente en /admin: shell vacío sin módulos administrativos", async () => {
       await customerPage.goto("/admin");
-      await expect(customerPage.getByRole("link", { name: "Inicio" })).toBeVisible();
+      await expect(customerPage.getByRole("link", { name: "Resumen" })).toBeVisible();
       await expect(customerPage.getByRole("link", { name: "Usuarios" })).toHaveCount(0);
       await expect(customerPage.getByRole("link", { name: "Roles" })).toHaveCount(0);
     });

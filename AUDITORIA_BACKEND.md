@@ -1,5 +1,14 @@
 # Auditoría técnica del backend — dominio restaurante
 
+> **📌 DOCUMENTO HISTÓRICO (actualizado 2026-07-04).** Es la foto de la auditoría
+> del 2026-07-03 y se conserva como REGISTRO, no como lista de pendientes
+> vigente. Los diez hallazgos H1–H10 están **cerrados**: H1–H9 corregidos y
+> validados (§10) y H10 resuelto por la regla de auto-completar la venta de
+> mostrador al verificar el pago (`api/v1/payments.py::verify_payment`). La
+> fuente de verdad del estado actual es el código y la suite de tests, no este
+> documento. Para el trabajo en curso, ver `docs/plan-admin-gaps.md` y
+> `GOALS.md`.
+
 **Fecha:** 2026-07-03 · **Alcance:** revisión estática (sin ejecutar nada) de las etapas 0–9 implementadas sobre platform-core · **Fuente de verdad:** el código, las migraciones y las reglas hoy presentes en `backend/` — no lo planeado en documentos.
 
 Clasificación usada en cada hallazgo:
@@ -24,7 +33,7 @@ La base es sólida: invariantes críticas están en la base de datos (no solo en
 | H7 | Media | Mezcla naive/aware en `utc_now()` vs columnas `timestamptz` (depende del TZ de la conexión) | **Corregido**: sesión PG fijada a UTC en `connect_args` (§10) |
 | H8 | Media | Sanitización de SVG por regex es evadible → vector XSS almacenado vía `/public/files` | **Mitigado**: favicon sin SVG (backend) + verificación MIME (frontend) (§10) |
 | H9 | Baja | `collection_instruction` etiqueta «efectivo» a cualquier pago pendiente | **Corregido**: «cobrar efectivo» solo con método de cobro real (§10) |
-| H10 | Baja | Venta POS con transferencia queda `approved` para siempre si nadie la completa tras verificar | Abierto — decisión de producto pendiente |
+| H10 | Baja | Venta POS con transferencia queda `approved` para siempre si nadie la completa tras verificar | **Corregido**: la venta de mostrador aprobada y pagada se auto-completa al verificar el pago (`verify_payment`; test `test_pos_transfer_stays_pending_verification` + escenario E del RC) |
 
 ---
 

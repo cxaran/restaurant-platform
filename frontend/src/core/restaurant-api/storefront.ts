@@ -1,33 +1,35 @@
 import "server-only";
 
-import { ApiRequestError } from "@/core/api/api-error";
 import { serverApi } from "@/core/api/server-client";
 import {
-  toStorefrontPageVM,
-  type PublicStorefrontPage,
-  type StorefrontPageVM,
+  toHighlightVM,
+  toSiteVM,
+  type HighlightVM,
+  type PublicHighlight,
+  type PublicStorefrontSite,
+  type SiteVM,
 } from "./view-models";
 
-export type StorefrontPageResult =
-  | { status: "published"; page: StorefrontPageVM }
-  | { status: "not_published" }
-  | { status: "maintenance"; message: string };
-
-/** Página pública publicada; el backend ya resolvió visibilidad y bindings.
- * El payload está TIPADO en OpenAPI (PublicStorefrontPage): sin parseo defensivo. */
-export async function getPublicStorefrontPage(pageKey: string): Promise<StorefrontPageResult> {
+/** Contenido configurable del sitio en UNA llamada (meta, tema, carrusel,
+ * heros y footer). Cualquier fallo degrada a null: la portada nunca revienta
+ * por el contenido editable. */
+export async function getPublicStorefrontSite(): Promise<SiteVM | null> {
   try {
-    const raw = await serverApi<PublicStorefrontPage>(
-      `/api/v1/public/storefront/${encodeURIComponent(pageKey)}`,
+    const raw = await serverApi<PublicStorefrontSite>("/api/v1/public/storefront/site");
+    return toSiteVM(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Destacados ACTIVOS de una superficie (el backend ya filtró ventana/orden). */
+export async function getPublicHighlights(surface: string): Promise<HighlightVM[]> {
+  try {
+    const raw = await serverApi<PublicHighlight[]>(
+      `/api/v1/public/storefront/highlights?surface=${encodeURIComponent(surface)}`,
     );
-    return { status: "published", page: toStorefrontPageVM(raw) };
-  } catch (error) {
-    if (error instanceof ApiRequestError) {
-      if (error.status === 503) {
-        return { status: "maintenance", message: error.body.message };
-      }
-      if (error.status === 404) return { status: "not_published" };
-    }
-    throw error;
+    return raw.map(toHighlightVM);
+  } catch {
+    return [];
   }
 }

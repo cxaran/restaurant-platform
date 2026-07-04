@@ -3,9 +3,11 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { CuentaLogoutButton } from "@/components/storefront/CuentaLogoutButton";
+import { HighlightBanner } from "@/components/storefront/Highlights";
 import { AddressBook } from "./AddressBook";
 import { serverApi } from "@/core/api/server-client";
 import { getSession } from "@/core/auth/session";
+import { getPublicHighlights } from "@/core/restaurant-api/storefront";
 import type {
   CreditMovementRead,
   CreditTotalsRead,
@@ -62,7 +64,7 @@ export default async function CuentaPage() {
   }
 
   const cookieHeader = (await cookies()).toString();
-  const [profile, orders, addresses, credits, movements] = await Promise.all([
+  const [profile, orders, addresses, credits, movements, highlights] = await Promise.all([
     fetchOrNull(
       serverApi<CustomerProfileSelfRead>("/api/v1/profiles/me", { cookie: cookieHeader }),
     ),
@@ -78,6 +80,7 @@ export default async function CuentaPage() {
         cookie: cookieHeader,
       }),
     ),
+    getPublicHighlights("account"),
   ]);
 
   const displayName =
@@ -88,6 +91,10 @@ export default async function CuentaPage() {
   return (
     <div className="sf-container" style={{ paddingBlock: 28, maxWidth: 720 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Aviso configurable de la cuenta (highlight `account`): slot fijo. */}
+        {highlights.length > 0 ? (
+          <HighlightBanner highlight={highlights[0]} variant="card" />
+        ) : null}
         {/* Banda de perfil (3a): avatar, nombre en display y acceso a edición. */}
         <section className="sf-band">
           <span className="sf-avatar sf-display" aria-hidden="true">{initial}</span>
@@ -99,8 +106,8 @@ export default async function CuentaPage() {
           </div>
           <Link
             className="sf-band-link"
-            href="/admin/account"
-            title="Cambiar correo o contraseña con el flujo seguro de la plataforma"
+            href="/cuenta/editar"
+            title="Editar tus datos, correo o contraseña"
           >
             Editar
           </Link>

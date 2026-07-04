@@ -14,6 +14,7 @@ import {
   formatOrderTime,
   statusTone,
 } from "../order-presentation";
+import { DeliveryEta } from "../DeliveryEta";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,13 @@ export default async function MyOrderDetailPage({
               ? " · El costo de envío está por confirmarse; el total puede cambiar."
               : ""}
           </div>
+          {/* Tiempo estimado / restante de entrega (solo delivery activo). */}
+          {isDelivery && order.status !== "completed" && order.status !== "cancelled" ? (
+            <DeliveryEta
+              estimatedDeliveryAt={order.estimated_delivery_at ?? null}
+              estimatedMinutes={order.shipping_estimated_minutes ?? null}
+            />
+          ) : null}
         </section>
 
         {/* Repartidor: el backend SOLO lo incluye en camino (privacidad §19.2). */}

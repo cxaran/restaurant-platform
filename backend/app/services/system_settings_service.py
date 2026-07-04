@@ -205,6 +205,8 @@ def apply_bootstrap_choices(
     public_registration_enabled: bool,
     institution_name: Optional[str],
     password_reset_enabled: bool = True,
+    customer_session_days: Optional[int] = None,
+    staff_session_minutes: Optional[int] = None,
 ) -> None:
     """Aplica al singleton las decisiones tomadas en el asistente de bootstrap."""
     row = get_system_settings(session, for_update=True)
@@ -212,4 +214,24 @@ def apply_bootstrap_choices(
     row.password_reset_enabled = password_reset_enabled
     if institution_name:
         row.institution_name = institution_name.strip()
+    if customer_session_days is not None:
+        row.customer_session_days = customer_session_days
+    if staff_session_minutes is not None:
+        row.staff_session_minutes = staff_session_minutes
     session.add(row)
+
+
+def customer_session_days_effective(session: Session) -> int:
+    """Días de sesión del cliente: política en BD o default del despliegue."""
+    return (
+        get_system_settings(session).customer_session_days
+        or settings.customer_session_expire_days
+    )
+
+
+def staff_session_minutes_effective(session: Session) -> int:
+    """Minutos de sesión del personal: política en BD o default del despliegue."""
+    return (
+        get_system_settings(session).staff_session_minutes
+        or settings.access_token_expire_minutes
+    )

@@ -165,6 +165,8 @@ class OrderShippingRead(ApiReadSchema):
     estimated_amount: Optional[Decimal] = None
     final_amount: Optional[Decimal] = None
     is_free_shipping: bool
+    # Tiempo estimado de entrega (min) congelado de la tarifa; NULL = no mostrar.
+    estimated_minutes: Optional[int] = None
 
 
 class OrderDeliveryRead(ApiReadSchema):
@@ -193,6 +195,22 @@ class OrderVisibleNoteRead(ApiReadSchema):
     changed_at: datetime
 
 
+class OrderStatusHistoryRead(ApiReadSchema):
+    """Bitácora INTERNA completa de una transición (§15.4): la ve el equipo en
+    el detalle del panel (quién aprobó/preparó/completó, motivo de cancelación,
+    notas por transición). Incluye la nota interna — jamás sale a la vista del
+    cliente, que sólo recibe ``visible_notes``. ``changed_by_name`` se resuelve
+    en el endpoint (join a ``User``)."""
+
+    previous_status: Optional[str] = None
+    new_status: str
+    reason_code: Optional[str] = None
+    internal_note: Optional[str] = None
+    customer_visible_note: Optional[str] = None
+    changed_by_name: Optional[str] = None
+    changed_at: datetime
+
+
 class OrderRead(ApiReadSchema):
     """Vista interna completa (panel)."""
 
@@ -217,6 +235,12 @@ class OrderRead(ApiReadSchema):
     internal_note: Optional[str] = None
     cancellation_money_resolution: Optional[str] = None
     cancellation_resolution_note: Optional[str] = None
+    # Marcas finales del ciclo (§16): quién y cuándo aprobó/completó/canceló.
+    # ``approved_by_name`` se resuelve en el endpoint (join a ``User``).
+    approved_at: Optional[datetime] = None
+    approved_by_name: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
     created_by: Optional[UUID] = None
     created_at: datetime
     lines: list[OrderLineRead] = Field(default_factory=list)
@@ -224,6 +248,8 @@ class OrderRead(ApiReadSchema):
     shipping: Optional[OrderShippingRead] = None
     delivery: Optional[OrderDeliveryRead] = None
     visible_notes: list[OrderVisibleNoteRead] = Field(default_factory=list)
+    # Línea de tiempo interna completa (§15.4): el detalle del panel la pinta.
+    status_history: list[OrderStatusHistoryRead] = Field(default_factory=list)
 
 
 class OrderListItem(ApiReadSchema):
@@ -236,7 +262,16 @@ class OrderListItem(ApiReadSchema):
     payment_status: str
     customer_name_snapshot: Optional[str] = None
     items_subtotal_amount: Decimal
+    shipping_total_amount: Optional[Decimal] = None
     total_money_amount: Optional[Decimal] = None
+    # Datos finales para el explorador de pedidos (§16), resueltos en el
+    # endpoint: aprobador (join a ``User``) y método de pago (snapshot del primer
+    # pago ``paid``). La lista se mantiene LIGERA — sin líneas ni bitácora.
+    approved_at: Optional[datetime] = None
+    approved_by_name: Optional[str] = None
+    payment_method_label: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
     created_at: datetime
 
 
@@ -269,6 +304,12 @@ class MyOrderRead(ApiReadSchema):
     discount_code_label: Optional[str] = None
     shipping_amount: Optional[Decimal] = None
     shipping_pending_review: bool
+    # Tiempo estimado de entrega (min) de la tarifa, snapshot; NULL = no mostrar.
+    shipping_estimated_minutes: Optional[int] = None
+    # Hora estimada de entrega = approved_at + estimated_minutes; el cliente
+    # deriva el «tiempo restante». NULL antes de aprobar, sin tiempo, en pickup
+    # o en estados terminales (completed/cancelled).
+    estimated_delivery_at: Optional[datetime] = None
     total_money_amount: Optional[Decimal] = None
     credits_earned_total_snapshot: int
     credits_redeemed_total: int

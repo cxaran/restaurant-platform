@@ -124,9 +124,12 @@ orders (state machine in `ORDER_TRANSITIONS`, immutable snapshots, frozen totals
 approval), payments (methods with `requires_manual_verification`/`allows_cash_change`,
 verification ≠ fulfillment), deliveries (courier self-assign, `GET /courier/deliveries/mine`),
 finances (per-line refunds with accumulated caps), credits (immutable ledger, balance =
-SUM(delta), reserve→consume/release), storefront (versioned revisions draft→published→archived,
-template registry with JSON Schemas, scheduled publish via Taskiq), profiles
-(customer/staff, `can_deliver`), discount codes (fixed-amount, web-only).
+SUM(delta), reserve→consume/release), storefront (FLAT config, no versioning: the home
+page is a FIXED composition hero-carousel → highlight strip → live menu → footer; tables
+`storefront_settings`/`storefront_heros`/`storefront_highlights`/`storefront_footer`,
+Pydantic contracts in `app/storefront/templates.py`, saving publishes instantly — the only
+gate is `is_active`; public payload at `GET /public/storefront/site` + `/highlights?surface=`),
+profiles (customer/staff, `can_deliver`), discount codes (fixed-amount, web-only).
 
 Non-negotiable domain invariants (enforced backend + DB, never frontend-only):
 

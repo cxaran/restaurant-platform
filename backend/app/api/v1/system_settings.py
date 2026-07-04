@@ -54,6 +54,14 @@ def _serialize_read(session: SessionDep, row: SystemSettings) -> SystemSettingsR
         google_auth_client_id=row.google_auth_client_id,
         google_auth_client_secret_configured=row.google_auth_client_secret_ciphertext is not None,
         password_reset_enabled=row.password_reset_enabled,
+        customer_session_days=row.customer_session_days,
+        staff_session_minutes=row.staff_session_minutes,
+        customer_session_days_effective=(
+            row.customer_session_days or settings.customer_session_expire_days
+        ),
+        staff_session_minutes_effective=(
+            row.staff_session_minutes or settings.access_token_expire_minutes
+        ),
         email_mode=row.email_mode,
         email_from_address=row.email_from_address,
         email_from_name=row.email_from_name,

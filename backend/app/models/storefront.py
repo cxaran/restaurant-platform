@@ -1,10 +1,10 @@
-"""Storefront: composición visual versionada del sitio público (§29–§57).
+"""Storefront plano: heros, destacados, footer y tema — edición directa.
 
-El administrador configura contenido/orden/estilos permitidos; NUNCA HTML/CSS/
-JS libre (§24 del módulo): cada sección referencia una plantilla REGISTRADA EN
-CÓDIGO (``app/storefront/templates``) y sus configs JSONB se validan contra el
-contrato de esa plantilla. El sitio público sólo carga revisiones PUBLICADAS;
-los borradores jamás se exponen (§47).
+Sin revisiones ni ciclo draft→published: guardar es publicar y el único gate
+es ``is_active``. La portada del sitio es una composición FIJA en código
+(hero(s) → franja destacada → menú → footer); aquí vive solo el CONTENIDO
+configurable. Los contratos de validación (Pydantic ``extra="forbid"``) están
+en ``app/storefront/templates.py`` — el administrador jamás escribe HTML/CSS.
 """
 
 import uuid
@@ -15,6 +15,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -25,12 +26,27 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
 
-REVISION_STATUSES = ("draft", "scheduled", "published", "archived")
 SINGLETON_ID = 1
+
+HERO_TEMPLATES = ("split", "background", "card", "showcase", "minimal")
+HERO_HEIGHTS = ("compact", "regular", "tall")
+HERO_ALIGNMENTS = ("left", "center")
+HERO_OVERLAYS = ("none", "soft", "strong")
+HERO_IMAGE_POSITIONS = ("left", "right")
+HERO_BUTTON_VARIANTS = ("solid", "outline")
+HERO_TRANSITIONS = ("slide", "fade")
+SECTION_COLOR_SCHEMES = ("surface", "surface_muted", "brand", "brand_inverse", "dark")
+
+HIGHLIGHT_SURFACES = ("global", "home", "login", "register", "cart", "checkout", "account")
+HIGHLIGHT_ANIMATIONS = ("none", "fade_in", "slide_down", "rise", "pulse", "shimmer", "marquee")
+HIGHLIGHT_SCHEMES = ("brand", "soft", "accent")
+
+FOOTER_TEMPLATES = ("barra", "columnas", "centrado")
+FOOTER_SCHEMES = ("dark", "soft", "brand")
 
 
 def _in_clause(column: str, values: tuple[str, ...]) -> str:
@@ -39,28 +55,28 @@ def _in_clause(column: str, values: tuple[str, ...]) -> str:
 
 
 class StorefrontSettings(Base):
-    """Singleton (§45): tema/layout activos + metadatos globales del sitio (§45.1)."""
+    """Singleton: metadatos del sitio, tema (preset + acento) y carrusel."""
 
     __tablename__ = "storefront_settings"
-    __table_args__ = (CheckConstraint("id = 1", name="storefront_settings_singleton"),)
+    __table_args__ = (
+        CheckConstraint("id = 1", name="storefront_settings_singleton"),
+        CheckConstraint(
+            "hero_interval_seconds BETWEEN 4 AND 12",
+            name="storefront_settings_hero_interval",
+        ),
+        CheckConstraint(
+            _in_clause("hero_transition", HERO_TRANSITIONS),
+            name="storefront_settings_hero_transition",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, default=SINGLETON_ID)
-    active_theme_revision_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("storefront_theme_revisions.id", ondelete="RESTRICT"),
-        nullable=True,
-    )
-    active_layout_revision_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("storefront_layout_revisions.id", ondelete="RESTRICT"),
-        nullable=True,
-    )
     storefront_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     maintenance_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     site_title: Mapped[Optional[str]] = mapped_column(
         String(120),
         nullable=True,
-        comment="Título del sitio; si falta se usa business_profile.trade_name (§45.1).",
+        comment="Título del sitio; si falta se usa business_profile.trade_name.",
     )
     site_description: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     favicon_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -69,6 +85,20 @@ class StorefrontSettings(Base):
     social_image_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("stored_files.id", ondelete="RESTRICT"), nullable=True
     )
+    # Tema: preset neutro + acento opcional; los tokens se derivan al servir
+    # (app/storefront/presets.py), jamás CSS libre almacenado.
+    theme_preset: Mapped[str] = mapped_column(String(40), nullable=False, default="calido")
+    theme_accent: Mapped[Optional[str]] = mapped_column(
+        String(7), nullable=True, comment="Hex #RRGGBB; None = acento del preset."
+    )
+    # Comportamiento del carrusel de heros (global, no por hero).
+    hero_autoplay: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    hero_interval_seconds: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=6
+    )
+    hero_transition: Mapped[str] = mapped_column(String(10), nullable=False, default="slide")
+    hero_show_arrows: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    hero_show_dots: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -77,234 +107,72 @@ class StorefrontSettings(Base):
     )
 
 
-class StorefrontThemeRevision(Base):
-    """Tokens de tema versionados (§39): presets NEUTROS, jamás CSS libre."""
+class StorefrontHero(Base):
+    """Un hero de portada; los activos rotan en carrusel por ``sort_order``.
 
-    __tablename__ = "storefront_theme_revisions"
+    ``template`` decide el renderer (split/background/card/showcase/minimal);
+    los CTAs son JSON validado contra el contrato ``Cta`` (enlaces controlados)
+    y ``product_id`` vincula el showcase a un producto REAL del catálogo —
+    precio y disponibilidad se resuelven al servir, nunca texto manual.
+    """
+
+    __tablename__ = "storefront_heros"
     __table_args__ = (
+        CheckConstraint(_in_clause("template", HERO_TEMPLATES), name="storefront_heros_template"),
+        CheckConstraint(_in_clause("height", HERO_HEIGHTS), name="storefront_heros_height"),
         CheckConstraint(
-            _in_clause("status", REVISION_STATUSES), name="storefront_theme_revisions_status"
+            _in_clause("alignment", HERO_ALIGNMENTS), name="storefront_heros_alignment"
         ),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default="draft")
-    theme_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    tokens_json: Mapped[dict] = mapped_column(JSON, nullable=False)
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="RESTRICT"), nullable=True
-    )
-    published_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="RESTRICT"), nullable=True
-    )
-    published_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-
-class StorefrontLayoutRevision(Base):
-    """Header/footer versionados (§44) sobre plantillas fijas."""
-
-    __tablename__ = "storefront_layout_revisions"
-    __table_args__ = (
         CheckConstraint(
-            _in_clause("status", REVISION_STATUSES), name="storefront_layout_revisions_status"
+            _in_clause("color_scheme", SECTION_COLOR_SCHEMES),
+            name="storefront_heros_color_scheme",
         ),
+        CheckConstraint(
+            _in_clause("button_variant", HERO_BUTTON_VARIANTS),
+            name="storefront_heros_button_variant",
+        ),
+        CheckConstraint(_in_clause("overlay", HERO_OVERLAYS), name="storefront_heros_overlay"),
+        CheckConstraint(
+            _in_clause("image_position", HERO_IMAGE_POSITIONS),
+            name="storefront_heros_image_position",
+        ),
+        Index("ix_storefront_heros_active_order", "is_active", "sort_order"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default="draft")
-    header_template_key: Mapped[str] = mapped_column(String(120), nullable=False)
-    header_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    footer_template_key: Mapped[str] = mapped_column(String(120), nullable=False)
-    footer_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="RESTRICT"), nullable=True
-    )
-    published_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="RESTRICT"), nullable=True
-    )
-    published_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-
-class StorefrontPage(Base):
-    """Página lógica estable (§41); las de sistema no se eliminan."""
-
-    __tablename__ = "storefront_pages"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    page_key: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
-    slug: Mapped[str] = mapped_column(String(180), nullable=False, unique=True)
-    page_type: Mapped[str] = mapped_column(String(40), nullable=False)
-    is_system_page: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    published_revision_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-    revisions: Mapped[list["StorefrontPageRevision"]] = relationship(
-        back_populates="page", cascade="all, delete-orphan"
-    )
-
-
-class StorefrontPageRevision(Base):
-    """Borradores y versiones publicadas de una página (§41)."""
-
-    __tablename__ = "storefront_page_revisions"
-    __table_args__ = (
-        CheckConstraint(
-            _in_clause("status", REVISION_STATUSES), name="storefront_page_revisions_status"
-        ),
-        Index("ix_storefront_page_revisions_page", "page_id", "revision_number"),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    page_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("storefront_pages.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default="draft")
-    page_title: Mapped[Optional[str]] = mapped_column(String(180), nullable=True)
-    meta_description: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
-    og_image_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("stored_files.id", ondelete="RESTRICT"), nullable=True
-    )
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="RESTRICT"), nullable=True
-    )
-    published_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="RESTRICT"), nullable=True
-    )
-    published_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    scheduled_publish_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    scheduled_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        comment="Cuándo se PROGRAMÓ (regla de supersesión §1.9: una publicación posterior la cancela).",
-    )
-    schedule_cancelled_reason: Mapped[Optional[str]] = mapped_column(
-        String(200),
-        nullable=True,
-        comment="Razón legible cuando la programación se canceló automáticamente.",
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-    page: Mapped["StorefrontPage"] = relationship(back_populates="revisions")
-    sections: Mapped[list["StorefrontPageSection"]] = relationship(
-        back_populates="revision", cascade="all, delete-orphan"
-    )
-
-
-class StorefrontPageSection(Base):
-    """Instancia de plantilla dentro de una revisión (§42)."""
-
-    __tablename__ = "storefront_page_sections"
-    __table_args__ = (
-        Index("ix_storefront_page_sections_revision", "page_revision_id", "sort_order"),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    page_revision_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("storefront_page_revisions.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    template_key: Mapped[str] = mapped_column(String(120), nullable=False)
-    template_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    section_name: Mapped[Optional[str]] = mapped_column(String(180), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    is_visible: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    visible_from: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    template: Mapped[str] = mapped_column(String(20), nullable=False, default="split")
+    eyebrow: Mapped[Optional[str]] = mapped_column(String(60), nullable=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    title_accent: Mapped[Optional[str]] = mapped_column(
+        String(60),
+        nullable=True,
+        comment="Fragmento del título resaltado en color de marca (subcadena exacta).",
     )
-    visible_until: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    description: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    primary_cta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    secondary_cta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    product_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("products.id", ondelete="SET NULL"), nullable=True
     )
-    content_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    style_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    data_binding_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    behavior_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-    revision: Mapped["StorefrontPageRevision"] = relationship(back_populates="sections")
-    media: Mapped[list["StorefrontSectionMedia"]] = relationship(
-        back_populates="section", cascade="all, delete-orphan"
-    )
-
-
-class StorefrontSectionMedia(Base):
-    """Imágenes por slot de la sección (§43): desktop/móvil + punto focal."""
-
-    __tablename__ = "storefront_section_media"
-    __table_args__ = (
-        Index("uq_storefront_section_media_slot", "section_id", "slot_key", unique=True),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    section_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("storefront_page_sections.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    slot_key: Mapped[str] = mapped_column(String(80), nullable=False)
     desktop_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("stored_files.id", ondelete="RESTRICT"), nullable=True
     )
     mobile_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("stored_files.id", ondelete="RESTRICT"), nullable=True
     )
-    alt_text: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    focal_point_x: Mapped[Optional[float]] = mapped_column(nullable=True)
-    focal_point_y: Mapped[Optional[float]] = mapped_column(nullable=True)
+    image_alt: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    focal_x: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    focal_y: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    height: Mapped[str] = mapped_column(String(10), nullable=False, default="regular")
+    alignment: Mapped[str] = mapped_column(String(10), nullable=False, default="left")
+    color_scheme: Mapped[str] = mapped_column(String(20), nullable=False, default="surface")
+    button_variant: Mapped[str] = mapped_column(String(10), nullable=False, default="solid")
+    overlay: Mapped[str] = mapped_column(String(10), nullable=False, default="soft")
+    image_position: Mapped[str] = mapped_column(String(10), nullable=False, default="right")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -312,4 +180,101 @@ class StorefrontSectionMedia(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    section: Mapped["StorefrontPageSection"] = relationship(back_populates="media")
+
+class StorefrontHighlight(Base):
+    """Texto destacable por superficie con slot de tamaño FIJO en el frontend.
+
+    El admin elige mensaje, animación (solo transform/opacity) y color de
+    token; el diseño decide espacio y posición — «visible pero sin robar
+    layout» es garantía estructural, no una promesa. Ventana temporal opcional
+    filtrada al servir (sin scheduler).
+    """
+
+    __tablename__ = "storefront_highlights"
+    __table_args__ = (
+        CheckConstraint(
+            _in_clause("surface", HIGHLIGHT_SURFACES), name="storefront_highlights_surface"
+        ),
+        CheckConstraint(
+            _in_clause("animation", HIGHLIGHT_ANIMATIONS),
+            name="storefront_highlights_animation",
+        ),
+        CheckConstraint(
+            _in_clause("color_scheme", HIGHLIGHT_SCHEMES),
+            name="storefront_highlights_color_scheme",
+        ),
+        Index("ix_storefront_highlights_surface", "surface", "is_active", "sort_order"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    surface: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    icon: Mapped[Optional[str]] = mapped_column(
+        String(16), nullable=True, comment="Emoji o badge corto opcional; nunca markup."
+    )
+    eyebrow: Mapped[Optional[str]] = mapped_column(
+        String(60),
+        nullable=True,
+        comment="Antetítulo corto (p. ej. «Únete al club») para superficies tipo tarjeta.",
+    )
+    title: Mapped[str] = mapped_column(String(140), nullable=False)
+    subtitle: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    cta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    animation: Mapped[str] = mapped_column(String(20), nullable=False, default="fade_in")
+    color_scheme: Mapped[str] = mapped_column(String(10), nullable=False, default="brand")
+    starts_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class StorefrontFooter(Base):
+    """Singleton del footer: plantilla + toggles + redes sociales.
+
+    El eslogan y los teléfonos viven en el perfil del negocio — aquí solo se
+    decide SI se muestran. Lo único propio son las redes (``social_links``:
+    lista {network, url https} validada por contrato) y la nota opcional.
+    """
+
+    __tablename__ = "storefront_footer"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="storefront_footer_singleton"),
+        CheckConstraint(
+            _in_clause("template", FOOTER_TEMPLATES), name="storefront_footer_template"
+        ),
+        CheckConstraint(
+            _in_clause("color_scheme", FOOTER_SCHEMES), name="storefront_footer_color_scheme"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, default=SINGLETON_ID)
+    template: Mapped[str] = mapped_column(String(12), nullable=False, default="barra")
+    show_slogan: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_phones: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_schedule: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_links: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        comment="Columnas de enlaces FIJOS del sitio (plantilla «columnas»).",
+    )
+    note: Mapped[Optional[str]] = mapped_column(
+        String(200), nullable=True, comment="Sustituye al eslogan del negocio si se define."
+    )
+    color_scheme: Mapped[str] = mapped_column(String(10), nullable=False, default="dark")
+    social_links: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

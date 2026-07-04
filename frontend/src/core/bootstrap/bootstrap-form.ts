@@ -35,6 +35,9 @@ export type BootstrapWizardDraft = {
   public_registration_enabled: boolean;
   password_reset_enabled: boolean;
   institution_name: string;
+  // Duración de sesión (texto para inputs numéricos; "" = default del despliegue).
+  customer_session_days: string;
+  staff_session_minutes: string;
 };
 
 export type WizardFieldErrors = Record<string, string[]>;
@@ -84,7 +87,15 @@ export function emptyBootstrapDraft(): BootstrapWizardDraft {
     public_registration_enabled: false,
     password_reset_enabled: true,
     institution_name: "",
+    customer_session_days: "",
+    staff_session_minutes: "",
   };
+}
+
+/** "" o no-numérico → null (default del despliegue); si no, el entero. */
+function parseOptionalInt(value: string): number | null {
+  const parsed = Number.parseInt(value.trim(), 10);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function buildBootstrapPayload(draft: BootstrapWizardDraft): BootstrapInitializeRequest {
@@ -111,6 +122,8 @@ export function buildBootstrapPayload(draft: BootstrapWizardDraft): BootstrapIni
     public_registration_enabled: draft.public_registration_enabled,
     password_reset_enabled: draft.password_reset_enabled,
     institution_name: draft.institution_name.trim() || null,
+    customer_session_days: parseOptionalInt(draft.customer_session_days),
+    staff_session_minutes: parseOptionalInt(draft.staff_session_minutes),
   };
 }
 

@@ -1,8 +1,9 @@
 "use client";
 
-// Detalle de una entrega propia: se busca dentro de /courier/deliveries/mine
-// (el backend ya filtra por el usuario autenticado). Si no aparece ahí, se
-// responde un mensaje 404-like sin revelar si la entrega existe para otro.
+// Detalle de una entrega propia con el lenguaje visual Tony-Tony (tt-card /
+// tt-btn / tt-badge): se busca dentro de /courier/deliveries/mine (el backend
+// ya filtra por el usuario autenticado). Si no aparece ahí, se responde un
+// mensaje 404-like sin revelar si la entrega existe para otro.
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -75,38 +76,66 @@ export function DeliveryDetail({ deliveryId }: Readonly<{ deliveryId: string }>)
   }
 
   if (state === "loading") {
-    return <p style={{ opacity: 0.7 }}>Cargando entrega…</p>;
+    return <p style={{ margin: 0, fontSize: 14, color: "var(--tx3)" }}>Cargando entrega…</p>;
   }
 
   if (state === "completed") {
     return (
-      <div style={{ border: "1px solid rgba(0,0,0,0.2)", borderRadius: 14, padding: "14px 16px" }}>
-        <p role="status" style={{ margin: "0 0 10px", fontWeight: 800 }}>
+      <div
+        className="tt-card"
+        style={{
+          border: "2px solid var(--ok)",
+          padding: "16px 18px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          alignItems: "flex-start",
+        }}
+      >
+        <span className="tt-badge tt-badge-ok">Entregado</span>
+        <p role="status" style={{ margin: 0, fontWeight: 800 }}>
           Entrega {delivery?.public_code} marcada como entregada.
         </p>
-        <Link href="/panel/reparto" style={{ fontWeight: 700 }}>Volver a mi cola de reparto</Link>
+        <Link href="/panel/reparto" className="tt-btn tt-btn-dark">
+          Volver a mi cola de reparto
+        </Link>
       </div>
     );
   }
 
   if (state === "not_mine" || !delivery) {
     return (
-      <div style={{ border: "1px solid rgba(0,0,0,0.2)", borderRadius: 14, padding: "14px 16px" }}>
+      <div
+        className="tt-card"
+        style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}
+      >
         {error ? (
-          <p role="alert" style={{ margin: "0 0 10px", color: "#b3261e", fontWeight: 700 }}>{error}</p>
+          <p role="alert" style={{ margin: 0, color: "var(--accent)", fontWeight: 800, fontSize: 13.5 }}>
+            {error}
+          </p>
         ) : (
-          <p style={{ margin: "0 0 10px", fontWeight: 700 }}>
+          <p style={{ margin: 0, fontWeight: 700, fontSize: 13.5, color: "var(--tx2)" }}>
             Esta entrega no está asignada a ti.
           </p>
         )}
-        <Link href="/panel/reparto" style={{ fontWeight: 700 }}>Ir a mi cola de reparto</Link>
+        <Link href="/panel/reparto" className="tt-btn tt-btn-ghost">
+          Ir a mi cola de reparto
+        </Link>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 560 }}>
-      {error ? <p role="alert" style={{ margin: 0, color: "#b3261e", fontWeight: 700 }}>{error}</p> : null}
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {error ? (
+        <p
+          role="alert"
+          className="tt-card"
+          style={{ margin: 0, padding: "10px 14px", color: "var(--accent)", fontWeight: 800, fontSize: 13 }}
+        >
+          {error}
+        </p>
+      ) : null}
       <ActiveDeliveryCard
         delivery={delivery}
         busy={busy}

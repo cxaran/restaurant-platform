@@ -3,6 +3,7 @@
 // Cliente del editor del storefront: envuelve los endpoints reales del
 // backend (nunca inventa contratos) sobre browserApi (cookie de sesión).
 
+import { ApiRequestError } from "@/core/api/api-error";
 import { browserApi } from "@/core/api/browser-client";
 import type { components } from "@/generated/openapi";
 import type { JsonSchema } from "./SchemaForm";
@@ -126,7 +127,17 @@ export const publishPage = (pageKey: string) =>
     method: "POST",
   });
 
+// Espejo del perfil "image" del backend (FILE_PROFILES, 5 MB): validar antes de
+// enviar evita que un proxy corte la subida con un error de red ilegible.
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
 export async function uploadImage(file: File): Promise<string> {
+  if (file.size > IMAGE_MAX_BYTES) {
+    throw new ApiRequestError(413, {
+      code: "archivo_demasiado_grande",
+      message: "La imagen supera el máximo de 5 MB; reduce su tamaño e intenta de nuevo.",
+    });
+  }
   const form = new FormData();
   form.append("file", file);
   form.append("kind", "image");

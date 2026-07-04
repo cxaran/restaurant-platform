@@ -102,11 +102,17 @@ class OrderTransitionRequest(ApiWriteSchema):
 
 
 class OrderShippingFinalizeRequest(ApiWriteSchema):
-    """Fija el envío: tarifa existente O monto manual con motivo (§17.2)."""
+    """Fija el envío (§17.2): tarifa existente O monto manual con motivo O
+    ubicación en mapa (el backend recotiza por polígono y fija el resultado).
+
+    ``location`` además PERSISTE el pin en la entrega (location_source
+    employee_selected); puede acompañar al monto manual cuando el punto queda
+    fuera de zona pero conviene guardar la ubicación de todos modos."""
 
     shipping_rate_rule_id: Optional[UUID] = None
     final_amount: Optional[Decimal] = Field(default=None, ge=0)
     reason: Optional[str] = None
+    location: Optional[GeoPoint] = None
 
 
 class OrderAdjustmentCreate(ApiWriteSchema):
@@ -177,6 +183,16 @@ class OrderDeliveryRead(ApiReadSchema):
     delivered_at: Optional[datetime] = None
 
 
+class OrderVisibleNoteRead(ApiReadSchema):
+    """Aclaración registrada en una transición (p. ej. al aprobar) y visible
+    fuera del equipo: la ven el cliente en su seguimiento y el repartidor en
+    su entrega, además del panel. La nota interna NUNCA sale por aquí."""
+
+    new_status: str
+    note: str
+    changed_at: datetime
+
+
 class OrderRead(ApiReadSchema):
     """Vista interna completa (panel)."""
 
@@ -207,6 +223,7 @@ class OrderRead(ApiReadSchema):
     adjustments: list[OrderAdjustmentRead] = Field(default_factory=list)
     shipping: Optional[OrderShippingRead] = None
     delivery: Optional[OrderDeliveryRead] = None
+    visible_notes: list[OrderVisibleNoteRead] = Field(default_factory=list)
 
 
 class OrderListItem(ApiReadSchema):
@@ -261,3 +278,5 @@ class MyOrderRead(ApiReadSchema):
     delivery: Optional[OrderDeliveryRead] = None
     # Visible SOLO con el pedido en camino y asignación vigente (§19.2).
     courier: Optional[PublicCourierInfo] = None
+    # Aclaraciones del restaurante hacia el cliente (§15.4: bitácora).
+    visible_notes: list[OrderVisibleNoteRead] = Field(default_factory=list)

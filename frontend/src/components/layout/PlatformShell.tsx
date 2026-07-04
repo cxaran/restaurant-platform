@@ -1,12 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { AccountMenu } from "@/components/layout/AccountMenu";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { AnimatedOrb } from "@/components/ui/AnimatedOrb";
+import { TTShell, type TTShellNavSection } from "@/components/layout/TTShell";
 import type {
   NavigationModule,
   ResourceCatalog as ResourceCatalogType,
@@ -28,7 +24,7 @@ function deriveTitle(
   catalog: ResourceCatalogType,
   modules: NavigationModule[],
 ): string {
-  if (pathname === "/admin") return "Inicio";
+  if (pathname === "/admin") return "Resumen";
   if (pathname.startsWith("/admin/account")) return "Mi cuenta";
   if (pathname.startsWith("/admin/backups")) return "Respaldos";
   if (pathname.startsWith("/admin/resources/")) {
@@ -42,27 +38,27 @@ function deriveTitle(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
   if (module_) return module_.label;
-  return "Restaurant Platform";
+  return "Administración";
 }
 
 /**
- * Cromo autenticado del producto: sidebar fija en escritorio (drawer en móvil vía las
- * clases .mc-sidebar de globals.css), header con el título derivado de la ruta y el
- * contenido con scroll propio. La navegación se deriva del CONTRATO del catálogo
- * (recursos + módulos especializados con sus href del backend, RBAC ya proyectado);
- * no hay rutas cableadas por rol ni URLs especializadas conocidas por el cliente.
+ * Cromo del administrador (pantallas 4a/5a/6a/1i): TTShell con la navegación
+ * derivada del CONTRATO del catálogo (recursos + módulos especializados con sus
+ * href del backend, RBAC ya proyectado); no hay rutas cableadas por rol ni URLs
+ * especializadas conocidas por el cliente.
  */
 export function PlatformShell({
   session,
   catalog,
+  brand = null,
   children,
 }: Readonly<{
   session: SessionUser;
   catalog: ResourceCatalogType;
+  brand?: { name: string; logoUrl: string | null } | null;
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const [navOpen, setNavOpen] = useState(false);
   // Módulos especializados de la sección admin, en el orden del backend.
   const adminModules = catalog.navigation_modules.filter(
     (module_) => module_.section === "admin",
@@ -77,106 +73,49 @@ export function PlatformShell({
     return true;
   });
 
+  const sections: TTShellNavSection[] = [
+    {
+      key: "main",
+      items: [
+        { key: "inicio", href: "/admin", label: "Resumen", active: pathname === "/admin" },
+        ...adminModules.map((module_) => ({
+          key: module_.name,
+          href: module_.href,
+          label: module_.label,
+          active: pathname === module_.href || pathname.startsWith(`${module_.href}/`),
+        })),
+      ],
+    },
+  ];
+  if (navItems.length > 0) {
+    sections.push({
+      key: "resources",
+      title: "Recursos",
+      items: navItems.map((resource) => {
+        const href = resourceHref(resource.name);
+        return {
+          key: resource.name,
+          href,
+          label: resource.label,
+          active: pathname === href || pathname.startsWith(`${href}/`),
+        };
+      }),
+    });
+  }
+
   return (
-    <div
-      className="flex h-dvh overflow-hidden bg-[var(--bg)] text-[var(--tx)]"
-      data-nav-open={navOpen ? "1" : "0"}
+    <TTShell
+      brand={{
+        homeHref: "/admin",
+        name: brand?.name ?? "Restaurant Platform",
+        subtitle: "Administrador",
+        logoUrl: brand?.logoUrl ?? null,
+      }}
+      sections={sections}
+      user={{ name: session.name, detail: session.email }}
+      title={title}
     >
-      <button
-        type="button"
-        aria-hidden="true"
-        tabIndex={-1}
-        className="mc-sidebar-backdrop fixed inset-0 z-30 bg-black/40"
-        onClick={() => setNavOpen(false)}
-      />
-      <aside className="mc-sidebar z-40 flex w-64 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--panel)]">
-        <Link href="/admin" className="flex items-center gap-3 px-5 py-4" onClick={() => setNavOpen(false)}>
-          <AnimatedOrb size={30} />
-          <span className="text-base font-semibold tracking-tight">Restaurant Platform</span>
-        </Link>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Recursos">
-          <Link
-            href="/admin"
-            onClick={() => setNavOpen(false)}
-            className={`block rounded-[10px] px-3 py-2 text-sm font-medium transition ${
-              pathname === "/admin"
-                ? "bg-[var(--panel2)] text-[var(--tx)]"
-                : "text-[var(--tx2)] hover:bg-[var(--panel2)] hover:text-[var(--tx)]"
-            }`}
-          >
-            Inicio
-          </Link>
-          {navItems.map((resource) => {
-            const href = resourceHref(resource.name);
-            const active = pathname === href || pathname.startsWith(`${href}/`);
-            return (
-              <Link
-                key={resource.name}
-                href={href}
-                onClick={() => setNavOpen(false)}
-                className={`block rounded-[10px] px-3 py-2 text-sm font-medium transition ${
-                  active
-                    ? "bg-[var(--panel2)] text-[var(--tx)]"
-                    : "text-[var(--tx2)] hover:bg-[var(--panel2)] hover:text-[var(--tx)]"
-                }`}
-              >
-                {resource.label}
-              </Link>
-            );
-          })}
-          {adminModules.length > 0 ? (
-            <>
-              <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--tx3)]">
-                Módulos
-              </p>
-              {adminModules.map((module_) => {
-                const active =
-                  pathname === module_.href || pathname.startsWith(`${module_.href}/`);
-                return (
-                  <Link
-                    key={module_.name}
-                    href={module_.href}
-                    onClick={() => setNavOpen(false)}
-                    className={`block rounded-[10px] px-3 py-2 text-sm font-medium transition ${
-                      active
-                        ? "bg-[var(--panel2)] text-[var(--tx)]"
-                        : "text-[var(--tx2)] hover:bg-[var(--panel2)] hover:text-[var(--tx)]"
-                    }`}
-                  >
-                    {module_.label}
-                  </Link>
-                );
-              })}
-            </>
-          ) : null}
-        </nav>
-        <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] px-4 py-3">
-          <div className="min-w-0 text-sm">
-            <p className="truncate font-medium">{session.name}</p>
-            <p className="truncate text-xs text-[var(--tx3)]">{session.email}</p>
-          </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <AccountMenu />
-          </div>
-        </div>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-[62px] shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--panel)] px-4 sm:px-6">
-          <button
-            type="button"
-            className="mc-menu-btn h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--border)] text-[var(--tx2)]"
-            aria-label="Abrir navegación"
-            onClick={() => setNavOpen((open) => !open)}
-          >
-            ☰
-          </button>
-          {/* Título del cromo, NO un heading: cada página aporta su propio h1/h2
-              (evita headings duplicados para lectores de pantalla y tests). */}
-          <p className="truncate text-lg font-semibold">{title}</p>
-        </header>
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">{children}</main>
-      </div>
-    </div>
+      {children}
+    </TTShell>
   );
 }

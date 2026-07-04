@@ -6,26 +6,27 @@ import { PendingRefunds } from "./PendingRefunds";
 
 export const dynamic = "force-dynamic";
 
+// El cromo (sidebar café + header con el título "Pedidos") lo pone PanelShell;
+// esta página solo renderiza el contenido del módulo (pantalla 1g).
 export default async function PanelOrdersPage() {
   const session = await requireSession();
   const permissions = session.permissions ?? [];
   if (!permissions.includes("orders:read")) {
     return (
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: "32px 20px" }}>
-        <p style={{ fontWeight: 700 }}>No tienes permiso para ver pedidos.</p>
-        <Link href="/panel">Volver al panel</Link>
-      </main>
+      <div className="tt-card" style={{ padding: "22px 24px", display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
+        <p style={{ margin: 0, fontWeight: 700 }}>No tienes permiso para ver pedidos.</p>
+        <Link href="/panel" className="tt-btn tt-btn-ghost">
+          Volver al panel
+        </Link>
+      </div>
     );
   }
   return (
-    <main style={{ maxWidth: 980, margin: "0 auto", padding: "24px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <header style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-        <h1 style={{ margin: 0, fontSize: 24 }}>Pedidos</h1>
-        <Link href="/panel" style={{ fontSize: 13, fontWeight: 700 }}>Panel</Link>
-        <Link href="/panel/pos" style={{ fontSize: 13, fontWeight: 700 }}>POS</Link>
-      </header>
-      {permissions.includes("payments:read") ? <PendingRefunds /> : null}
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {permissions.includes("payments:read") ? (
+        <PendingRefunds canRefund={permissions.includes("payments:refund")} />
+      ) : null}
       <OrdersBoard permissions={permissions} />
-    </main>
+    </div>
   );
 }

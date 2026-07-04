@@ -32,7 +32,7 @@ from backend.app.models.orders import (
     Order,
     OrderStatusHistory,
 )
-from backend.app.services.business_service import get_business_profile
+from backend.app.services.business_service import get_business_profile, get_business_settings
 from backend.app.services.pricing_service import PricedOrder
 from backend.app.utils.utc_now import utc_now
 
@@ -376,9 +376,18 @@ def create_order(
     profile = get_business_profile(session)
     number = _next_order_number(session)
     now = utc_now()
+    # Branding congelado para el ticket (§20): reimprimir muestra lo vendido,
+    # no el perfil actual del negocio.
+    business_settings = get_business_settings(session)
     order = Order(
         order_number=number,
         public_code=f"{profile.order_prefix}-{number:06d}",
+        business_snapshot={
+            "trade_name": profile.trade_name,
+            "slogan": profile.slogan,
+            "logo_file_id": str(profile.logo_file_id) if profile.logo_file_id else None,
+            "footer_text": business_settings.ticket_footer_text,
+        },
         customer_user_id=identity.customer_user_id,
         source=identity.source,
         fulfillment_type=identity.fulfillment_type,

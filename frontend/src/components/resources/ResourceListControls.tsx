@@ -7,8 +7,8 @@ import type {
 
 type SearchCapability = ResourceListCapability["search"];
 
-const INPUT_CLASS = "rounded-md border border-slate-300 px-3 py-2 text-sm";
-const LABEL_CLASS = "mb-1 text-xs font-medium text-slate-600";
+const INPUT_CLASS = "rounded-md border border-[var(--border2)] px-3 py-2 text-sm";
+const LABEL_CLASS = "mb-1 text-xs font-medium text-[var(--tx2)]";
 
 function fieldValue(filters: Record<string, string>, parameter?: string): string {
   return parameter ? (filters[parameter] ?? "") : "";
@@ -155,8 +155,8 @@ function FieldControl({
   }
 
   return (
-    <fieldset className="flex flex-wrap items-end gap-3 rounded-md border border-slate-200 p-3">
-      <legend className="px-1 text-xs font-semibold text-slate-700">{field.label}</legend>
+    <fieldset className="flex flex-wrap items-end gap-3 rounded-md border border-[var(--border)] p-3">
+      <legend className="px-1 text-xs font-semibold text-[var(--tx2)]">{field.label}</legend>
       {field.operators.map((operator) => (
         <OperatorControl
           key={`${field.key}-${operator.key}`}
@@ -212,10 +212,10 @@ export function ResourceListControls({
             minLength={search.min_length ?? undefined}
             maxLength={search.max_length ?? undefined}
             placeholder="Buscar…"
-            className="w-64 rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="w-64 rounded-md border border-[var(--border2)] px-3 py-2 text-sm"
           />
           {searchTooShort ? (
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-[var(--tx3)]">
               Escribe al menos {effectiveMin} caracteres para buscar.
             </p>
           ) : null}
@@ -232,7 +232,7 @@ export function ResourceListControls({
 
       <button
         type="submit"
-        className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+        className="rounded-md bg-[var(--side-bg)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--tx2)]"
       >
         Aplicar
       </button>

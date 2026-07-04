@@ -9,6 +9,7 @@ class PaymentPermissions(SecurityGroup, label="Pagos"):
     RECORD = ("payments:record", "Registrar pagos y evidencias")
     VERIFY = ("payments:verify", "Verificar o rechazar pagos declarados")
     REFUND = ("payments:refund", "Registrar reembolsos")
+    MANAGE_METHODS = ("payments:manage_methods", "Administrar métodos de pago")
 
 
 class TicketPermissions(SecurityGroup, label="Tickets"):

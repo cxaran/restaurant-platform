@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.app.core.database import SessionDep
 from backend.app.core.settings import settings
 from backend.app.models.user import User
-from backend.app.utils.email import send_email
+from backend.app.services.email_service import send_system_email
 
 from .security import generate_token, get_password_hash, get_user_by_email, save_user, verify_password
 from .token_store import delete_token_pair, get_subject, set_token_pair
@@ -27,7 +27,8 @@ async def send_password_reset_token(
     ttl = settings.email_token_expire_minutes * 60
     set_token_pair(PASSWORD_RESET_TOKEN_KEY, user_id, token, ttl)
 
-    await send_email(
+    await send_system_email(
+        session,
         subject="Recuperar contraseña",
         email_to=email,
         message=f"Hola {user.name}, tu token para recuperar la contraseña es: {token}",

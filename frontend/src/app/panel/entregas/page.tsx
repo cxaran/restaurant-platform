@@ -8,29 +8,35 @@ export const dynamic = "force-dynamic";
 // Pantalla de DESPACHO para supervisor: cola global de envíos listos y
 // asignación manual de repartidor. Ocultar acciones no es seguridad: el
 // backend valida deliveries:read / deliveries:assign / profiles:read en cada
-// endpoint.
+// endpoint. El shell del panel (TTShell) ya aporta <main>, sidebar y título.
 export default async function PanelEntregasPage() {
   const session = await requireSession();
   const permissions = session.permissions ?? [];
   if (!permissions.includes("deliveries:read")) {
     return (
-      <main style={{ maxWidth: 900, margin: "0 auto", padding: "32px 20px" }}>
-        <p style={{ fontWeight: 700 }}>No tienes permiso para ver la cola de entregas.</p>
-        <Link href="/panel">Volver al panel</Link>
-      </main>
+      <div className="mx-auto w-full max-w-xl">
+        <div
+          className="tt-card"
+          style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}
+        >
+          <p style={{ margin: 0, fontWeight: 800 }}>
+            No tienes permiso para ver la cola de entregas.
+          </p>
+          <Link href="/panel" className="tt-btn tt-btn-ghost">
+            Volver al panel
+          </Link>
+        </div>
+      </div>
     );
   }
   return (
-    <main style={{ maxWidth: 760, margin: "0 auto", padding: "24px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <header style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-        <h1 style={{ margin: 0, fontSize: 24 }}>Entregas</h1>
-        <Link href="/panel" style={{ fontSize: 13, fontWeight: 700 }}>Panel</Link>
-        <Link href="/panel/pedidos" style={{ fontSize: 13, fontWeight: 700 }}>Pedidos</Link>
-      </header>
+    <div className="mx-auto w-full max-w-3xl">
+      <h1 className="sr-only">Entregas</h1>
       <EntregasView
         canAssign={permissions.includes("deliveries:assign")}
         canListStaff={permissions.includes("profiles:read")}
+        canManageStaff={permissions.includes("profiles:manage_staff")}
       />
-    </main>
+    </div>
   );
 }

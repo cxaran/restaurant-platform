@@ -20,7 +20,7 @@ export function ResourceDetailFields({
   values: Record<string, unknown>;
 }>) {
   if (fields.length === 0) {
-    return <p className="text-sm text-slate-500">Este recurso no declara campos para mostrar.</p>;
+    return <p className="text-sm text-[var(--tx3)]">Este recurso no declara campos para mostrar.</p>;
   }
 
   return (
@@ -31,8 +31,8 @@ export function ResourceDetailFields({
         const relationTarget = kind === "relation" ? resolveRelationTarget(field.name) : null;
         return (
           <div key={field.name} className="min-w-0">
-            <dt className="text-sm font-medium text-slate-500">{field.label}</dt>
-            <dd className="mt-1 break-words text-sm text-slate-900">
+            <dt className="text-sm font-medium text-[var(--tx3)]">{field.label}</dt>
+            <dd className="mt-1 break-words text-sm text-[var(--tx)]">
               {relationTarget ? (
                 <RelationLabel
                   target={relationTarget}
@@ -43,7 +43,7 @@ export function ResourceDetailFields({
               )}
             </dd>
             {field.description ? (
-              <p className="mt-1 text-xs text-slate-400">{field.description}</p>
+              <p className="mt-1 text-xs text-[var(--tx3)]">{field.description}</p>
             ) : null}
           </div>
         );

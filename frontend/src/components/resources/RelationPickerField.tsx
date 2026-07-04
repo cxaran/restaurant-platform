@@ -21,7 +21,7 @@ import {
 type Selected = { id: string; label: string };
 
 const inputClass =
-  "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none";
+  "mt-1 w-full rounded-md border border-[var(--border2)] px-3 py-2 text-sm text-[var(--tx)] shadow-sm focus:border-[var(--tx3)] focus:outline-none";
 
 /**
  * Selector de relación para un campo FK del formulario genérico (F5). En lugar de pegar un
@@ -159,7 +159,7 @@ export function RelationPickerField({
 
   return (
     <div>
-      <label htmlFor={field.name} className="block text-sm font-medium text-slate-900">
+      <label htmlFor={field.name} className="block text-sm font-medium text-[var(--tx)]">
         {field.label}
         <RequiredHint required={field.required} />
       </label>
@@ -182,7 +182,7 @@ export function RelationPickerField({
           <button
             type="button"
             onClick={switchToPicker}
-            className="mt-1 text-sm font-medium text-slate-600 underline hover:text-slate-900"
+            className="mt-1 text-sm font-medium text-[var(--tx2)] underline hover:text-[var(--tx)]"
           >
             Buscar por nombre
           </button>
@@ -193,12 +193,12 @@ export function RelationPickerField({
           <input type="hidden" name={field.name} value={selected?.id ?? ""} />
 
           {selected ? (
-            <div className="mt-1 flex items-center justify-between gap-3 rounded-md border border-slate-300 px-3 py-2">
-              <span className="text-sm text-slate-900">{selected.label}</span>
+            <div className="mt-1 flex items-center justify-between gap-3 rounded-md border border-[var(--border2)] px-3 py-2">
+              <span className="text-sm text-[var(--tx)]">{selected.label}</span>
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="text-sm font-medium text-slate-600 underline hover:text-slate-900"
+                className="text-sm font-medium text-[var(--tx2)] underline hover:text-[var(--tx)]"
               >
                 Cambiar
               </button>
@@ -215,9 +215,9 @@ export function RelationPickerField({
                 className={inputClass}
               />
               {loading ? (
-                <p className="mt-1 text-sm text-slate-500">Buscando...</p>
+                <p className="mt-1 text-sm text-[var(--tx3)]">Buscando...</p>
               ) : results.length > 0 ? (
-                <ul className="mt-1 max-h-56 overflow-auto rounded-md border border-slate-200">
+                <ul className="mt-1 max-h-56 overflow-auto rounded-md border border-[var(--border)]">
                   {results.map((item) => {
                     const id = relationItemId(item);
                     if (!id) {
@@ -229,13 +229,13 @@ export function RelationPickerField({
                         <button
                           type="button"
                           onClick={() => choose(item)}
-                          className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-[var(--panel2)]"
                         >
-                          <span className="font-medium text-slate-900">
+                          <span className="font-medium text-[var(--tx)]">
                             {relationItemLabel(item, target)}
                           </span>
                           {secondary ? (
-                            <span className="text-xs text-slate-500">{secondary}</span>
+                            <span className="text-xs text-[var(--tx3)]">{secondary}</span>
                           ) : null}
                         </button>
                       </li>
@@ -243,12 +243,12 @@ export function RelationPickerField({
                   })}
                 </ul>
               ) : searched ? (
-                <p className="mt-1 text-sm text-slate-500">Sin resultados.</p>
+                <p className="mt-1 text-sm text-[var(--tx3)]">Sin resultados.</p>
               ) : null}
               <button
                 type="button"
                 onClick={switchToManual}
-                className="mt-1 text-sm font-medium text-slate-600 underline hover:text-slate-900"
+                className="mt-1 text-sm font-medium text-[var(--tx2)] underline hover:text-[var(--tx)]"
               >
                 Ingresar ID manualmente
               </button>
@@ -258,7 +258,7 @@ export function RelationPickerField({
       )}
 
       {field.description ? (
-        <p className="mt-1 text-sm text-slate-500">{field.description}</p>
+        <p className="mt-1 text-sm text-[var(--tx3)]">{field.description}</p>
       ) : null}
       {errors.length > 0 ? (
         <p id={errorId} className="mt-1 text-sm text-red-600">

@@ -8,11 +8,17 @@ ningún endpoint lo edita directamente.
 
 import uuid
 from decimal import Decimal
+from typing import Annotated
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 from sqlmodel import select
 
-from backend.app.api.resource_actions import api_error, commit_or_conflict, get_or_404
+from backend.app.api.resource_actions import (
+    api_error,
+    commit_or_conflict,
+    get_or_404,
+    paginate_resource,
+)
 from backend.app.auth.auth_dependencies import CurrentUser
 from backend.app.core.database import SessionDep
 from backend.app.models.orders import Order
@@ -22,10 +28,16 @@ from backend.app.models.payments import (
     PaymentMethodConfig,
     TicketPrintLog,
 )
+from backend.app.resources.registry import PAYMENT_METHODS
+from backend.app.schemas.pagination import OffsetPage
 from backend.app.schemas.payment import (
     PaymentAttachmentCreate,
     PaymentAttachmentRead,
     PaymentCreate,
+    PaymentMethodConfigCreate,
+    PaymentMethodConfigListItem,
+    PaymentMethodConfigRead,
+    PaymentMethodConfigUpdate,
     PaymentMethodPublic,
     PaymentRead,
     PaymentVerifyRequest,
@@ -53,6 +65,7 @@ from backend.app.services.payment_service import (
     reject_payment,
 )
 from backend.app.services.ticket_service import build_ticket_payload
+from backend.app.utils.utc_now import utc_now
 
 # Reusa el pricing/carrito del router de pedidos (misma conversión y errores).
 from backend.app.api.v1.orders import _order_read, _priced_or_422
@@ -101,6 +114,96 @@ def list_public_payment_methods(session: SessionDep) -> list[PaymentMethodPublic
         .order_by(PaymentMethodConfig.sort_order)  # pyright: ignore[reportArgumentType]
     ).all()
     return [PaymentMethodPublic.model_validate(row, from_attributes=True) for row in rows]
+
+
+@router.get("/pos/payment-methods", response_model=list[PaymentMethodPublic])
+def list_pos_payment_methods(
+    session: SessionDep,
+    _: PaymentPermissions.RECORD.requiere,
+) -> list[PaymentMethodPublic]:
+    """Métodos ACTIVOS disponibles en mostrador (1h: efectivo/terminal/transferencia).
+
+    El listado público filtra ``available_online`` y deja fuera los métodos
+    exclusivos de mostrador (p. ej. efectivo en caja); el POS necesita los
+    ``available_pos``.
+    """
+    rows = session.exec(
+        select(PaymentMethodConfig)
+        .where(PaymentMethodConfig.is_active == True)  # noqa: E712
+        .where(PaymentMethodConfig.available_pos == True)  # noqa: E712
+        .order_by(PaymentMethodConfig.sort_order)  # pyright: ignore[reportArgumentType]
+    ).all()
+    return [PaymentMethodPublic.model_validate(row, from_attributes=True) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Administración de métodos de pago (§18.1) — recurso genérico payment_methods
+# ---------------------------------------------------------------------------
+
+_METHOD_NOT_FOUND = "Método de pago no encontrado"
+
+
+@router.get(
+    "/payment-method-configs",
+    response_model=OffsetPage[PaymentMethodConfigListItem],
+)
+def list_payment_method_configs(
+    session: SessionDep,
+    query: Annotated[PAYMENT_METHODS.Query, Query()],  # pyright: ignore[reportInvalidTypeForm]
+    _: PaymentPermissions.MANAGE_METHODS.requiere,
+) -> OffsetPage[PaymentMethodConfigListItem]:
+    """Listado administrativo (motor de query): filtros y búsqueda por código/nombre."""
+    return paginate_resource(PAYMENT_METHODS, session, query)
+
+
+@router.get(
+    "/payment-method-configs/{method_id}", response_model=PaymentMethodConfigRead
+)
+def get_payment_method_config(
+    method_id: uuid.UUID,
+    session: SessionDep,
+    _: PaymentPermissions.MANAGE_METHODS.requiere,
+) -> PaymentMethodConfigRead:
+    method = get_or_404(session, PaymentMethodConfig, method_id, _METHOD_NOT_FOUND)
+    return PaymentMethodConfigRead.model_validate(method, from_attributes=True)
+
+
+@router.post(
+    "/payment-method-configs",
+    response_model=PaymentMethodConfigRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_payment_method_config(
+    payload: PaymentMethodConfigCreate,
+    session: SessionDep,
+    _: PaymentPermissions.MANAGE_METHODS.requiere,
+) -> PaymentMethodConfigRead:
+    method = PaymentMethodConfig(**payload.model_dump())
+    session.add(method)
+    commit_or_conflict(session, "Ya existe un método de pago con ese código.")
+    session.refresh(method)
+    return PaymentMethodConfigRead.model_validate(method, from_attributes=True)
+
+
+@router.patch(
+    "/payment-method-configs/{method_id}", response_model=PaymentMethodConfigRead
+)
+def update_payment_method_config(
+    method_id: uuid.UUID,
+    payload: PaymentMethodConfigUpdate,
+    session: SessionDep,
+    _: PaymentPermissions.MANAGE_METHODS.requiere,
+) -> PaymentMethodConfigRead:
+    """PATCH parcial. El ``code`` es inmutable y no existe DELETE: desactivar
+    conserva los pagos históricos (FK RESTRICT sobre payments)."""
+    method = get_or_404(session, PaymentMethodConfig, method_id, _METHOD_NOT_FOUND)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(method, field, value)
+    method.updated_at = utc_now()
+    session.add(method)
+    commit_or_conflict(session, "No fue posible actualizar el método de pago.")
+    session.refresh(method)
+    return PaymentMethodConfigRead.model_validate(method, from_attributes=True)
 
 
 # ---------------------------------------------------------------------------
@@ -266,6 +369,23 @@ def get_order_ticket(
     return TicketRead.model_validate(build_ticket_payload(session, order))
 
 
+@router.get("/orders/{order_id}/ticket-prints", response_model=list[TicketPrintRead])
+def list_ticket_prints(
+    order_id: uuid.UUID,
+    session: SessionDep,
+    _: TicketPermissions.PRINT.requiere,
+) -> list[TicketPrintRead]:
+    """Bitácora de impresiones del pedido (§20): el frontend deriva de aquí el
+    número de copia siguiente y la marca de REIMPRESIÓN."""
+    order = get_or_404(session, Order, order_id, _ORDER_NOT_FOUND)
+    rows = session.exec(
+        select(TicketPrintLog)
+        .where(TicketPrintLog.order_id == order.id)
+        .order_by(TicketPrintLog.printed_at)  # pyright: ignore[reportArgumentType]
+    ).all()
+    return [TicketPrintRead.model_validate(row, from_attributes=True) for row in rows]
+
+
 @router.post(
     "/orders/{order_id}/ticket-prints",
     response_model=TicketPrintRead,
@@ -337,7 +457,7 @@ def pos_sale(
             session,
             priced,
             OrderIdentity(
-                source="counter",
+                source=payload.source,
                 fulfillment_type="counter",
                 customer_user_id=payload.customer_user_id,
                 created_by=current_user.id,

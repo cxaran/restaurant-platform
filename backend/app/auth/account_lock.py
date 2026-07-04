@@ -7,7 +7,7 @@ from backend.app.core.redis import redis_client
 from backend.app.core.settings import settings
 from backend.app.utils.utc_now import utc_now
 from backend.app.models.user import User
-from backend.app.utils.email import send_email
+from backend.app.services.email_service import send_system_email
 
 from .security import generate_token, save_user
 from .token_store import delete_token_pair, get_subject, get_token, set_token_pair
@@ -48,7 +48,8 @@ async def increment_failed_login_attempts(
     if old_token:
         return
 
-    await send_email(
+    await send_system_email(
+        session,
         subject="Cuenta bloqueada",
         email_to=user.email,
         message=f"Tu cuenta ha sido bloqueada por {lock_minutes} minutos. Token de desbloqueo: {token}",

@@ -109,6 +109,7 @@ class ResourcesAuthTest(unittest.TestCase):
                 "modifier_groups",
                 "delivery_zones",
                 "finance_categories",
+                "payment_methods",
             ],
         )
 
@@ -462,14 +463,18 @@ class NavigationModulesTest(unittest.TestCase):
         self.assertEqual(
             [m["name"] for m in body["navigation_modules"]],
             [
+                "negocio",
+                "catalogo",
                 "storefront",
+                "zona-entrega",
                 "codigos-descuento",
+                "clientes",
+                "finanzas",
                 "reportes",
                 "pedidos",
                 "pos",
                 "entregas",
                 "reparto",
-                "tickets",
             ],
         )
 

@@ -56,6 +56,14 @@ test("normalizeApiError: respuesta no conforme cae a un envelope http_<status> s
   });
 });
 
+test("normalizeApiError: 413 fuera del envelope (proxy) explica que es por tamaño", () => {
+  const result = normalizeApiError(413, "<html>413 Request Entity Too Large</html>");
+  assert.deepEqual(result, {
+    code: "http_413",
+    message: "El archivo supera el tamaño máximo que acepta el servidor",
+  });
+});
+
 test("normalizeApiError: null/undefined también caen al fallback con el status real", () => {
   assert.equal(normalizeApiError(404, null).code, "http_404");
   assert.equal(normalizeApiError(0, undefined).code, "http_0");

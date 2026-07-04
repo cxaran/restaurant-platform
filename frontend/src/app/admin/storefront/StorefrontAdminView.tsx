@@ -5,16 +5,25 @@
 // reorden atómico, layout (header/footer) y tema por presets. El preview usa
 // EXACTAMENTE el renderer del sitio público; publicar es la única vía a
 // producción y la visibilidad real siempre la decide el servidor.
+//
+// Presentación según handoff Tony-Tony: pantalla 6a (elementos · vista previa
+// · inspector) y pantalla 5a (apariencia: presets de color, acento y fuentes).
 import "@/app/(storefront)/storefront.css";
+import "./editor.css";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { CapabilityGate } from "@/components/storefront/CapabilityGate";
 import { SectionRenderer } from "@/components/storefront/SectionRenderer";
 import { StorefrontThemeProvider } from "@/components/storefront/StorefrontThemeProvider";
 import { ApiRequestError } from "@/core/api/api-error";
 import { browserApi } from "@/core/api/browser-client";
-import { FALLBACK_TOKENS, type StorefrontSectionVM } from "@/core/restaurant-api/view-models";
+import {
+  FALLBACK_TOKENS,
+  parseThemeTokens,
+  type StorefrontSectionVM,
+  type ThemeTokens,
+} from "@/core/restaurant-api/view-models";
 import {
   addSection,
   applyTheme,
@@ -42,11 +51,6 @@ import {
 import { SchemaForm } from "./SchemaForm";
 import { SectionEditor } from "./SectionEditor";
 
-const btn: React.CSSProperties = {
-  padding: "8px 14px", borderRadius: 8, fontWeight: 800, fontSize: 13,
-  border: "1px solid rgba(0,0,0,0.3)", background: "transparent", cursor: "pointer",
-};
-
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
@@ -67,6 +71,24 @@ function toRendererSections(sections: PreviewSection[]): StorefrontSectionVM[] {
     media: (section.media ?? {}) as StorefrontSectionVM["media"],
   }));
 }
+
+// Estados de revisión del backend → badge del sistema tt-*.
+const REVISION_BADGES: Record<string, { className: string; label: string }> = {
+  draft: { className: "tt-badge tt-badge-warn", label: "Borrador" },
+  published: { className: "tt-badge tt-badge-ok", label: "Publicada" },
+  archived: { className: "tt-badge tt-badge-done", label: "Archivada" },
+};
+
+// Claves de fuente autorizadas por el provider del storefront (solo etiquetas
+// de presentación; la fuente real la define el preset del backend).
+const FONT_LABELS: Record<string, string> = {
+  display_slab: "Slab display",
+  modern_sans: "Sans moderna",
+  classic_serif: "Serif clásica",
+  friendly_rounded: "Redondeada",
+};
+
+const VIEW_LABELS = { secciones: "Secciones", layout: "Layout", tema: "Apariencia" } as const;
 
 export function StorefrontAdminView({
   permissions,
@@ -97,6 +119,12 @@ export function StorefrontAdminView({
   const [previewLink, setPreviewLink] = useState<PreviewLinkResult | null>(null);
   const [previewMinutes, setPreviewMinutes] = useState("");
   const refresh = useCallback(() => setTick((value) => value + 1), []);
+
+  // El botón «Guardar» de la barra superior dispara el guardado del inspector.
+  const sectionSaveRef = useRef<(() => void) | null>(null);
+  const registerSectionSave = useCallback((save: (() => void) | null) => {
+    sectionSaveRef.current = save;
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -194,20 +222,27 @@ export function StorefrontAdminView({
   const selectedTemplate = selected
     ? templates.find((template) => template.key === selected.template_key) ?? null
     : null;
+  const revisionBadge = draft
+    ? REVISION_BADGES[draft.status] ?? { className: "tt-badge tt-badge-done", label: draft.status }
+    : null;
+
+  const templateLabel = (key: string) =>
+    templates.find((template) => template.key === key)?.label ?? key;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <label htmlFor="sf-page" style={{ fontWeight: 700, fontSize: 14 }}>Página:</label>
+    <div className="sfe-root">
+      {/* Barra superior del editor (pantalla 6a). */}
+      <div className="tt-card sfe-toolbar">
+        <label htmlFor="sf-page" className="tt-label">Página</label>
         <select
           id="sf-page"
+          className="sfe-select"
           value={pageKey}
           onChange={(event) => {
             setSelectedId(null);
             setPreviewLink(null);
             setPageKey(event.target.value);
           }}
-          style={{ padding: "8px 12px", borderRadius: 8 }}
         >
           {(pages.length > 0 ? pages : [{ page_key: "home", published_revision_number: null, has_draft: false } as PageSummary]).map((page) => (
             <option key={page.page_key} value={page.page_key}>
@@ -217,28 +252,46 @@ export function StorefrontAdminView({
             </option>
           ))}
         </select>
-        {(["secciones", "layout", "tema"] as const).map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => setView(option)}
-            style={{ ...btn, background: view === option ? "rgba(0,0,0,0.1)" : "transparent" }}
-          >
-            {option[0].toUpperCase() + option.slice(1)}
-          </button>
-        ))}
+        {revisionBadge ? (
+          <span className={revisionBadge.className}>
+            {revisionBadge.label} · rev #{draft?.revision_number}
+          </span>
+        ) : null}
+        {currentPage ? (
+          currentPage.published_revision_number ? (
+            <span className="tt-badge tt-badge-ok">Publicado · v{currentPage.published_revision_number}</span>
+          ) : (
+            <span className="tt-badge tt-badge-done">Sin publicar</span>
+          )
+        ) : null}
+        <div className="tt-seg" role="tablist" aria-label="Vista del editor">
+          {(["secciones", "layout", "tema"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="tab"
+              aria-selected={view === option}
+              data-active={view === option ? "1" : "0"}
+              className="tt-seg-item"
+              onClick={() => setView(option)}
+            >
+              {VIEW_LABELS[option]}
+            </button>
+          ))}
+        </div>
+        <span className="sfe-spacer" />
         {canPublish ? (
-          <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <>
             <input
               type="datetime-local"
               aria-label="Programar publicación"
+              className="sfe-input-sm"
               value={scheduleAt}
               onChange={(event) => setScheduleAt(event.target.value)}
-              style={{ padding: "6px 8px", borderRadius: 8 }}
             />
             <button
               type="button"
-              style={btn}
+              className="tt-btn tt-btn-ghost sfe-btn-sm"
               disabled={busy || !scheduleAt}
               onClick={() =>
                 void run(
@@ -249,45 +302,52 @@ export function StorefrontAdminView({
             >
               Programar
             </button>
-            <button
-              type="button"
-              style={btn}
-              disabled={busy}
-              onClick={() => void run(() => unschedulePublish(pageKey), "Programación cancelada.")}
-            >
-              Cancelar prog.
-            </button>
-            <button
-              type="button"
-              style={btn}
-              disabled={busy}
-              onClick={() => {
-                // Publicar invalida cualquier enlace de preview vigente.
-                setPreviewLink(null);
-                void run(() => publishPage(pageKey), "Revisión publicada: el sitio ya la muestra.");
-              }}
-            >
-              Publicar ahora
-            </button>
-          </span>
+            {currentPage?.scheduled_publish_at ? (
+              <button
+                type="button"
+                className="tt-btn tt-btn-ghost sfe-btn-sm"
+                disabled={busy}
+                onClick={() => void run(() => unschedulePublish(pageKey), "Programación cancelada.")}
+              >
+                Cancelar prog.
+              </button>
+            ) : null}
+          </>
+        ) : null}
+        {canEdit && view === "secciones" ? (
+          <button
+            type="button"
+            className="tt-btn tt-btn-success sfe-btn-sm"
+            disabled={busy || !selected}
+            onClick={() => sectionSaveRef.current?.()}
+          >
+            Guardar
+          </button>
+        ) : null}
+        {canPublish ? (
+          <button
+            type="button"
+            className="tt-btn tt-btn-primary sfe-btn-sm"
+            disabled={busy}
+            onClick={() => {
+              // Publicar invalida cualquier enlace de preview vigente.
+              setPreviewLink(null);
+              void run(() => publishPage(pageKey), "Revisión publicada: el sitio ya la muestra.");
+            }}
+          >
+            Publicar
+          </button>
         ) : null}
       </div>
 
       {/* Estado REAL de programación reportado por el backend. */}
       {currentPage?.scheduled_publish_at ? (
-        <p role="status" style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>
+        <p role="status" className="sfe-note">
           Programada para {formatDateTime(currentPage.scheduled_publish_at)} (la ejecuta el servidor).
         </p>
       ) : null}
       {currentPage?.schedule_cancelled_reason ? (
-        <p
-          role="status"
-          style={{
-            margin: 0, fontSize: 13, fontWeight: 800, color: "#8a4b00",
-            background: "rgba(246, 185, 59, 0.18)", border: "1px solid rgba(138, 75, 0, 0.4)",
-            borderRadius: 8, padding: "6px 10px",
-          }}
-        >
+        <p role="status" className="sfe-note">
           Programación cancelada: {currentPage.schedule_cancelled_reason}
         </p>
       ) : null}
@@ -296,7 +356,7 @@ export function StorefrontAdminView({
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button
             type="button"
-            style={btn}
+            className="tt-btn tt-btn-ghost sfe-btn-sm"
             disabled={busy}
             onClick={() =>
               void run(async () => {
@@ -307,7 +367,7 @@ export function StorefrontAdminView({
               })
             }
           >
-            Enlace de preview
+            Vista previa completa
           </button>
           <label style={{ fontSize: 12, fontWeight: 700, display: "flex", gap: 6, alignItems: "center" }}>
             Minutos
@@ -315,26 +375,26 @@ export function StorefrontAdminView({
               type="number"
               min={1}
               placeholder="auto"
+              className="sfe-input-sm"
               value={previewMinutes}
               onChange={(event) => setPreviewMinutes(event.target.value)}
-              style={{ width: 72, padding: "6px 8px", borderRadius: 8 }}
+              style={{ width: 72 }}
             />
           </label>
           {previewLink ? (
             <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12 }}>
-              <code style={{ padding: "4px 8px", background: "rgba(0,0,0,0.06)", borderRadius: 6, wordBreak: "break-all" }}>
-                {`${window.location.origin}${previewLink.url}`}
-              </code>
+              <code className="sfe-code">{`${window.location.origin}${previewLink.url}`}</code>
               <button
                 type="button"
-                style={{ ...btn, padding: "4px 10px", fontSize: 11 }}
+                className="tt-btn tt-btn-ghost"
+                style={{ padding: "4px 10px", fontSize: 11 }}
                 onClick={() =>
                   void navigator.clipboard.writeText(`${window.location.origin}${previewLink.url}`)
                 }
               >
                 Copiar
               </button>
-              <span style={{ opacity: 0.7 }}>
+              <span style={{ color: "var(--tx3)" }}>
                 Expira {formatDateTime(previewLink.expires_at)} · rev #{previewLink.revision_number} · solo
                 lectura; se invalida al publicar.
               </span>
@@ -343,38 +403,51 @@ export function StorefrontAdminView({
         </div>
       ) : null}
 
-      {message ? <p role="status" style={{ margin: 0, fontWeight: 700 }}>{message}</p> : null}
-      {error ? <p role="alert" style={{ margin: 0, color: "#b3261e", fontWeight: 700 }}>{error}</p> : null}
+      {message ? <p role="status" className="sfe-note sfe-note-ok">{message}</p> : null}
+      {error ? <p role="alert" className="sfe-note sfe-note-danger">{error}</p> : null}
 
       {view === "secciones" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(230px, 300px) minmax(0, 1fr)", gap: 16, alignItems: "start" }}>
-          <aside style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {draft ? (
-              <div style={{ fontSize: 12, opacity: 0.75 }}>
-                Borrador · revisión #{draft.revision_number}
-              </div>
-            ) : null}
+        <div className="sfe-grid">
+          {/* Columna izquierda: elementos de la página (6a). */}
+          <aside className="sfe-col" aria-label="Elementos de la página">
+            <span className="tt-label" style={{ padding: "0 4px" }}>Elementos de la página</span>
             {sections.map((section, index) => (
               <div
                 key={section.id}
-                style={{
-                  border: `1px solid ${selectedId === section.id ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.2)"}`,
-                  borderRadius: 10, padding: "8px 10px", display: "flex", gap: 6, alignItems: "center",
-                }}
+                className="sfe-el"
+                data-active={selectedId === section.id ? "1" : "0"}
+                data-hidden={section.is_visible ? "0" : "1"}
               >
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(section.id)}
-                  style={{ flex: 1, textAlign: "left", border: "none", background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 700, opacity: section.is_visible ? 1 : 0.5 }}
-                >
-                  {templates.find((template) => template.key === section.template_key)?.label ?? section.template_key}
-                  {section.section_name ? ` · ${section.section_name}` : ""}
+                <span className="sfe-el-grip" aria-hidden>⠿</span>
+                <button type="button" className="sfe-el-main" onClick={() => setSelectedId(section.id)}>
+                  <span className="sfe-el-name">
+                    {section.section_name ?? templateLabel(section.template_key)}
+                  </span>
+                  <span className="sfe-el-sub">
+                    {section.is_visible ? `Plantilla: ${templateLabel(section.template_key)}` : "Oculto"}
+                  </span>
                 </button>
                 {canEdit ? (
-                  <>
-                    <button type="button" aria-label="Subir" disabled={busy || index === 0} onClick={() => move(section.id, -1)} style={{ ...btn, padding: "2px 8px" }}>↑</button>
-                    <button type="button" aria-label="Bajar" disabled={busy || index === sections.length - 1} onClick={() => move(section.id, 1)} style={{ ...btn, padding: "2px 8px" }}>↓</button>
-                  </>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <button
+                      type="button"
+                      className="sfe-icon-btn"
+                      aria-label="Subir"
+                      disabled={busy || index === 0}
+                      onClick={() => move(section.id, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className="sfe-icon-btn"
+                      aria-label="Bajar"
+                      disabled={busy || index === sections.length - 1}
+                      onClick={() => move(section.id, 1)}
+                    >
+                      ↓
+                    </button>
+                  </span>
                 ) : null}
               </div>
             ))}
@@ -382,18 +455,20 @@ export function StorefrontAdminView({
               <div style={{ display: "flex", gap: 6 }}>
                 <select
                   aria-label="Plantilla nueva"
+                  className="sfe-select"
+                  style={{ flex: 1, minWidth: 0 }}
                   value={addKey}
                   onChange={(event) => setAddKey(event.target.value)}
-                  style={{ flex: 1, padding: "7px 10px", borderRadius: 8 }}
                 >
-                  <option value="">Agregar sección…</option>
+                  <option value="">Plantilla…</option>
                   {templates.map((template) => (
                     <option key={template.key} value={template.key}>{template.label}</option>
                   ))}
                 </select>
                 <button
                   type="button"
-                  style={btn}
+                  className="sfe-dashed"
+                  style={{ padding: "8px 12px", whiteSpace: "nowrap" }}
                   disabled={busy || !addKey}
                   onClick={() => {
                     const template = templates.find((item) => item.key === addKey);
@@ -414,32 +489,75 @@ export function StorefrontAdminView({
                     setAddKey("");
                   }}
                 >
-                  +
+                  + Agregar
                 </button>
               </div>
             ) : null}
             {draft && canEdit ? (
-              <fieldset style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 }}>
-                <legend style={{ fontSize: 12, fontWeight: 800 }}>SEO de la página</legend>
-                <input
-                  aria-label="Título de la página"
-                  placeholder="Título (title)"
-                  defaultValue={draft.page_title ?? ""}
-                  onBlur={(event) => void run(() => patchDraftMeta(pageKey, { page_title: event.target.value || null }))}
-                  style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid rgba(0,0,0,0.25)", fontSize: 12 }}
-                />
-                <input
-                  aria-label="Descripción meta"
-                  placeholder="Meta descripción"
-                  defaultValue={draft.meta_description ?? ""}
-                  onBlur={(event) => void run(() => patchDraftMeta(pageKey, { meta_description: event.target.value || null }))}
-                  style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid rgba(0,0,0,0.25)", fontSize: 12 }}
-                />
-              </fieldset>
+              <div className="tt-card sfe-form" style={{ padding: "12px 14px" }}>
+                <span className="tt-label">SEO de la página</span>
+                <div className="sfe-field">
+                  <label className="sfe-flabel" htmlFor="sfe-seo-title">Título (title)</label>
+                  <input
+                    id="sfe-seo-title"
+                    className="tt-input"
+                    placeholder="Título de la página"
+                    defaultValue={draft.page_title ?? ""}
+                    onBlur={(event) => void run(() => patchDraftMeta(pageKey, { page_title: event.target.value || null }))}
+                  />
+                </div>
+                <div className="sfe-field">
+                  <label className="sfe-flabel" htmlFor="sfe-seo-desc">Meta descripción</label>
+                  <input
+                    id="sfe-seo-desc"
+                    className="tt-input"
+                    placeholder="Descripción para buscadores"
+                    defaultValue={draft.meta_description ?? ""}
+                    onBlur={(event) => void run(() => patchDraftMeta(pageKey, { meta_description: event.target.value || null }))}
+                  />
+                </div>
+              </div>
             ) : null}
+            <p className="sfe-note" style={{ marginTop: 4 }}>
+              Cada elemento usa una plantilla definida: eliges la plantilla y solo ajustas
+              textos, colores e imágenes.
+            </p>
           </aside>
 
-          <div>
+          {/* Centro: vista previa con el renderer real del sitio. */}
+          <section className="sfe-col" aria-label="Vista previa">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span className="tt-label">Vista previa · {pageKey}</span>
+              {draft ? (
+                <span style={{ fontSize: 11, color: "var(--tx3)", fontWeight: 700 }}>
+                  Borrador · revisión #{draft.revision_number}
+                </span>
+              ) : null}
+            </div>
+            {canPreview && draft ? (
+              <div className="sfe-preview-frame">
+                <StorefrontThemeProvider tokens={FALLBACK_TOKENS} fontVars="">
+                  <SectionRenderer
+                    sections={toRendererSections(
+                      sections.map((section) => ({ ...section, media: mediaBySection[section.id] })),
+                    )}
+                    preview
+                  />
+                </StorefrontThemeProvider>
+              </div>
+            ) : (
+              <div className="tt-card" style={{ padding: 18, fontSize: 13, color: "var(--tx3)" }}>
+                {canPreview ? "Sin borrador que previsualizar." : "Sin permiso de preview."}
+              </div>
+            )}
+            <p style={{ margin: 0, fontSize: 11, color: "var(--tx3)" }}>
+              Mismo renderer que el sitio público; los datos dinámicos y la visibilidad por
+              fechas los resuelve el servidor al publicar.
+            </p>
+          </section>
+
+          {/* Columna derecha: inspector de la sección seleccionada. */}
+          <aside className="sfe-col sfe-inspector-col">
             {selected && canEdit ? (
               <SectionEditor
                 key={`${selected.id}-${tick}`}
@@ -452,13 +570,19 @@ export function StorefrontAdminView({
                   setSelectedId(null);
                   refresh();
                 }}
+                onRegisterSave={registerSectionSave}
               />
             ) : (
-              <p style={{ margin: 0, fontSize: 13, opacity: 0.7 }}>
-                {canEdit ? "Selecciona una sección para editarla." : "Sin permiso de edición: solo lectura."}
-              </p>
+              <div className="tt-card" style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 4 }}>
+                <span className="tt-label">Configurando</span>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--tx2)" }}>
+                  {canEdit
+                    ? "Selecciona un elemento de la lista para ajustar su plantilla, textos, colores e imágenes."
+                    : "Sin permiso de edición: solo lectura."}
+                </p>
+              </div>
             )}
-          </div>
+          </aside>
         </div>
       ) : null}
 
@@ -468,49 +592,208 @@ export function StorefrontAdminView({
             void run(async () => setLayout(await putLayout(header, footer)), "Layout publicado.")
           } />
         ) : (
-          <p style={{ fontSize: 13, opacity: 0.7 }}>Requiere permiso storefront:manage_navigation.</p>
+          <div className="tt-card" style={{ padding: "16px 18px", fontSize: 13, color: "var(--tx3)" }}>
+            Requiere permiso storefront:manage_navigation.
+          </div>
         )
       ) : null}
 
       {view === "tema" ? (
         perms.has("storefront:manage_theme") ? (
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <select value={presetName} onChange={(event) => setPresetName(event.target.value)} style={{ padding: "8px 12px", borderRadius: 8 }}>
-              {presets.map((preset) => (
-                <option key={preset.name} value={preset.name}>{preset.name}{preset.is_default ? " (base)" : ""}</option>
-              ))}
-            </select>
-            <label style={{ fontSize: 13, fontWeight: 700, display: "flex", gap: 6, alignItems: "center" }}>
-              Acento
-              <input type="color" value={accent || "#F59E0B"} onChange={(event) => setAccent(event.target.value)} />
-            </label>
-            <button type="button" style={btn} disabled={busy || !presetName} onClick={() => void run(() => applyTheme(presetName, accent || undefined), "Tema activado.")}>
-              Activar tema
-            </button>
-            <span style={{ fontSize: 12, opacity: 0.7 }}>Presets neutros; la marca es configuración, no código.</span>
-          </div>
+          <ThemePanel
+            presets={presets}
+            presetName={presetName}
+            onPresetName={setPresetName}
+            accent={accent}
+            onAccent={setAccent}
+            busy={busy}
+            onApply={() => void run(() => applyTheme(presetName, accent || undefined), "Tema activado.")}
+            previewSections={
+              canPreview && draft
+                ? toRendererSections(
+                    sections.map((section) => ({ ...section, media: mediaBySection[section.id] })),
+                  )
+                : null
+            }
+          />
         ) : (
-          <p style={{ fontSize: 13, opacity: 0.7 }}>Requiere permiso storefront:manage_theme.</p>
+          <div className="tt-card" style={{ padding: "16px 18px", fontSize: 13, color: "var(--tx3)" }}>
+            Requiere permiso storefront:manage_theme.
+          </div>
         )
       ) : null}
+    </div>
+  );
+}
 
-      {canPreview && draft ? (
-        <div style={{ border: "1px solid rgba(0,0,0,0.2)", borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ padding: "8px 14px", fontSize: 13, background: "rgba(0,0,0,0.06)" }}>
-            <span style={{ fontWeight: 700 }}>Vista previa de borrador · revisión #{draft.revision_number}</span>{" "}
-            — mismo renderer que el sitio público; los datos dinámicos y la visibilidad por fechas
-            los resuelve el servidor al publicar.
-          </div>
-          <StorefrontThemeProvider tokens={FALLBACK_TOKENS} fontVars="">
-            <SectionRenderer
-              sections={toRendererSections(
-                sections.map((section) => ({ ...section, media: mediaBySection[section.id] })),
-              )}
-              preview
-            />
-          </StorefrontThemeProvider>
+// Apariencia del sitio (pantalla 5a): presets como tarjetas de swatches,
+// acento como círculos y fuentes como chips. Mismos controles de siempre
+// (preset + acento → POST /storefront/theme); solo cambia la presentación.
+function ThemePanel({
+  presets, presetName, onPresetName, accent, onAccent, busy, onApply, previewSections,
+}: Readonly<{
+  presets: ThemePreset[];
+  presetName: string;
+  onPresetName: (name: string) => void;
+  accent: string;
+  onAccent: (value: string) => void;
+  busy: boolean;
+  onApply: () => void;
+  previewSections: StorefrontSectionVM[] | null;
+}>) {
+  const parsedByName = new Map<string, ThemeTokens | null>(
+    presets.map((preset) => [preset.name, parseThemeTokens(preset.tokens)]),
+  );
+  const selectedTokens = parsedByName.get(presetName) ?? null;
+  const effectiveAccent = accent || selectedTokens?.colors.accent || "";
+
+  const accentOptions = Array.from(
+    new Set(
+      presets
+        .map((preset) => parsedByName.get(preset.name)?.colors.accent)
+        .filter((color): color is string => Boolean(color)),
+    ),
+  );
+  const fontOptions = Array.from(
+    new Set(
+      presets
+        .map((preset) => parsedByName.get(preset.name)?.typography.font_family_key)
+        .filter((key): key is string => Boolean(key)),
+    ),
+  );
+
+  const previewTokens: ThemeTokens = selectedTokens
+    ? {
+        ...selectedTokens,
+        colors: {
+          ...selectedTokens.colors,
+          ...(effectiveAccent ? { accent: effectiveAccent } : {}),
+        },
+      }
+    : FALLBACK_TOKENS;
+
+  const barsFor = (name: string): string[] => {
+    const colors = parsedByName.get(name)?.colors ?? {};
+    const preferred = [colors.brand_primary, colors.brand_secondary, colors.surface]
+      .filter((color): color is string => Boolean(color));
+    return preferred.length === 3 ? preferred : Object.values(colors).slice(0, 3);
+  };
+
+  return (
+    <div className="sfe-theme-grid">
+      <section
+        className="tt-card"
+        style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}
+        aria-label="Colores del sitio"
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <strong style={{ fontSize: 15 }}>Colores del sitio</strong>
+          <span style={{ fontSize: 11, color: "var(--tx3)" }}>se aplican a botones, barras y acentos</span>
         </div>
-      ) : null}
+        <div className="sfe-preset-row">
+          {presets.map((preset) => (
+            <button
+              key={preset.name}
+              type="button"
+              className="sfe-preset"
+              data-active={presetName === preset.name ? "1" : "0"}
+              onClick={() => onPresetName(preset.name)}
+            >
+              <span className="sfe-preset-bars">
+                {barsFor(preset.name).map((color, index) => (
+                  <span key={index} className="sfe-preset-bar" style={{ background: color }} />
+                ))}
+              </span>
+              <span>
+                {preset.name}
+                {preset.is_default ? " (base)" : ""}
+                {presetName === preset.name ? " ✓" : ""}
+              </span>
+            </button>
+          ))}
+          {presets.length === 0 ? (
+            <p style={{ margin: 0, fontSize: 12, color: "var(--tx3)" }}>Sin presets disponibles.</p>
+          ) : null}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+          <span className="tt-label">Acento</span>
+          {accentOptions.map((color) => (
+            <button
+              key={color}
+              type="button"
+              className="sfe-swatch"
+              style={{ background: color }}
+              aria-label={`Acento ${color}`}
+              data-active={effectiveAccent.toLowerCase() === color.toLowerCase() ? "1" : "0"}
+              onClick={() => onAccent(color)}
+            />
+          ))}
+          <input
+            type="color"
+            className="sfe-swatch-custom"
+            aria-label="Acento personalizado"
+            value={/^#[0-9a-fA-F]{6}$/.test(effectiveAccent) ? effectiveAccent : "#c1272d"}
+            onChange={(event) => onAccent(event.target.value)}
+          />
+          {accent ? (
+            <button
+              type="button"
+              className="sfe-link-danger"
+              onClick={() => onAccent("")}
+            >
+              usar el del preset
+            </button>
+          ) : null}
+        </div>
+        {fontOptions.length > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span className="tt-label">Fuente</span>
+            {fontOptions.map((key) => (
+              <span
+                key={key}
+                className="tt-chip"
+                data-active={selectedTokens?.typography.font_family_key === key ? "1" : "0"}
+                style={{ cursor: "default" }}
+              >
+                {FONT_LABELS[key] ?? key}
+              </span>
+            ))}
+            <span style={{ fontSize: 11, color: "var(--tx3)" }}>la fuente la define el preset</span>
+          </div>
+        ) : null}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+          <button
+            type="button"
+            className="tt-btn tt-btn-primary sfe-btn-sm"
+            disabled={busy || !presetName}
+            onClick={onApply}
+          >
+            Activar tema
+          </button>
+          <span style={{ fontSize: 11, color: "var(--tx3)" }}>
+            Presets neutros; la marca es configuración, no código.
+          </span>
+        </div>
+      </section>
+
+      <section className="sfe-col" aria-label="Vista previa en vivo">
+        <span className="tt-label">Vista previa en vivo</span>
+        {previewSections ? (
+          <div className="sfe-preview-frame">
+            <StorefrontThemeProvider tokens={previewTokens} fontVars="">
+              <SectionRenderer sections={previewSections} preview />
+            </StorefrontThemeProvider>
+          </div>
+        ) : (
+          <div className="tt-card" style={{ padding: 18, fontSize: 13, color: "var(--tx3)" }}>
+            Sin borrador que previsualizar.
+          </div>
+        )}
+        <p className="sfe-note">
+          La vista usa el preset y acento seleccionados; el sitio público solo cambia al
+          pulsar «Activar tema».
+        </p>
+      </section>
     </div>
   );
 }
@@ -543,20 +826,26 @@ function LayoutPanel({
     );
   }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
-      <fieldset style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: 12 }}>
-        <legend style={{ fontWeight: 800, fontSize: 13 }}>Header · navegación</legend>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, alignItems: "start" }}>
+      <section className="tt-card sfe-form" style={{ padding: "16px 18px" }}>
+        <span className="tt-label">Header · navegación</span>
         <SchemaForm schema={layout.header_schema} value={header} onChange={setHeader} />
-      </fieldset>
-      <fieldset style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: 12 }}>
-        <legend style={{ fontWeight: 800, fontSize: 13 }}>Footer</legend>
+      </section>
+      <section className="tt-card sfe-form" style={{ padding: "16px 18px" }}>
+        <span className="tt-label">Footer</span>
         <SchemaForm schema={layout.footer_schema} value={footer} onChange={setFooter} />
-      </fieldset>
-      <div>
-        <button type="button" style={btn} disabled={busy} onClick={() => onSave(header, footer)}>
+      </section>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <button
+          type="button"
+          className="tt-btn tt-btn-primary sfe-btn-sm"
+          style={{ alignSelf: "flex-start" }}
+          disabled={busy}
+          onClick={() => onSave(header, footer)}
+        >
           Publicar layout (v{layout.version_number ?? 0} → v{(layout.version_number ?? 0) + 1})
         </button>
-        <p style={{ fontSize: 11, opacity: 0.65, marginTop: 6 }}>
+        <p style={{ fontSize: 11, color: "var(--tx3)", margin: 0 }}>
           Los enlaces son CTAs controlados: el backend rechaza esquemas peligrosos.
         </p>
       </div>

@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { ApiRequestError } from "@/core/api/api-error";
 import type { HttpMethod } from "@/core/api/contracts";
 import type { RelationOptionGroup } from "@/core/resources/relation-editor-client";
-import { replaceRelation } from "@/core/resources/resource-mutation-client";
+import {
+  forbiddenMutationMessage,
+  replaceRelation,
+} from "@/core/resources/resource-mutation-client";
 
 const ADMIN_COVERAGE_MESSAGE =
   "No se puede aplicar el cambio porque dejaría la plataforma sin cobertura administrativa.";
@@ -104,7 +107,10 @@ export function RelationEditor({
           return;
         }
         if (error.status === 403) {
-          router.replace(listPath);
+          // Un 403 al GUARDAR jamás se traga: redirigir en silencio haría creer
+          // que el cambio se aplicó (p. ej. rechazo CSRF por origen no confiable).
+          setGeneralError(forbiddenMutationMessage(error));
+          setPending(false);
           return;
         }
         setGeneralError(submitError(error));
@@ -121,11 +127,11 @@ export function RelationEditor({
     <form
       onSubmit={onSubmit}
       aria-label={title}
-      className="max-w-2xl space-y-6 rounded-lg border border-slate-200 bg-white p-6"
+      className="max-w-2xl space-y-6 rounded-lg border border-[var(--border)] bg-white p-6"
     >
       <header>
-        <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
-        {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
+        <h2 className="text-xl font-semibold text-[var(--tx)]">{title}</h2>
+        {description ? <p className="mt-1 text-sm text-[var(--tx3)]">{description}</p> : null}
       </header>
 
       {generalError ? (
@@ -138,14 +144,14 @@ export function RelationEditor({
       ) : null}
 
       {isEmpty ? (
-        <p className="text-sm text-slate-500">No hay opciones disponibles.</p>
+        <p className="text-sm text-[var(--tx3)]">No hay opciones disponibles.</p>
       ) : (
         <div className="space-y-5">
           {groups.map((group) => (
             <fieldset key={group.name} className="space-y-2">
-              <legend className="mb-1 flex w-full items-center gap-3 text-sm font-semibold text-slate-700">
+              <legend className="mb-1 flex w-full items-center gap-3 text-sm font-semibold text-[var(--tx2)]">
                 <span>{group.label ?? title}</span>
-                <span className="text-xs font-normal text-slate-500">
+                <span className="text-xs font-normal text-[var(--tx3)]">
                   {selectedCountIn(group)}/{group.options.length}
                 </span>
                 {group.options.length > 0 ? (
@@ -156,7 +162,7 @@ export function RelationEditor({
                     aria-label={`${
                       allSelectedIn(group) ? "Quitar" : "Seleccionar"
                     } todo en ${group.label ?? title}`}
-                    className="text-xs font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                    className="text-xs font-medium text-[var(--tx2)] underline-offset-2 hover:text-[var(--tx)] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {allSelectedIn(group) ? "Quitar todo" : "Seleccionar todo"}
                   </button>
@@ -166,7 +172,7 @@ export function RelationEditor({
                 {group.options.map((option) => (
                   <label
                     key={option.value}
-                    className="flex items-center gap-2 text-sm text-slate-800"
+                    className="flex items-center gap-2 text-sm text-[var(--tx2)]"
                   >
                     <input
                       type="checkbox"
@@ -175,7 +181,7 @@ export function RelationEditor({
                       checked={selected.has(option.value)}
                       onChange={() => toggle(option.value)}
                       disabled={pending}
-                      className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-2 focus:ring-slate-500"
+                      className="h-4 w-4 rounded border-[var(--border2)] text-[var(--tx)] focus:ring-2 focus:ring-[var(--tx3)]"
                     />
                     <span>{option.label}</span>
                   </label>
@@ -194,7 +200,7 @@ export function RelationEditor({
           type="button"
           onClick={() => router.replace(listPath)}
           disabled={pending}
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md border border-[var(--border2)] px-4 py-2 text-sm font-medium text-[var(--tx2)] transition hover:bg-[var(--panel2)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Cancelar
         </button>

@@ -155,29 +155,33 @@ def update_zone(
 
 
 @router.delete("/zones/{zone_id}", response_model=DeliveryZoneRead)
-def deactivate_zone(
+def delete_zone(
     zone_id: uuid.UUID,
     session: SessionDep,
     current_user: CurrentUser,
     _: ShippingPermissions.MANAGE.requiere,
 ) -> DeliveryZoneRead:
+    """Elimina la zona DEFINITIVAMENTE (sus tarifas caen en cascada).
+
+    El historial de pedidos NO depende de la zona viva: cada pedido congela el
+    monto cobrado y el nombre de la zona (snapshots en ``order_shipping``), y su
+    referencia viva cae a NULL al borrar (FK ON DELETE SET NULL). La
+    desactivación (PATCH ``is_active=false``) sigue disponible para pausar una
+    zona sin destruirla.
+    """
     zone = get_or_404(session, DeliveryZone, zone_id, _ZONE_NOT_FOUND)
-    if not zone.is_active:
-        api_error(status.HTTP_409_CONFLICT, "zona_inactiva", "La zona ya está inactiva.")
-    zone.is_active = False
-    zone.updated_at = utc_now()
-    session.add(zone)
+    result = _serialize_zone(zone)
+    session.delete(zone)
     record_config_change(
         session,
         actor_user_id=current_user.id,
         entity_type="delivery_zones",
         entity_id=zone.id,
-        action="deactivate",
-        changed_fields=["is_active"],
+        action="delete",
+        changed_fields=["is_active", "code", "name"],
     )
-    commit_or_conflict(session, "No fue posible desactivar la zona.")
-    session.refresh(zone)
-    return _serialize_zone(zone)
+    commit_or_conflict(session, "No fue posible eliminar la zona.")
+    return result
 
 
 # ---------------------------------------------------------------------------

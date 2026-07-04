@@ -8,10 +8,13 @@ bitácora (§17.3).
 """
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Query, Request, status
+from sqlalchemy import func as sa_func
+from sqlalchemy import or_ as sa_or
 
 from backend.app.security.rate_limit import limit_checkout
 from sqlmodel import select
@@ -46,7 +49,9 @@ from backend.app.schemas.order import (
     OrderShippingFinalizeRequest,
     OrderShippingRead,
     OrderTransitionRequest,
+    OrderVisibleNoteRead,
 )
+from backend.app.schemas.pagination import OffsetPage, OffsetPagination
 from backend.app.security.groups.orders import OrderPermissions
 from backend.app.security.groups.payments import PaymentPermissions
 from backend.app.services.business_service import (
@@ -242,18 +247,39 @@ def _line_read(line) -> OrderLineRead:
 def _delivery_read(delivery: Optional[OrderDelivery]) -> Optional[OrderDeliveryRead]:
     if delivery is None:
         return None
+    # ``location`` se traduce aparte: la columna es un WKBElement de PostGIS y
+    # pydantic no puede validarlo como GeoPoint (reventaba en cuanto un pedido
+    # traía coordenadas reales).
     lonlat = wkb_point_to_lonlat(delivery.location)
-    data = OrderDeliveryRead.model_validate(delivery, from_attributes=True)
-    return data.model_copy(
-        update={"location": GeoPoint(coordinates=lonlat) if lonlat else None}
+    data = {
+        field: getattr(delivery, field)
+        for field in OrderDeliveryRead.model_fields
+        if field != "location"
+    }
+    return OrderDeliveryRead(
+        **data, location=GeoPoint(coordinates=lonlat) if lonlat else None
     )
+
+
+def _visible_notes(order: Order) -> list[OrderVisibleNoteRead]:
+    """Aclaraciones de la bitácora visibles fuera del equipo, en orden
+    cronológico. La nota interna de cada transición jamás se proyecta."""
+    return [
+        OrderVisibleNoteRead(
+            new_status=entry.new_status,
+            note=entry.customer_visible_note,
+            changed_at=entry.changed_at,
+        )
+        for entry in sorted(order.status_history, key=lambda h: h.changed_at)
+        if (entry.customer_visible_note or "").strip()
+    ]
 
 
 def _order_read(order: Order) -> OrderRead:
     data = {
         field: getattr(order, field)
         for field in OrderRead.model_fields
-        if field not in {"lines", "adjustments", "shipping", "delivery"}
+        if field not in {"lines", "adjustments", "shipping", "delivery", "visible_notes"}
     }
     return OrderRead(
         **data,
@@ -268,6 +294,7 @@ def _order_read(order: Order) -> OrderRead:
             else None
         ),
         delivery=_delivery_read(order.delivery),
+        visible_notes=_visible_notes(order),
     )
 
 
@@ -312,6 +339,7 @@ def _my_order_read(session: SessionDep, order: Order) -> MyOrderRead:
         lines=[_line_read(line) for line in sorted(order.lines, key=lambda l: l.sort_order)],
         delivery=_delivery_read(order.delivery),
         courier=courier,
+        visible_notes=_visible_notes(order),
     )
 
 
@@ -528,29 +556,126 @@ def capture_order(
     return _order_read(order)
 
 
-@router.get("", response_model=list[OrderListItem])
+def _apply_order_list_filters(
+    stmt,
+    *,
+    statuses: Optional[str],
+    source: Optional[str],
+    fulfillment_type: Optional[str],
+    q: Optional[str],
+    created_from: Optional[datetime],
+    created_to: Optional[datetime],
+    customer_user_id: Optional[uuid.UUID] = None,
+):
+    """Filtros compartidos del tablero interno (lista y conteos por estado).
+
+    ``q`` busca por folio, cliente/teléfono del pedido y, vía la entrega,
+    por quien recibe y la dirección (calle/colonia). ``statuses`` acepta uno
+    o varios estados separados por coma.
+    """
+    if statuses:
+        parsed = [s.strip() for s in statuses.split(",") if s.strip()]
+        if parsed:
+            stmt = stmt.where(Order.status.in_(parsed))  # pyright: ignore[reportAttributeAccessIssue]
+    if source:
+        stmt = stmt.where(Order.source == source)
+    if fulfillment_type:
+        stmt = stmt.where(Order.fulfillment_type == fulfillment_type)
+    # Ficha de cliente (§8.2): sus pedidos por cuenta registrada.
+    if customer_user_id is not None:
+        stmt = stmt.where(Order.customer_user_id == customer_user_id)
+    if created_from is not None:
+        stmt = stmt.where(Order.created_at >= created_from)
+    if created_to is not None:
+        stmt = stmt.where(Order.created_at < created_to)
+    if q and q.strip():
+        term = f"%{q.strip()}%"
+        stmt = stmt.outerjoin(OrderDelivery, OrderDelivery.order_id == Order.id).where(  # pyright: ignore[reportArgumentType]
+            sa_or(
+                Order.public_code.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
+                Order.customer_name_snapshot.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
+                Order.customer_phone_snapshot.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
+                OrderDelivery.recipient_name.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
+                OrderDelivery.recipient_phone.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
+                OrderDelivery.street.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
+                OrderDelivery.neighborhood.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
+            )
+        )
+    return stmt
+
+
+@router.get("", response_model=OffsetPage[OrderListItem])
 def list_orders(
     session: SessionDep,
     _: OrderPermissions.READ.requiere,
-    status_filter: Optional[str] = Query(default=None, alias="status"),
+    status_filter: Optional[str] = Query(
+        default=None,
+        alias="status",
+        description="Uno o varios estados separados por coma.",
+    ),
     source: Optional[str] = Query(default=None),
+    fulfillment_type: Optional[str] = Query(default=None),
+    q: Optional[str] = Query(default=None, max_length=120),
+    created_from: Optional[datetime] = Query(default=None),
+    created_to: Optional[datetime] = Query(default=None),
+    customer_user_id: Optional[uuid.UUID] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-) -> list[OrderListItem]:
-    stmt = select(Order)
-    if status_filter:
-        stmt = stmt.where(Order.status == status_filter)
-    if source:
-        stmt = stmt.where(Order.source == source)
-    stmt = (
+) -> OffsetPage[OrderListItem]:
+    """Tablero interno paginado: filtros por estado/canal/fechas/cliente y
+    búsqueda por folio, cliente, quien recibe y dirección (envelope estándar)."""
+    stmt = _apply_order_list_filters(
+        select(Order),
+        statuses=status_filter,
+        source=source,
+        fulfillment_type=fulfillment_type,
+        q=q,
+        created_from=created_from,
+        created_to=created_to,
+        customer_user_id=customer_user_id,
+    )
+    subq = stmt.subquery()
+    total = int(
+        session.exec(select(sa_func.count(sa_func.distinct(subq.c.id)))).one()  # pyright: ignore[reportArgumentType]
+    )
+    rows = session.exec(
         stmt.order_by(Order.created_at.desc())  # pyright: ignore[reportAttributeAccessIssue]
         .offset(offset)
         .limit(limit)
+    ).all()
+    return OffsetPage(
+        items=[OrderListItem.model_validate(order, from_attributes=True) for order in rows],
+        pagination=OffsetPagination(
+            limit=limit,
+            offset=offset,
+            total=total,
+            has_next=offset + len(rows) < total,
+        ),
     )
-    return [
-        OrderListItem.model_validate(order, from_attributes=True)
-        for order in session.exec(stmt).all()
-    ]
+
+
+@router.get("/status-counts", response_model=dict[str, int])
+def order_status_counts(
+    session: SessionDep,
+    _: OrderPermissions.READ.requiere,
+    source: Optional[str] = Query(default=None),
+    fulfillment_type: Optional[str] = Query(default=None),
+    q: Optional[str] = Query(default=None, max_length=120),
+    created_from: Optional[datetime] = Query(default=None),
+    created_to: Optional[datetime] = Query(default=None),
+) -> dict[str, int]:
+    """Conteo por estado con los MISMOS filtros del tablero (menos ``status``):
+    alimenta los chips «Nuevos · 3» sin traerse los pedidos."""
+    stmt = _apply_order_list_filters(
+        select(Order.status, sa_func.count(sa_func.distinct(Order.id))),  # pyright: ignore[reportArgumentType]
+        statuses=None,
+        source=source,
+        fulfillment_type=fulfillment_type,
+        q=q,
+        created_from=created_from,
+        created_to=created_to,
+    ).group_by(Order.status)  # pyright: ignore[reportArgumentType]
+    return {status_value: int(count) for status_value, count in session.exec(stmt).all()}
 
 
 @router.get(
@@ -645,6 +770,14 @@ def transition(
     ):
         api_error(status.HTTP_403_FORBIDDEN, "forbidden", "Se requiere permiso para cancelar pedidos.")
 
+    # La nota interna de la transición también se refleja en el pedido (donde
+    # el equipo la lee); la bitácora conserva además el registro por transición.
+    if (payload.internal_note or "").strip():
+        note = payload.internal_note.strip()
+        order.internal_note = (
+            f"{order.internal_note} · {note}" if order.internal_note else note
+        )
+
     try:
         transition_order(
             session,
@@ -699,6 +832,16 @@ def finalize_shipping(
         "rate": shipping.shipping_rate_name_snapshot,
     }
 
+    # Pin del empleado: se PERSISTE en la entrega (sirve al reparto) y, si no
+    # viene tarifa ni monto manual, es la base para recotizar por polígono.
+    lonlat: Optional[tuple[float, float]] = None
+    if payload.location is not None and order.delivery is not None:
+        lonlat = payload.location.coordinates
+        order.delivery.location = point_to_ewkt(*lonlat)  # type: ignore[assignment]
+        order.delivery.location_source = "employee_selected"
+        order.delivery.updated_at = utc_now()
+        session.add(order.delivery)
+
     if payload.shipping_rate_rule_id is not None:
         rate = session.get(ShippingRateRule, payload.shipping_rate_rule_id)
         if rate is None or not rate.is_active:
@@ -721,11 +864,44 @@ def finalize_shipping(
         shipping.is_free_shipping = payload.final_amount == Decimal("0")
         shipping.calculation_source = "employee_manual_override"
         shipping.manual_override_reason = payload.reason
+    elif lonlat is not None:
+        # Recotización por polígono con el pin del empleado: el backend decide
+        # zona y tarifa (PostGIS); fuera de zona o sin tarifa aplicable se pide
+        # el monto manual — el empleado SIEMPRE puede fijarlo manualmente.
+        quote = quote_shipping(
+            session,
+            subtotal=order.items_subtotal_amount,
+            longitude=lonlat[0],
+            latitude=lonlat[1],
+        )
+        if quote.status != "calculated" or quote.amount is None:
+            api_error(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "fuera_de_zona",
+                (
+                    f"El punto cae en la zona «{quote.zone_name}», pero sin tarifa "
+                    "aplicable al subtotal; ingresa el costo manualmente."
+                    if quote.zone_name
+                    else "El punto no cae en ninguna zona de entrega activa; "
+                    "ingresa el costo manualmente."
+                ),
+            )
+        shipping.delivery_zone_id = quote.zone_id
+        shipping.delivery_zone_name_snapshot = quote.zone_name
+        shipping.shipping_rate_rule_id = quote.rate_id
+        shipping.shipping_rate_name_snapshot = quote.rate_name
+        shipping.estimated_amount = quote.amount
+        shipping.final_amount = quote.amount
+        shipping.is_free_shipping = quote.is_free_shipping
+        shipping.calculation_source = (
+            "free_shipping_rule" if quote.is_free_shipping else "polygon_auto"
+        )
     else:
         api_error(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "envio_sin_datos",
-            "Indica una tarifa existente o un monto manual con motivo.",
+            "Indica una tarifa existente, un monto manual con motivo o una "
+            "ubicación en el mapa para cotizar.",
         )
 
     shipping.calculation_status = "finalized"

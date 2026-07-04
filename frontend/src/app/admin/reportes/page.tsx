@@ -18,12 +18,16 @@ export default async function ReportsPage() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <h1 style={{ margin: 0 }}>Reportes</h1>
-      <p style={{ margin: 0, fontSize: 14, opacity: 0.75 }}>
-        Ventas registradas por el sistema en el rango elegido. No es utilidad ni
-        reporte contable.
-      </p>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <header>
+        <h1 className="tt-display" style={{ margin: 0, fontSize: 24 }}>
+          Reportes
+        </h1>
+        <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted-btn-tx)" }}>
+          Ventas registradas por el sistema en el rango elegido. No es utilidad
+          ni reporte contable.
+        </p>
+      </header>
       <ReportsView />
     </div>
   );

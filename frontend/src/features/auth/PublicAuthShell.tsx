@@ -1,62 +1,86 @@
 import Link from "next/link";
 
-import { AnimatedOrb } from "@/components/ui/AnimatedOrb";
-
 /**
- * Marco visual común a las páginas públicas de auth — re-skin del LOGIN del diseño (MP-CTRL-0127):
- * marca centrada (orbe animado + "Restaurant Platform"), título/descripción de la página y una tarjeta
- * de panel suave; con blobs decorativos a la deriva al fondo. SÓLO presentación (tokens de tema, sin
- * lógica de auth): cada página inyecta su formulario como ``children`` sin cambios de comportamiento.
+ * Marco visual común a las páginas públicas de auth — re-skin del LOGIN del
+ * handoff Tony-Tony (Turno 8, escenas 8a/8b): la MARCA vive en el layout del
+ * grupo (public) (panel oscuro con identidad dinámica del negocio); aquí solo
+ * queda la columna del formulario sobre la superficie del tema — título en
+ * tipografía display y contenido directo, sin tarjeta ni orbes. SÓLO
+ * presentación (tokens `--sf-*` remapeados en `.sf-auth`, sin lógica de auth):
+ * cada página inyecta su formulario como ``children`` sin cambios de
+ * comportamiento.
  */
 export function PublicAuthShell({
   title,
+  badge,
   description,
   children,
   footer,
 }: Readonly<{
   title: string;
+  badge?: React.ReactNode;
   description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }>) {
   return (
-    <main className="relative flex min-h-screen flex-col overflow-hidden bg-[var(--bg)] px-4 py-10 text-[var(--tx)]">
-      {/* Blobs decorativos del diseño: a la deriva (blobdrift), sin captura de eventos. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="absolute -left-40 -top-44 h-[560px] w-[560px] rounded-full opacity-40 blur-[70px] [background:radial-gradient(circle,#a59bf6,transparent_68%)]"
-          style={{ animation: "blobdrift-a 19s ease-in-out infinite" }}
-        />
-        <div
-          className="absolute -bottom-40 -right-40 h-[520px] w-[520px] rounded-full opacity-30 blur-[72px] [background:radial-gradient(circle,#7fd9d0,transparent_68%)]"
-          style={{ animation: "blobdrift-b 24s ease-in-out infinite" }}
-        />
-        <div
-          className="absolute -top-28 right-[8%] h-[380px] w-[380px] rounded-full opacity-25 blur-[66px] [background:radial-gradient(circle,#f4a6c0,transparent_70%)]"
-          style={{ animation: "blobdrift-c 27s ease-in-out infinite" }}
-        />
-      </div>
+    <section className="sf-auth-card">
+      <header className="sf-auth-head">
+        <h1 className="sf-display sf-auth-title">{title}</h1>
+        {badge ? <span className="sf-auth-badge">{badge}</span> : null}
+        {description ? <p className="sf-auth-desc">{description}</p> : null}
+      </header>
+      {children}
+      {footer ? <div className="sf-auth-footer">{footer}</div> : null}
+    </section>
+  );
+}
 
-      <div className="relative z-[1] m-auto flex w-full max-w-[392px] flex-col items-center">
-        <div className="orb-intro-soft">
-          <AnimatedOrb size={84} />
-        </div>
-        <h1 className="text-blur-intro mt-5 text-[27px] font-semibold tracking-tight text-[var(--tx)]">
-          Restaurant Platform
-        </h1>
-        <h2 className="text-blur-intro-delay mt-2 text-center text-[14.5px] font-normal text-[var(--tx2)]">
-          {title}
-        </h2>
-        {description ? (
-          <p className="mt-1 text-center text-sm text-[var(--tx3)]">{description}</p>
-        ) : null}
+/**
+ * Separador con texto de las escenas 8a/10a («o», «o con tus datos»). Solo
+ * decorativo: los lectores de pantalla no lo necesitan para entender el flujo.
+ */
+export function AuthDivider({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <div className="my-4 flex items-center gap-3" aria-hidden="true">
+      <span className="h-px flex-1 bg-[var(--border2)]" />
+      <span className="text-xs font-bold text-[var(--tx3)]">{children}</span>
+      <span className="h-px flex-1 bg-[var(--border2)]" />
+    </div>
+  );
+}
 
-        <div className="composer-intro mt-7 w-full rounded-[22px] bg-[var(--panel)] p-6 shadow-[var(--soft2)]">
-          {children}
-          {footer ? <div className="mt-6 text-sm text-[var(--tx2)]">{footer}</div> : null}
-        </div>
-      </div>
-    </main>
+/**
+ * Botón «Continuar con Google» (escenas 8a/10a): navegación completa (no fetch),
+ * el backend responde 302 a Google. Compartido por login y registro; mostrarlo
+ * SOLO cuando la política publica google_login_enabled.
+ */
+export function GoogleAuthButton() {
+  return (
+    <a
+      href="/api/v1/auth/google/start"
+      className="flex w-full items-center justify-center gap-2.5 rounded-[13px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-2.5 text-sm font-medium text-[var(--tx)] transition hover:border-[var(--accent-bd)]"
+    >
+      <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          fill="#4285F4"
+          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"
+        />
+        <path
+          fill="#34A853"
+          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.99.66-2.25 1.05-3.72 1.05-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"
+        />
+        <path
+          fill="#FBBC05"
+          d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.1V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"
+        />
+        <path
+          fill="#EA4335"
+          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06L5.84 9.9C6.71 7.31 9.14 5.38 12 5.38z"
+        />
+      </svg>
+      Continuar con Google
+    </a>
   );
 }
 
@@ -64,7 +88,7 @@ export function AuthLink({ href, children }: Readonly<{ href: string; children: 
   return (
     <Link
       href={href}
-      className="font-medium text-[var(--accent-tx)] underline-offset-2 hover:underline"
+      className="font-semibold text-[var(--accent-tx)] underline-offset-2 hover:underline"
     >
       {children}
     </Link>

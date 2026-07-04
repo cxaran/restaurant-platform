@@ -13,7 +13,7 @@ export function GroupedCatalog({
 }: Readonly<{ label: string; catalog: PermissionsCatalog }>) {
   if (catalog.length === 0) {
     return (
-      <p className="rounded-md border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+      <p className="rounded-md border border-[var(--border)] bg-white px-4 py-6 text-sm text-[var(--tx3)]">
         No hay permisos disponibles.
       </p>
     );
@@ -25,17 +25,17 @@ export function GroupedCatalog({
         <section
           key={group.name}
           aria-labelledby={`group-${group.name}`}
-          className="rounded-lg border border-slate-200 bg-white p-5"
+          className="rounded-lg border border-[var(--border)] bg-white p-5"
         >
-          <h2 id={`group-${group.name}`} className="text-base font-semibold text-slate-900">
+          <h2 id={`group-${group.name}`} className="text-base font-semibold text-[var(--tx)]">
             {group.label}
           </h2>
-          <ul className="mt-3 divide-y divide-slate-100">
+          <ul className="mt-3 divide-y divide-[var(--border)]">
             {group.permissions.map((permission) => (
               <li key={permission.access} className="py-2">
-                <p className="text-sm font-medium text-slate-800">{permission.label}</p>
+                <p className="text-sm font-medium text-[var(--tx2)]">{permission.label}</p>
                 {permission.description && permission.description !== permission.label ? (
-                  <p className="mt-0.5 text-sm text-slate-500">{permission.description}</p>
+                  <p className="mt-0.5 text-sm text-[var(--tx3)]">{permission.description}</p>
                 ) : null}
               </li>
             ))}

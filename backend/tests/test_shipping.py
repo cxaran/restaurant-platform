@@ -38,17 +38,22 @@ DEV_ENV = {
 
 os.environ.update(DEV_ENV)
 
+from unittest import mock  # noqa: E402
+
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
-from sqlmodel import Session  # noqa: E402
+from sqlmodel import Session, select  # noqa: E402
 
+from backend.app.auth.auth_dependencies import get_current_user  # noqa: E402
 from backend.app.core.database import get_db  # noqa: E402
 from backend.app.core.settings import settings  # noqa: E402
 from backend.app.main import app  # noqa: E402
 from backend.app.models import Base  # noqa: E402
 from backend.app.models.business import BusinessSettings  # noqa: E402
+from backend.app.models.orders import OrderShipping  # noqa: E402
 from backend.app.models.shipping import DeliveryZone, ShippingRateRule  # noqa: E402
+from backend.app.schemas.user import SessionUser  # noqa: E402
 from backend.app.services.shipping_service import (  # noqa: E402
     quote_shipping,
     select_rate,
@@ -212,6 +217,118 @@ class ShippingRoutesTest(unittest.TestCase):
             "/api/v1/public/shipping-quote", json={"subtotal": "-5"}
         )
         self.assertEqual(response.status_code, 422)
+
+
+class _As:
+    """Sesión simulada con permisos exactos (mismo patrón del resto de suites)."""
+
+    def __init__(self, *permissions: str) -> None:
+        self.user = SessionUser(
+            id=uuid.uuid4(),
+            name="Tester",
+            last_name="Apellido",
+            email="tester@example.com",
+            permissions=set(permissions),
+        )
+
+    def __enter__(self) -> None:
+        app.dependency_overrides[get_current_user] = lambda: self.user
+
+    def __exit__(self, *exc: object) -> None:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+class ZoneDeletionTest(unittest.TestCase):
+    """DELETE /shipping/zones/{id} elimina de verdad; con pedidos se rechaza."""
+
+    def setUp(self) -> None:
+        self.engine = _sqlite_engine()
+
+        def override_db():
+            with Session(self.engine) as session:
+                yield session
+
+        app.dependency_overrides[get_db] = override_db
+        self.client = TestClient(app)
+        # La geometría en SQLite es un BLOB inerte: la serialización GeoJSON de
+        # la respuesta se neutraliza (el borrado es lo que se prueba aquí).
+        self._geo = mock.patch(
+            "backend.app.api.v1.shipping.wkb_to_geojson", return_value={}
+        )
+        self._geo.start()
+
+        self.zone_id = uuid.uuid4()
+        with Session(self.engine) as session:
+            zone = _zone(name="Zona borrable")
+            zone.id = self.zone_id
+            zone.rates.append(
+                ShippingRateRule(name="Base", base_fee=Decimal("30"), priority=0)
+            )
+            session.add(zone)
+            session.commit()
+
+    def tearDown(self) -> None:
+        self._geo.stop()
+        app.dependency_overrides.clear()
+
+    def test_delete_zone_removes_zone_and_rates(self) -> None:
+        with _As("shipping:manage"):
+            response = self.client.delete(f"/api/v1/shipping/zones/{self.zone_id}")
+        self.assertEqual(response.status_code, 200, response.text)
+        with Session(self.engine) as session:
+            self.assertIsNone(session.get(DeliveryZone, self.zone_id))
+            # Las tarifas caen en cascada con la zona.
+            self.assertEqual(
+                session.exec(
+                    select(ShippingRateRule).where(
+                        ShippingRateRule.delivery_zone_id == self.zone_id
+                    )
+                ).all(),
+                [],
+            )
+
+    def test_delete_zone_with_orders_keeps_order_snapshot(self) -> None:
+        """El historial NO depende de la zona viva: snapshot y monto sobreviven.
+
+        (La puesta a NULL de la referencia viva es DDL — ON DELETE SET NULL — y
+        se valida contra PostgreSQL; SQLite no aplica FKs aquí.)
+        """
+        shipping_id = uuid.uuid4()
+        with Session(self.engine) as session:
+            session.add(
+                OrderShipping(
+                    id=shipping_id,
+                    order_id=uuid.uuid4(),
+                    delivery_zone_id=self.zone_id,
+                    delivery_zone_name_snapshot="Zona borrable",
+                    calculation_status="calculated",
+                    calculation_source="polygon_auto",
+                    final_amount=Decimal("30"),
+                )
+            )
+            session.commit()
+        with _As("shipping:manage"):
+            response = self.client.delete(f"/api/v1/shipping/zones/{self.zone_id}")
+        self.assertEqual(response.status_code, 200, response.text)
+        with Session(self.engine) as session:
+            self.assertIsNone(session.get(DeliveryZone, self.zone_id))
+            shipping = session.get(OrderShipping, shipping_id)
+            assert shipping is not None
+            self.assertEqual(shipping.delivery_zone_name_snapshot, "Zona borrable")
+            self.assertEqual(shipping.final_amount, Decimal("30"))
+
+    def test_deactivation_still_available_via_patch(self) -> None:
+        with _As("shipping:manage"):
+            response = self.client.patch(
+                f"/api/v1/shipping/zones/{self.zone_id}", json={"is_active": False}
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertFalse(response.json()["is_active"])
+
+    def test_delete_requires_manage_permission(self) -> None:
+        with _As("shipping:read"):
+            response = self.client.delete(f"/api/v1/shipping/zones/{self.zone_id}")
+        self.assertEqual(response.status_code, 403)
 
 
 if __name__ == "__main__":

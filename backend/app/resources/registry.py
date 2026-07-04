@@ -17,6 +17,7 @@ from backend.app.models.audit_event import AuditEvent
 from backend.app.models.backup import BackupRun, BackupSettings
 from backend.app.models.catalog import ModifierGroup, Product, ProductCategory
 from backend.app.models.finances import FinancialCategory
+from backend.app.models.payments import PaymentMethodConfig
 from backend.app.models.shipping import DeliveryZone
 from backend.app.models.system_settings import SystemSettings
 from backend.app.models.user import Role, User
@@ -69,6 +70,11 @@ from backend.app.schemas.finance import (
     FinancialCategoryCreate,
     FinancialCategoryListItem,
 )
+from backend.app.schemas.payment import (
+    PaymentMethodConfigCreate,
+    PaymentMethodConfigListItem,
+    PaymentMethodConfigUpdate,
+)
 from backend.app.schemas.shipping import DeliveryZoneListItem, DeliveryZoneUpdate
 from backend.app.schemas.role import RoleCreate, RoleListItem, RoleRead, RoleUpdate
 from backend.app.schemas.system_settings import (
@@ -86,6 +92,7 @@ from backend.app.security.groups.audit_events import AuditEventPermissions
 from backend.app.security.groups.backups import BackupPermissions
 from backend.app.security.groups.catalog import CatalogPermissions
 from backend.app.security.groups.finances import FinancePermissions
+from backend.app.security.groups.payments import PaymentPermissions
 from backend.app.security.groups.permissions import PermissionPermissions
 from backend.app.security.groups.roles import RolePermissions
 from backend.app.security.groups.shipping import ShippingPermissions
@@ -289,6 +296,27 @@ FINANCE_CATEGORIES = ResourceQuery(
         in_fields=("id",),
         field_operators={"name": _TEXT_FILTER_OPERATORS},
         default_sort="name",
+    ),
+)
+
+PAYMENT_METHODS = ResourceQuery(
+    name="PaymentMethodConfigQuery",
+    model=PaymentMethodConfig,
+    schema=PaymentMethodConfigListItem,
+    options=QueryOptions(
+        filter_fields=(
+            "is_active",
+            "available_online",
+            "available_pos",
+            "requires_manual_verification",
+            "code",
+            "display_name",
+        ),
+        sort_fields=("sort_order", "display_name", "created_at"),
+        search_fields=("code", "display_name"),
+        in_fields=("id",),
+        field_operators={"display_name": _TEXT_FILTER_OPERATORS},
+        default_sort="sort_order",
     ),
 )
 
@@ -974,6 +1002,25 @@ RESOURCE_REGISTRY: tuple[ResourceDefinition, ...] = (
                     destructive=True,
                 ),
             ),
+            ActionDef(
+                name="delete",
+                label="Eliminar",
+                method=HttpMethod.DELETE,
+                url_template="/api/v1/shipping/zones/{id}",
+                scope=ActionScope.ITEM,
+                danger=True,
+                permission=ShippingPermissions.MANAGE,
+                confirmation=ConfirmationDef(
+                    title="Eliminar zona",
+                    message=(
+                        "Se eliminará la zona y sus tarifas DE FORMA DEFINITIVA. "
+                        "Los pedidos existentes conservan el monto y el nombre de "
+                        "zona que se cobró."
+                    ),
+                    confirm_label="Eliminar",
+                    destructive=True,
+                ),
+            ),
         ),
     ),
     ResourceDefinition(
@@ -989,6 +1036,60 @@ RESOURCE_REGISTRY: tuple[ResourceDefinition, ...] = (
         create_schema=FinancialCategoryCreate,
         create_permission=FinancePermissions.RECORD,
         detail_url_template="/api/v1/finances/categories/{id}",
+    ),
+    ResourceDefinition(
+        name="payment_methods",
+        label="Métodos de pago",
+        api_path="/api/v1/payment-method-configs",
+        view=ResourceView.TABLE,
+        # Configuración del cobro (§18.1): solo quien administra métodos la ve
+        # y la edita. El DELETE no existe: desactivar preserva pagos históricos
+        # (FK RESTRICT) y el ``code`` es inmutable tras crearse.
+        read_permission=PaymentPermissions.MANAGE_METHODS,
+        list_query=PAYMENT_METHODS,
+        list_schema=PaymentMethodConfigListItem,
+        create_schema=PaymentMethodConfigCreate,
+        update_schema=PaymentMethodConfigUpdate,
+        create_permission=PaymentPermissions.MANAGE_METHODS,
+        update_permission=PaymentPermissions.MANAGE_METHODS,
+        detail_url_template="/api/v1/payment-method-configs/{id}",
+        actions=(
+            ActionDef(
+                name="activate",
+                label="Activar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/payment-method-configs/{id}",
+                scope=ActionScope.ITEM,
+                danger=False,
+                permission=PaymentPermissions.MANAGE_METHODS,
+                fixed_body={"is_active": True},
+                visible_when=ActionCondition.model_validate(
+                    {"all": [{"field": "is_active", "operator": "eq", "value": False}]}
+                ),
+            ),
+            ActionDef(
+                name="deactivate",
+                label="Desactivar",
+                method=HttpMethod.PATCH,
+                url_template="/api/v1/payment-method-configs/{id}",
+                scope=ActionScope.ITEM,
+                danger=True,
+                permission=PaymentPermissions.MANAGE_METHODS,
+                fixed_body={"is_active": False},
+                visible_when=ActionCondition.model_validate(
+                    {"all": [{"field": "is_active", "operator": "eq", "value": True}]}
+                ),
+                confirmation=ConfirmationDef(
+                    title="Desactivar método de pago",
+                    message=(
+                        "El método deja de ofrecerse en línea y en mostrador; "
+                        "los pagos históricos se conservan."
+                    ),
+                    confirm_label="Desactivar",
+                    destructive=True,
+                ),
+            ),
+        ),
     ),
 )
 

@@ -9,13 +9,26 @@ export default async function CheckoutPage() {
   const session = await getSession();
 
   return (
-    <div className="sf-container" style={{ paddingBlock: 28, maxWidth: 620 }}>
-      <h1 className="sf-display" style={{ fontSize: 30, margin: "0 0 18px" }}>Finalizar pedido</h1>
+    <div className="sf-container" style={{ paddingBlock: 24, maxWidth: 620 }}>
+      <div className="sf-cart-head">
+        <Link href="/carrito" className="sf-pd-back sf-cart-back" aria-label="Volver al carrito">
+          ‹
+        </Link>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          <h1 className="sf-display" style={{ fontSize: 26, margin: 0 }}>Finalizar pedido</h1>
+          <span className="sf-muted" style={{ fontSize: 12 }}>
+            {session
+              ? `Con tu cuenta · ${session.name}`
+              : "Necesitas una cuenta para confirmar"}
+          </span>
+        </div>
+      </div>
       {session ? (
         <CheckoutForm session={session} />
       ) : (
-        // No existe checkout de invitado: el carrito local se conserva y el
-        // cliente vuelve aquí después de iniciar sesión o crear su cuenta.
+        // No existe checkout de invitado (requiere backend): el carrito local
+        // se conserva y el cliente vuelve aquí después de iniciar sesión o
+        // crear su cuenta.
         <div className="sf-card" style={{ padding: 26, display: "flex", flexDirection: "column", gap: 14 }}>
           <div className="sf-display" style={{ fontSize: 20 }}>Confirma tus datos para continuar</div>
           <p className="sf-muted" style={{ margin: 0, fontSize: 14 }}>

@@ -81,30 +81,50 @@ def _own_current_assignment(
 # Vista del repartidor
 # ---------------------------------------------------------------------------
 
+def _delivery_item_fields(session: Session, order, delivery) -> dict:
+    """Campos comunes de la cola y de «mis entregas»: dirección, contacto,
+    coordenadas (si el punto existe) y cobro derivado (H9)."""
+    from backend.app.utils.geo import wkb_point_to_lonlat
+
+    address = delivery.street
+    if delivery.neighborhood:
+        address += f", {delivery.neighborhood}"
+    shipping = order.shipping
+    lonlat = wkb_point_to_lonlat(delivery.location)
+    return {
+        "order_id": order.id,
+        "order_delivery_id": delivery.id,
+        "public_code": order.public_code,
+        "customer_name": order.customer_name_snapshot,
+        "address_summary": address,
+        "zone_name": shipping.delivery_zone_name_snapshot if shipping else None,
+        "collection_label": collection_instruction(session, order).label,
+        "ready_since": order.updated_at,
+        "recipient_phone": delivery.recipient_phone or order.customer_phone_snapshot,
+        "references": delivery.references,
+        "location": (
+            {"type": "Point", "coordinates": list(lonlat)} if lonlat is not None else None
+        ),
+        "total_amount": order.total_money_amount,
+        # Aclaraciones registradas al transicionar (p. ej. al aprobar) y
+        # visibles fuera del panel; la nota interna nunca llega aquí.
+        "visible_notes": [
+            entry.customer_visible_note
+            for entry in sorted(order.status_history, key=lambda h: h.changed_at)
+            if (entry.customer_visible_note or "").strip()
+        ],
+    }
+
+
 @router.get("/courier/available-orders", response_model=list[AvailableDeliveryItem])
 def list_available_orders(
     session: SessionDep,
     _: DeliveryPermissions.SELF_ASSIGN.requiere,
 ) -> list[AvailableDeliveryItem]:
-    items: list[AvailableDeliveryItem] = []
-    for order, delivery in available_deliveries(session):
-        address = delivery.street
-        if delivery.neighborhood:
-            address += f", {delivery.neighborhood}"
-        shipping = order.shipping
-        items.append(
-            AvailableDeliveryItem(
-                order_id=order.id,
-                order_delivery_id=delivery.id,
-                public_code=order.public_code,
-                customer_name=order.customer_name_snapshot,
-                address_summary=address,
-                zone_name=shipping.delivery_zone_name_snapshot if shipping else None,
-                collection_label=collection_instruction(session, order).label,
-                ready_since=order.updated_at,
-            )
-        )
-    return items
+    return [
+        AvailableDeliveryItem(**_delivery_item_fields(session, order, delivery))
+        for order, delivery in available_deliveries(session)
+    ]
 
 
 @router.get("/courier/deliveries/mine", response_model=list[MyActiveDelivery])
@@ -127,26 +147,13 @@ def my_active_deliveries(
         )
         .order_by(DeliveryAssignment.assigned_at)  # pyright: ignore[reportArgumentType]
     ).all()
-    items: list[MyActiveDelivery] = []
-    for assignment, delivery, order in rows:
-        address = delivery.street
-        if delivery.neighborhood:
-            address += f", {delivery.neighborhood}"
-        shipping = order.shipping
-        items.append(
-            MyActiveDelivery(
-                order_id=order.id,
-                order_delivery_id=delivery.id,
-                public_code=order.public_code,
-                customer_name=order.customer_name_snapshot,
-                address_summary=address,
-                zone_name=shipping.delivery_zone_name_snapshot if shipping else None,
-                collection_label=collection_instruction(session, order).label,
-                ready_since=order.updated_at,
-                assignment_status=assignment.status,
-            )
+    return [
+        MyActiveDelivery(
+            **_delivery_item_fields(session, order, delivery),
+            assignment_status=assignment.status,
         )
-    return items
+        for assignment, delivery, order in rows
+    ]
 
 
 @router.post("/courier/availability", response_model=CourierSummaryRead)
@@ -169,6 +176,7 @@ def set_availability(
         deliveries_completed=summary.deliveries_completed,
         cash_collected=summary.cash_collected,
         shipping_charged=summary.shipping_charged,
+        is_delivery_available=profile.is_delivery_available,
     )
 
 
@@ -264,10 +272,12 @@ def my_summary(
     _: DeliveryPermissions.SELF_ASSIGN.requiere,
 ) -> CourierSummaryRead:
     summary = courier_daily_summary(session, current_user.id)
+    profile = session.get(StaffProfile, current_user.id)
     return CourierSummaryRead(
         deliveries_completed=summary.deliveries_completed,
         cash_collected=summary.cash_collected,
         shipping_charged=summary.shipping_charged,
+        is_delivery_available=bool(profile and profile.is_delivery_available),
     )
 
 

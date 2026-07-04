@@ -289,9 +289,810 @@
   margin-top: 3px;
 }
 
+/* ---------------------------------------------------------------------------
+   Auth pública (login/registro/reset/unlock) — handoff Turno 8, escenas 8a/8b.
+   Móvil: banda de marca oscura arriba (esquinas inferiores redondeadas) y el
+   formulario sobre la superficie. Escritorio (≥900px): panel de marca como
+   columna izquierda con héroe y pie. TODO el color sale de tokens --sf-*.
+   Los formularios de plataforma (variables --bg2/--tx/--accent/…) NO se tocan:
+   aquí se REMAPEAN esas variables a los tokens del tema publicado. */
+
+.sf-auth {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+
+  --bg: var(--sf-surface);
+  --bg2: color-mix(in srgb, var(--sf-surface) 30%, white);
+  --panel: color-mix(in srgb, var(--sf-surface) 40%, white);
+  --panel2: var(--sf-surface-muted);
+  --border2: color-mix(in srgb, var(--sf-text) 35%, transparent);
+  --tx: var(--sf-text);
+  --tx2: color-mix(in srgb, var(--sf-text) 76%, var(--sf-surface));
+  --tx3: color-mix(in srgb, var(--sf-text) 55%, var(--sf-surface));
+  --accent: var(--sf-brand);
+  --accent-tx: var(--sf-brand);
+  --accent-dim: color-mix(in srgb, var(--sf-brand) 11%, transparent);
+  --accent-bd: color-mix(in srgb, var(--sf-brand) 60%, transparent);
+  --on-accent: var(--sf-text-inverse);
+  --danger: #b3261e;
+  --ok: var(--sf-success);
+  --soft: 0 6px 16px color-mix(in srgb, var(--sf-brand) 30%, transparent);
+  --soft2: var(--sf-shadow-card);
+}
+
+.sf-auth-brand {
+  background: var(--sf-brand-2);
+  color: color-mix(in srgb, var(--sf-text-inverse) 78%, var(--sf-brand-2));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 56px 28px 30px;
+  border-radius: 0 0 28px 28px;
+}
+
+.sf-auth-brand-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.sf-auth-monogram {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--sf-brand);
+  color: var(--sf-text-inverse);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+}
+
+.sf-auth-brand-name {
+  color: var(--sf-text-inverse);
+  font-size: 24px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.sf-auth-brand-slogan {
+  font-size: 13px;
+}
+
+/* Piezas exclusivas del panel de escritorio: ocultas en móvil. */
+.sf-auth-brand-top,
+.sf-auth-brand-hero,
+.sf-auth-brand-foot {
+  display: none;
+}
+
+.sf-auth-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px 28px 44px;
+}
+
+.sf-auth-main {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.sf-auth-card {
+  width: 100%;
+  max-width: 400px;
+}
+
+.sf-auth-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.sf-auth-title {
+  margin: 0;
+  font-size: 21px;
+}
+
+.sf-auth-desc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--tx2);
+}
+
+.sf-auth-footer {
+  margin-top: 18px;
+  font-size: 14px;
+  color: var(--tx2);
+}
+
+/* Insignia del registro (10a/10b): píldora de acento bajo el título. */
+.sf-auth-badge {
+  align-self: flex-start;
+  background: var(--sf-brand);
+  color: var(--sf-text-inverse);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Detalles de formulario que el handoff marca explícitamente: labels en
+   versales, botón de envío contundente y botón de Google delineado. */
+.sf-auth label {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--tx3);
+}
+
+.sf-auth button[type="submit"] {
+  font-weight: 800;
+}
+
+.sf-auth a[href^="/api/v1/auth/google"] {
+  border-width: 2px;
+  border-color: var(--sf-text);
+  border-radius: 14px;
+  font-weight: 800;
+  color: var(--sf-text);
+}
+
+@media (min-width: 900px) {
+  .sf-auth {
+    flex-direction: row;
+  }
+
+  .sf-auth-brand {
+    width: clamp(360px, 38vw, 460px);
+    flex-shrink: 0;
+    border-radius: 0;
+    align-items: stretch;
+    justify-content: space-between;
+    text-align: left;
+    gap: 24px;
+    padding: 48px 44px;
+  }
+
+  .sf-auth-brand-stack {
+    display: none;
+  }
+
+  .sf-auth-brand-top {
+    display: block;
+    color: var(--sf-text-inverse);
+  }
+
+  .sf-auth-brand-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sf-auth-brand-headline {
+    margin: 0;
+    font-size: clamp(30px, 2.6vw, 38px);
+    line-height: 1.15;
+    color: var(--sf-text-inverse);
+  }
+
+  .sf-auth-brand-copy {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .sf-auth-brand-foot {
+    display: block;
+    margin: 0;
+    font-size: 12px;
+    color: color-mix(in srgb, var(--sf-text-inverse) 55%, var(--sf-brand-2));
+  }
+
+  .sf-auth-content {
+    padding: 48px;
+  }
+
+  .sf-auth-title {
+    font-size: 26px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sf-root * {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* === Cuenta y seguimiento (3a/2a/1e) ===
+   Apéndice: solo clases NUEVAS de «Mi cuenta», «Mis créditos» y el seguimiento
+   de pedido. Todo el color sale de tokens --sf-*; nada de paleta hardcodeada. */
+
+/* Banda de identidad oscura: cabecera de la cuenta (3a) y del seguimiento. */
+.sf-band {
+  background: var(--sf-brand-2);
+  color: var(--sf-text-inverse);
+  border-radius: var(--sf-radius-card);
+  box-shadow: var(--sf-shadow-card);
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sf-band-sub {
+  color: color-mix(in srgb, var(--sf-text-inverse) 68%, var(--sf-brand-2));
+}
+
+.sf-band-link {
+  border: 1px solid color-mix(in srgb, var(--sf-text-inverse) 40%, transparent);
+  border-radius: 12px;
+  padding: 8px 13px;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--sf-text-inverse);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sf-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--sf-brand);
+  color: var(--sf-text-inverse);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+/* Tarjeta de saldo de créditos (3a): marca sólida con saldo en display. */
+.sf-credits-hero {
+  background: var(--sf-brand);
+  color: var(--sf-text-inverse);
+  border-radius: var(--sf-radius-card);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sf-brand) 30%, transparent);
+}
+
+.sf-credits-hero-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--sf-text-inverse) 74%, var(--sf-brand));
+}
+
+.sf-credits-hero-hint {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--sf-text-inverse) 74%, var(--sf-brand));
+}
+
+.sf-credit-stat {
+  flex: 1 1 90px;
+  background: color-mix(in srgb, black 18%, transparent);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sf-credit-stat span {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--sf-text-inverse) 74%, var(--sf-brand));
+}
+
+.sf-credit-stat strong {
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.sf-credit-cta {
+  flex: 1.3 1 120px;
+  background: var(--sf-surface);
+  color: var(--sf-brand);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 900;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+/* Etiquetas de sección en versales (3a). */
+.sf-section-label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--sf-text) 78%, var(--sf-surface));
+}
+
+/* Lista de renglones divididos (movimientos, direcciones). */
+.sf-rowlist {
+  background: color-mix(in srgb, var(--sf-surface) 40%, white);
+  border: 1px solid color-mix(in srgb, var(--sf-text) 14%, transparent);
+  border-radius: 14px;
+  padding: 4px 16px;
+}
+
+.sf-rowlist-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 13px;
+}
+
+.sf-rowlist-row + .sf-rowlist-row {
+  border-top: 1px solid color-mix(in srgb, var(--sf-text) 9%, transparent);
+}
+
+.sf-delta {
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.sf-delta[data-dir="pos"] {
+  color: var(--sf-success);
+}
+
+.sf-delta[data-dir="neg"] {
+  color: var(--sf-brand);
+}
+
+/* Chips de estado suaves (historial 3a). */
+.sf-status-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  background: var(--sf-surface-muted);
+  color: var(--sf-text);
+}
+
+.sf-status-chip[data-tone="success"] {
+  background: color-mix(in srgb, var(--sf-success) 14%, white);
+  color: color-mix(in srgb, var(--sf-success) 85%, var(--sf-text));
+}
+
+.sf-status-chip[data-tone="warn"] {
+  background: color-mix(in srgb, var(--sf-accent) 22%, white);
+  color: color-mix(in srgb, var(--sf-accent) 45%, var(--sf-text));
+}
+
+.sf-status-chip[data-tone="danger"] {
+  background: color-mix(in srgb, var(--sf-brand) 12%, white);
+  color: color-mix(in srgb, var(--sf-brand) 80%, var(--sf-text));
+}
+
+/* Insignias sólidas del encabezado de seguimiento (1e/2a). */
+.sf-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--sf-text-inverse) 16%, var(--sf-brand-2));
+  color: var(--sf-text-inverse);
+}
+
+.sf-badge[data-tone="success"] {
+  background: var(--sf-success);
+}
+
+.sf-badge[data-tone="warn"] {
+  background: color-mix(in srgb, var(--sf-accent) 70%, var(--sf-brand-2));
+}
+
+.sf-badge[data-tone="danger"] {
+  background: var(--sf-brand);
+}
+
+/* Línea de tiempo del pedido (1e/2a). */
+.sf-tl-row {
+  display: flex;
+  gap: 14px;
+}
+
+.sf-tl-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sf-tl-dot {
+  --tl-c: var(--sf-brand);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.sf-tl-dot[data-tone="success"] {
+  --tl-c: var(--sf-success);
+}
+
+.sf-tl-dot[data-state="done"],
+.sf-tl-dot[data-state="current"] {
+  background: var(--tl-c);
+}
+
+.sf-tl-dot[data-state="current"] {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--tl-c) 18%, transparent);
+}
+
+.sf-tl-dot[data-state="todo"] {
+  border: 3px solid color-mix(in srgb, var(--sf-text) 20%, transparent);
+}
+
+.sf-tl-line {
+  width: 2px;
+  flex: 1;
+  min-height: 22px;
+  background: color-mix(in srgb, var(--sf-text) 16%, transparent);
+}
+
+.sf-tl-line[data-tone="success"] {
+  background: var(--sf-success);
+}
+
+.sf-tl-line[data-tone="brand"] {
+  background: var(--sf-brand);
+}
+
+.sf-tl-title {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.sf-tl-title[data-state="todo"] {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--sf-text) 45%, var(--sf-surface));
+}
+
+.sf-tl-title[data-state="current"][data-tone="success"] {
+  color: var(--sf-success);
+}
+
+.sf-tl-title[data-state="current"][data-tone="brand"] {
+  color: var(--sf-brand);
+}
+
+.sf-tl-caption {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--sf-text) 55%, var(--sf-surface));
+}
+
+/* Mapa placeholder con rayas (2a): SOLO cuando no hay coordenadas reales. */
+.sf-map-ph {
+  height: 180px;
+  border-radius: var(--sf-radius-card);
+  border: 1px solid color-mix(in srgb, var(--sf-text) 14%, transparent);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--sf-surface-muted),
+    var(--sf-surface-muted) 12px,
+    color-mix(in srgb, var(--sf-text) 7%, var(--sf-surface-muted)) 12px,
+    color-mix(in srgb, var(--sf-text) 7%, var(--sf-surface-muted)) 24px
+  );
+  position: relative;
+  overflow: hidden;
+}
+
+.sf-live-pill {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: color-mix(in srgb, var(--sf-surface) 30%, white);
+  border: 1px solid color-mix(in srgb, var(--sf-text) 14%, transparent);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--sf-success);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sf-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sf-success);
+  flex-shrink: 0;
+}
+
+.sf-map-ph-note {
+  position: absolute;
+  bottom: 10px;
+  right: 12px;
+  font-size: 10px;
+  color: color-mix(in srgb, var(--sf-text) 55%, var(--sf-surface-muted));
+}
+
+/* Botón de WhatsApp del repartidor (2a). */
+.sf-btn-wa {
+  background: var(--sf-success);
+  border-color: var(--sf-success);
+}
+
+/* Fila de acciones al pie de la cuenta (3a). */
+.sf-account-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sf-account-actions > * {
+  flex: 1 1 200px;
+}
+
+/* === Producto/carrito/checkout (1b/1c/1d) === */
+
+/* Utilidad de accesibilidad: texto solo para lectores de pantalla. */
+.sf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- 1b · Página de detalle de producto --- */
+.sf-pd {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.sf-pd-hero {
+  position: relative;
+  height: 250px;
+  background: var(--sf-surface-muted);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.sf-pd-hero img {
+  max-height: 92%;
+  max-width: 88%;
+  object-fit: contain;
+}
+
+.sf-pd-back {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sf-surface) 30%, white);
+  border: 1px solid color-mix(in srgb, var(--sf-text) 18%, transparent);
+  color: var(--sf-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  text-decoration: none;
+  z-index: 1;
+}
+
+.sf-pd-body {
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+  padding: 18px 20px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sf-pd-titlerow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sf-pd-price {
+  font-weight: 900;
+  font-size: 21px;
+  color: var(--sf-brand);
+  white-space: nowrap;
+}
+
+/* Encabezado de grupo en versales, como el diseño 1b. */
+.sf-pd-grouphead,
+.sf-pd-grouphead > span:first-child {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--sf-text) 80%, var(--sf-surface));
+}
+
+.sf-pd-note {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--sf-text) 32%, transparent);
+  resize: vertical;
+}
+
+/* Barra inferior pegajosa con stepper + CTA grande. */
+.sf-pd-footer {
+  position: sticky;
+  bottom: 0;
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+  padding: 12px 20px 22px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: linear-gradient(to top, var(--sf-surface) 72%, transparent);
+}
+
+.sf-pd-add {
+  flex: 1;
+  justify-content: space-between;
+  padding: 15px 18px;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--sf-brand) 35%, transparent);
+}
+
+/* --- 1c · Carrito --- */
+.sf-cart-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sf-cart-back {
+  position: static;
+  flex-shrink: 0;
+}
+
+.sf-cart-line {
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.sf-cart-thumb {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.sf-cart-thumb img {
+  max-width: 58px;
+  max-height: 58px;
+  object-fit: contain;
+}
+
+.sf-cart-linefoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.sf-cart-summary {
+  margin-top: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 14px;
+}
+
+.sf-cart-summaryrow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: color-mix(in srgb, var(--sf-text) 82%, var(--sf-surface));
+}
+
+.sf-cart-summarytotal {
+  border-top: 1px dashed color-mix(in srgb, var(--sf-text) 30%, transparent);
+  padding-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.sf-cart-authlinks {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.sf-cart-authlinks a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* --- 1d · Checkout --- */
+/* Control segmentado A domicilio / Recoger. */
+.sf-segment {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--sf-surface-muted);
+}
+
+.sf-segment button {
+  flex: 1;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: color-mix(in srgb, var(--sf-text) 72%, var(--sf-surface));
+  text-align: center;
+  padding: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sf-segment button[data-active="true"] {
+  background: var(--sf-brand-2);
+  color: var(--sf-text-inverse);
+  font-weight: 800;
+}
+
+.sf-segment button:focus-visible {
+  outline: 3px solid var(--sf-accent);
+  outline-offset: 2px;
+}
+
+/* Labels del checkout en versales pequeñas, como las cajas del diseño 1d. */
+.sf-checkout .sf-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--sf-text) 62%, var(--sf-surface));
 }

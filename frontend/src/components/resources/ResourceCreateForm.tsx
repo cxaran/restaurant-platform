@@ -8,7 +8,10 @@ import { ResourceFormFields } from "@/components/resources/ResourceFormFields";
 import { ApiRequestError } from "@/core/api/api-error";
 import type { ResourceFormCapability } from "@/core/api/contracts";
 import { buildCreatePayload, buildMultipartPayload } from "@/core/resources/resource-form";
-import { createResource } from "@/core/resources/resource-mutation-client";
+import {
+  createResource,
+  forbiddenMutationMessage,
+} from "@/core/resources/resource-mutation-client";
 
 /** Tamaño legible (KB/MB) para los textos de ayuda del campo de archivo. */
 function formatBytes(bytes: number): string {
@@ -116,7 +119,10 @@ export function ResourceCreateForm({
           return;
         }
         if (error.status === 403) {
-          router.replace(listPath);
+          // Un 403 al crear se MUESTRA (permiso perdido o rechazo CSRF);
+          // redirigir en silencio haría creer que el alta se aplicó.
+          setGeneralError(forbiddenMutationMessage(error));
+          setPending(false);
           return;
         }
         const parsed = formErrors(error, allowedFields);
@@ -130,10 +136,10 @@ export function ResourceCreateForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="max-w-2xl space-y-6 rounded-lg border border-slate-200 bg-white p-6">
+    <form onSubmit={onSubmit} className="max-w-2xl space-y-6 rounded-lg border border-[var(--border)] bg-white p-6">
       <header>
-        <p className="text-sm font-medium text-slate-500">Nuevo recurso</p>
-        <h2 className="mt-1 text-xl font-semibold text-slate-900">Crear {resourceLabel}</h2>
+        <p className="text-sm font-medium text-[var(--tx3)]">Nuevo recurso</p>
+        <h2 className="mt-1 text-xl font-semibold text-[var(--tx)]">Crear {resourceLabel}</h2>
       </header>
 
       {generalError ? (
@@ -144,7 +150,7 @@ export function ResourceCreateForm({
 
       {fileField ? (
         <div>
-          <label htmlFor={fileField.name} className="block text-sm font-medium text-slate-900">
+          <label htmlFor={fileField.name} className="block text-sm font-medium text-[var(--tx)]">
             {fileField.label}
           </label>
           <input
@@ -156,9 +162,9 @@ export function ResourceCreateForm({
             aria-describedby={
               fieldErrors[fileField.name]?.length ? `${fileField.name}-error` : undefined
             }
-            className="mt-1 block w-full text-sm text-slate-900 file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
+            className="mt-1 block w-full text-sm text-[var(--tx)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--side-bg)] file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-[var(--tx2)]"
           />
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-[var(--tx3)]">
             Tamaño máximo {formatBytes(fileField.max_size_bytes)}.
             {fileField.accepted_mime_types.length > 0
               ? ` Tipos permitidos: ${fileField.accepted_mime_types.join(", ")}.`
@@ -182,7 +188,7 @@ export function ResourceCreateForm({
           type="button"
           onClick={() => router.replace(listPath)}
           disabled={pending}
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md border border-[var(--border2)] px-4 py-2 text-sm font-medium text-[var(--tx2)] transition hover:bg-[var(--panel2)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Cancelar
         </button>

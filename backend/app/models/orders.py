@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any, Optional
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -214,6 +215,15 @@ class Order(Base):
     )
     customer_phone_snapshot: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     customer_email_snapshot: Mapped[Optional[str]] = mapped_column(String(180), nullable=True)
+    business_snapshot: Mapped[Optional[dict[str, Any]]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment=(
+            "Encabezado/pie del negocio al crear el pedido (trade_name, slogan, "
+            "logo_file_id, footer_text): el ticket reimpreso muestra lo vendido, "
+            "no el branding actual (§20). NULL en pedidos previos a este campo."
+        ),
+    )
     items_subtotal_amount: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False, default=Decimal("0")
     )
@@ -570,15 +580,18 @@ class OrderShipping(Base):
     order_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
     )
+    # El HISTORIAL del pedido vive en los snapshots (nombre de zona/tarifa) y en
+    # los montos congelados; estas FKs son solo el enlace vivo y NO deben impedir
+    # borrar una zona o tarifa: al eliminarlas, la referencia cae a NULL.
     delivery_zone_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("delivery_zones.id", ondelete="RESTRICT"), nullable=True
+        PG_UUID(as_uuid=True), ForeignKey("delivery_zones.id", ondelete="SET NULL"), nullable=True
     )
     delivery_zone_name_snapshot: Mapped[Optional[str]] = mapped_column(
         String(120), nullable=True
     )
     shipping_rate_rule_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("shipping_rate_rules.id", ondelete="RESTRICT"),
+        ForeignKey("shipping_rate_rules.id", ondelete="SET NULL"),
         nullable=True,
     )
     shipping_rate_name_snapshot: Mapped[Optional[str]] = mapped_column(

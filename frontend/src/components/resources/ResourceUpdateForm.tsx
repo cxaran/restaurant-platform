@@ -8,7 +8,10 @@ import { ResourceFormFields } from "@/components/resources/ResourceFormFields";
 import { ApiRequestError } from "@/core/api/api-error";
 import type { ResourceFormCapability } from "@/core/api/contracts";
 import { buildUpdatePayload } from "@/core/resources/resource-form";
-import { updateResource } from "@/core/resources/resource-mutation-client";
+import {
+  forbiddenMutationMessage,
+  updateResource,
+} from "@/core/resources/resource-mutation-client";
 
 type FieldErrors = Record<string, string[]>;
 
@@ -92,8 +95,16 @@ export function ResourceUpdateForm({
           router.push("/login");
           return;
         }
-        if (error.status === 403 || error.status === 404) {
+        if (error.status === 404) {
+          // El recurso ya no existe: volver a la lista es lo correcto.
           router.replace(listPath);
+          return;
+        }
+        if (error.status === 403) {
+          // Un 403 al guardar se MUESTRA (permiso perdido o rechazo CSRF);
+          // redirigir en silencio haría creer que el cambio se aplicó.
+          setGeneralError(forbiddenMutationMessage(error));
+          setPending(false);
           return;
         }
         const parsed = formErrors(error, allowedFields);
@@ -110,11 +121,11 @@ export function ResourceUpdateForm({
     <form
       onSubmit={onSubmit}
       aria-label={`Editar ${resourceLabel}`}
-      className="max-w-2xl space-y-6 rounded-lg border border-slate-200 bg-white p-6"
+      className="max-w-2xl space-y-6 rounded-lg border border-[var(--border)] bg-white p-6"
     >
       <header>
-        <p className="text-sm font-medium text-slate-500">Editar recurso</p>
-        <h2 className="mt-1 text-xl font-semibold text-slate-900">Editar {resourceLabel}</h2>
+        <p className="text-sm font-medium text-[var(--tx3)]">Editar recurso</p>
+        <h2 className="mt-1 text-xl font-semibold text-[var(--tx)]">Editar {resourceLabel}</h2>
       </header>
 
       {generalError ? (
@@ -140,7 +151,7 @@ export function ResourceUpdateForm({
           type="button"
           onClick={() => router.replace(listPath)}
           disabled={pending}
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md border border-[var(--border2)] px-4 py-2 text-sm font-medium text-[var(--tx2)] transition hover:bg-[var(--panel2)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Cancelar
         </button>

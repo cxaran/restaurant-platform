@@ -5,6 +5,7 @@
 // subconjunto que emiten esos contratos: objetos, strings (con enum/longitud),
 // booleanos, números, objetos anidados opcionales ($ref) y listas de objetos.
 // Cualquier forma no soportada cae a un editor JSON crudo (fallback honesto).
+// Presentación: sistema tt-* + clases sfe-* del editor (handoff 6a).
 
 import { useId, useState } from "react";
 
@@ -51,24 +52,18 @@ function unwrap(
   return { inner: deref(schema, defs), nullable: false };
 }
 
-const rowStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 3 };
-const labelStyle: React.CSSProperties = { fontSize: 12, fontWeight: 700 };
-const inputStyle: React.CSSProperties = {
-  padding: "7px 10px", borderRadius: 8, border: "1px solid rgba(0,0,0,0.25)",
-  fontSize: 13, width: "100%",
-};
-
 function JsonFallback({
   label, value, onChange,
 }: Readonly<{ label: string; value: unknown; onChange: (next: unknown) => void }>) {
   const [text, setText] = useState(JSON.stringify(value ?? null, null, 1));
   const [bad, setBad] = useState(false);
   return (
-    <div style={rowStyle}>
-      <span style={labelStyle}>{label} (JSON)</span>
+    <div className="sfe-field">
+      <span className="sfe-flabel">{label} (JSON)</span>
       <textarea
         rows={3}
-        style={{ ...inputStyle, fontFamily: "ui-monospace, monospace" }}
+        className="tt-input"
+        style={{ fontFamily: "ui-monospace, monospace" }}
         value={text}
         onChange={(event) => {
           setText(event.target.value);
@@ -80,7 +75,11 @@ function JsonFallback({
           }
         }}
       />
-      {bad ? <span style={{ fontSize: 11, color: "#b3261e" }}>JSON inválido (no guardado)</span> : null}
+      {bad ? (
+        <span style={{ fontSize: 11, color: "var(--danger)", fontWeight: 700 }}>
+          JSON inválido (no guardado)
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -100,11 +99,11 @@ function FieldControl({
 
   if (Array.isArray(schema.enum)) {
     return (
-      <div style={rowStyle}>
-        <label htmlFor={id} style={labelStyle}>{label}</label>
+      <div className="sfe-field">
+        <label htmlFor={id} className="sfe-flabel">{label}</label>
         <select
           id={id}
-          style={inputStyle}
+          className="tt-input"
           value={typeof value === "string" ? value : ""}
           onChange={(event) => onChange(event.target.value === "" ? null : event.target.value)}
         >
@@ -119,7 +118,7 @@ function FieldControl({
 
   if (schema.type === "boolean") {
     return (
-      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600 }}>
+      <label className="sfe-check">
         <input
           type="checkbox"
           checked={value === true || (value === undefined && schema.default === true)}
@@ -132,12 +131,12 @@ function FieldControl({
 
   if (schema.type === "integer" || schema.type === "number") {
     return (
-      <div style={rowStyle}>
-        <label htmlFor={id} style={labelStyle}>{label}</label>
+      <div className="sfe-field">
+        <label htmlFor={id} className="sfe-flabel">{label}</label>
         <input
           id={id}
           type="number"
-          style={inputStyle}
+          className="tt-input"
           step={schema.type === "integer" ? 1 : "any"}
           min={schema.minimum}
           max={schema.maximum}
@@ -156,14 +155,14 @@ function FieldControl({
   if (schema.type === "string") {
     const long = (schema.maxLength ?? 0) > 140;
     return (
-      <div style={rowStyle}>
-        <label htmlFor={id} style={labelStyle}>{label}</label>
+      <div className="sfe-field">
+        <label htmlFor={id} className="sfe-flabel">{label}</label>
         {long ? (
           <textarea
             id={id}
             rows={2}
             maxLength={schema.maxLength}
-            style={inputStyle}
+            className="tt-input"
             value={typeof value === "string" ? value : ""}
             onChange={(event) => onChange(event.target.value === "" && nullable ? null : event.target.value)}
           />
@@ -171,7 +170,7 @@ function FieldControl({
           <input
             id={id}
             maxLength={schema.maxLength}
-            style={inputStyle}
+            className="tt-input"
             value={typeof value === "string" ? value : ""}
             onChange={(event) => onChange(event.target.value === "" && nullable ? null : event.target.value)}
           />
@@ -183,10 +182,10 @@ function FieldControl({
   if (schema.type === "object" && schema.properties) {
     const enabled = value !== null && value !== undefined;
     return (
-      <fieldset style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
-        <legend style={{ fontSize: 12, fontWeight: 800, padding: "0 4px" }}>
+      <fieldset className="sfe-group">
+        <legend>
           {nullable ? (
-            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <label className="sfe-check" style={{ fontSize: 11, fontWeight: 800 }}>
               <input
                 type="checkbox"
                 checked={enabled}
@@ -217,16 +216,16 @@ function FieldControl({
       return <JsonFallback label={label} value={value} onChange={onChange} />;
     }
     return (
-      <div style={{ ...rowStyle, gap: 8 }}>
-        <span style={labelStyle}>{label}</span>
+      <div className="sfe-field" style={{ gap: 8 }}>
+        <span className="sfe-flabel">{label}</span>
         {list.map((item, index) => (
-          <fieldset key={index} style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: "8px 10px" }}>
-            <legend style={{ fontSize: 11, fontWeight: 800, padding: "0 4px", display: "flex", gap: 8 }}>
+          <fieldset key={index} className="sfe-group">
+            <legend style={{ display: "flex", gap: 8, alignItems: "center" }}>
               #{index + 1}
               <button
                 type="button"
+                className="sfe-link-danger"
                 onClick={() => onChange(list.filter((_, i) => i !== index))}
-                style={{ border: "none", background: "transparent", cursor: "pointer", color: "#b3261e", fontWeight: 800 }}
               >
                 quitar
               </button>
@@ -242,8 +241,9 @@ function FieldControl({
         {(schema.maxItems === undefined || list.length < schema.maxItems) ? (
           <button
             type="button"
+            className="sfe-dashed"
+            style={{ alignSelf: "flex-start", padding: "6px 14px" }}
             onClick={() => onChange([...list, {}])}
-            style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 800, padding: "5px 12px", borderRadius: 8, border: "1px dashed rgba(0,0,0,0.4)", background: "transparent", cursor: "pointer" }}
           >
             + Agregar
           </button>
@@ -267,10 +267,14 @@ export function SchemaForm({
   const properties = schema.properties ?? {};
   const names = Object.keys(properties);
   if (names.length === 0) {
-    return <p style={{ fontSize: 12, opacity: 0.65, margin: 0 }}>Esta configuración no tiene campos.</p>;
+    return (
+      <p style={{ fontSize: 12, color: "var(--tx3)", margin: 0 }}>
+        Esta configuración no tiene campos.
+      </p>
+    );
   }
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="sfe-form">
       {names.map((name) => {
         const { inner, nullable } = unwrap(properties[name], allDefs);
         return (

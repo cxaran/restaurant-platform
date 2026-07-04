@@ -12,7 +12,7 @@ export function BackLink({
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 transition hover:text-slate-900"
+      className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--tx2)] transition hover:text-[var(--tx)]"
     >
       <svg
         aria-hidden="true"

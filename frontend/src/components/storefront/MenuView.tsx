@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import type { PublicMenuCategory, PublicProduct } from "@/core/restaurant-api/contracts";
@@ -9,7 +10,6 @@ import { isCustomizable, requiresConfiguration } from "@/core/storefront/configu
 import { redemptionPrice } from "@/core/storefront/credits-cart";
 import { useMyCredits } from "@/core/storefront/useMyCredits";
 import { CartModeToggle } from "./CartModeToggle";
-import { ProductConfigurator } from "./ProductConfigurator";
 
 export function AddToCartButton({
   productId,
@@ -51,10 +51,7 @@ export function AddToCartButton({
   );
 }
 
-function ProductCard({
-  product,
-  onConfigure,
-}: Readonly<{ product: PublicProduct; onConfigure: (product: PublicProduct) => void }>) {
+function ProductCard({ product }: Readonly<{ product: PublicProduct }>) {
   const { mode } = useCart();
   const imageUrl = publicFileUrl(product.image_file_ids[0] ?? null);
   const money = product.is_money_purchase_available && product.money_price_amount != null;
@@ -62,12 +59,19 @@ function ProductCard({
   const credits = mode === "credits";
   // En modo créditos solo se puede agregar lo canjeable; en dinero, lo comprable.
   const addable = credits ? redeemPrice !== null : money;
-  // Con grupos requeridos (o mínimos > 0) NUNCA se agrega directo al carrito.
+  // Con grupos requeridos (o mínimos > 0) NUNCA se agrega directo al carrito:
+  // el detalle (página 1b) es el único camino para configurar.
   const mustConfigure = requiresConfiguration(product);
   const customizable = isCustomizable(product);
+  const detailHref = `/menu/${product.id}`;
   return (
     <article className="sf-card" style={{ display: "flex", flexDirection: "column" }}>
-      <div className="sf-imgbox" style={{ height: 170, borderRadius: 0 }}>
+      <Link
+        href={detailHref}
+        aria-label={`Ver ${product.name}`}
+        className="sf-imgbox"
+        style={{ height: 170, borderRadius: 0 }}
+      >
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- media dinámica del backend
           <img
@@ -80,9 +84,14 @@ function ProductCard({
             {product.name.charAt(0)}
           </span>
         )}
-      </div>
+      </Link>
       <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>{product.name}</div>
+        <Link
+          href={detailHref}
+          style={{ fontWeight: 800, fontSize: 16, color: "inherit", textDecoration: "none" }}
+        >
+          {product.name}
+        </Link>
         {product.description ? (
           <div className="sf-muted" style={{ fontSize: 13, lineHeight: 1.45, flex: 1 }}>
             {product.description}
@@ -115,24 +124,23 @@ function ProductCard({
           {addable ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {customizable && !mustConfigure ? (
-                <button
-                  type="button"
+                <Link
+                  href={detailHref}
                   className="sf-chip"
-                  onClick={() => onConfigure(product)}
                   aria-label={`Personalizar ${product.name}`}
                 >
                   Personalizar
-                </button>
+                </Link>
               ) : null}
               {mustConfigure ? (
-                <button
-                  type="button"
+                <Link
+                  href={detailHref}
                   className="sf-btn"
                   style={{ padding: "8px 18px", fontSize: 13 }}
-                  onClick={() => onConfigure(product)}
+                  aria-label={`Agregar ${product.name}`}
                 >
                   Agregar
-                </button>
+                </Link>
               ) : (
                 <AddToCartButton
                   productId={product.id}
@@ -155,10 +163,8 @@ function ProductCard({
 }
 
 export function MenuView({ categories }: Readonly<{ categories: PublicMenuCategory[] }>) {
-  const { mode } = useCart();
   const myCredits = useMyCredits();
   const [active, setActive] = useState<string | "all">("all");
-  const [configuring, setConfiguring] = useState<PublicProduct | null>(null);
   const visible = useMemo(
     () => (active === "all" ? categories : categories.filter((c) => c.id === active)),
     [categories, active],
@@ -234,18 +240,11 @@ export function MenuView({ categories }: Readonly<{ categories: PublicMenuCatego
             }}
           >
             {category.products.map((product) => (
-              <ProductCard key={product.id} product={product} onConfigure={setConfiguring} />
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         </section>
       ))}
-      {configuring ? (
-        <ProductConfigurator
-          product={configuring}
-          mode={mode}
-          onClose={() => setConfiguring(null)}
-        />
-      ) : null}
     </div>
   );
 }

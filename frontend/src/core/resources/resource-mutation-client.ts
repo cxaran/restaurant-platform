@@ -4,7 +4,25 @@ import type {
   HttpMethod,
   ResourceFormCapability,
 } from "@/core/api/contracts";
+import type { ApiRequestError } from "@/core/api/api-error";
 import { browserApi } from "@/core/api/browser-client";
+
+/**
+ * Mensaje para un 403 en una MUTACIÓN. Nunca se traga en silencio: un 403 aquí
+ * puede ser pérdida real de permiso, pero también un rechazo CSRF por origen no
+ * confiable (``csrf_origin_invalid``) — si se redirige sin avisar, el usuario
+ * cree que guardó y el cambio jamás se aplicó.
+ */
+export function forbiddenMutationMessage(error: ApiRequestError): string {
+  if (error.body.code === "csrf_origin_invalid") {
+    return (
+      "El servidor rechazó el origen de la solicitud (CSRF). Recarga la página; " +
+      "si persiste, el dominio desde el que navegas no está en los orígenes " +
+      "confiables del backend (TRUSTED_BROWSER_ORIGINS)."
+    );
+  }
+  return "No tienes permiso para realizar esta acción.";
+}
 
 function assertInternalApiPath(path: string): void {
   if (

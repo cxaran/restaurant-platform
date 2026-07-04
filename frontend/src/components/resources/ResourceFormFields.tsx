@@ -69,13 +69,13 @@ export function ResourceFormFields({
 
         if (field.widget === "switch") {
           return (
-            <div key={field.name} className="rounded-md border border-slate-200 bg-white p-4">
-              <label className="flex items-center gap-3 text-sm font-medium text-slate-900">
+            <div key={field.name} className="rounded-md border border-[var(--border)] bg-white p-4">
+              <label className="flex items-center gap-3 text-sm font-medium text-[var(--tx)]">
                 <input
                   type="checkbox"
                   name={field.name}
                   defaultChecked={Boolean(initialValues[field.name])}
-                  className="h-4 w-4 rounded border-slate-300 text-slate-950"
+                  className="h-4 w-4 rounded border-[var(--border2)] text-[var(--tx)]"
                   aria-required={field.required || undefined}
                   aria-invalid={errors.length > 0 || undefined}
                   aria-describedby={errorId}
@@ -84,7 +84,7 @@ export function ResourceFormFields({
                 <RequiredHint required={field.required} />
               </label>
               {field.description ? (
-                <p className="mt-1 text-sm text-slate-500">{field.description}</p>
+                <p className="mt-1 text-sm text-[var(--tx3)]">{field.description}</p>
               ) : null}
               {errors.length > 0 ? (
                 <p id={errorId} className="mt-2 text-sm text-red-600">
@@ -101,7 +101,7 @@ export function ResourceFormFields({
           const initialValue = initial == null ? "" : String(initial);
           return (
             <div key={field.name}>
-              <label htmlFor={field.name} className="block text-sm font-medium text-slate-900">
+              <label htmlFor={field.name} className="block text-sm font-medium text-[var(--tx)]">
                 {field.label}
               </label>
               <select
@@ -112,7 +112,7 @@ export function ResourceFormFields({
                 aria-required={field.required || undefined}
                 aria-invalid={errors.length > 0 || undefined}
                 aria-describedby={errorId}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none"
+                className="mt-1 w-full rounded-md border border-[var(--border2)] px-3 py-2 text-sm text-[var(--tx)] shadow-sm focus:border-[var(--tx3)] focus:outline-none"
               >
                 {/* Opción vacía solo cuando el campo es opcional (permite no elegir). */}
                 {field.required ? null : <option value="">—</option>}
@@ -123,7 +123,7 @@ export function ResourceFormFields({
                 ))}
               </select>
               {field.description ? (
-                <p className="mt-1 text-sm text-slate-500">{field.description}</p>
+                <p className="mt-1 text-sm text-[var(--tx3)]">{field.description}</p>
               ) : null}
               {errors.length > 0 ? (
                 <p id={errorId} className="mt-1 text-sm text-red-600">
@@ -136,7 +136,7 @@ export function ResourceFormFields({
 
         return (
           <div key={field.name}>
-            <label htmlFor={field.name} className="block text-sm font-medium text-slate-900">
+            <label htmlFor={field.name} className="block text-sm font-medium text-[var(--tx)]">
               {field.label}
               <RequiredHint required={field.required} />
             </label>
@@ -149,7 +149,7 @@ export function ResourceFormFields({
                 aria-required={field.required || undefined}
                 aria-invalid={errors.length > 0 || undefined}
                 aria-describedby={errorId}
-                className="mt-1 min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none"
+                className="mt-1 min-h-28 w-full rounded-md border border-[var(--border2)] px-3 py-2 text-sm text-[var(--tx)] shadow-sm focus:border-[var(--tx3)] focus:outline-none"
               />
             ) : (
               <input
@@ -163,11 +163,11 @@ export function ResourceFormFields({
                 aria-required={field.required || undefined}
                 aria-invalid={errors.length > 0 || undefined}
                 aria-describedby={errorId}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none"
+                className="mt-1 w-full rounded-md border border-[var(--border2)] px-3 py-2 text-sm text-[var(--tx)] shadow-sm focus:border-[var(--tx3)] focus:outline-none"
               />
             )}
             {field.description ? (
-              <p className="mt-1 text-sm text-slate-500">{field.description}</p>
+              <p className="mt-1 text-sm text-[var(--tx3)]">{field.description}</p>
             ) : null}
             {errors.length > 0 ? (
               <p id={errorId} className="mt-1 text-sm text-red-600">

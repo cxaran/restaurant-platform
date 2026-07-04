@@ -17,11 +17,14 @@ from typing import Literal
 
 from backend.app.schemas.capabilities import NavigationModule
 from backend.app.schemas.user import SessionUser
+from backend.app.security.groups.business import BusinessPermissions
+from backend.app.security.groups.catalog import CatalogPermissions
 from backend.app.security.groups.deliveries import DeliveryPermissions
 from backend.app.security.groups.discounts import DiscountCodePermissions
 from backend.app.security.groups.finances import FinancePermissions
 from backend.app.security.groups.orders import OrderPermissions
-from backend.app.security.groups.payments import TicketPermissions
+from backend.app.security.groups.profiles import ProfilePermissions
+from backend.app.security.groups.shipping import ShippingPermissions
 from backend.app.security.groups.storefront import StorefrontPermissions
 from backend.app.security.security_group import SecurityGroup
 
@@ -49,6 +52,20 @@ class NavigationModuleDef:
 
 NAVIGATION_REGISTRY: tuple[NavigationModuleDef, ...] = (
     NavigationModuleDef(
+        name="negocio",
+        label="Negocio",
+        href="/admin/negocio",
+        section="admin",
+        permissions=(BusinessPermissions.READ,),
+    ),
+    NavigationModuleDef(
+        name="catalogo",
+        label="Catálogo",
+        href="/admin/catalogo",
+        section="admin",
+        permissions=(CatalogPermissions.READ,),
+    ),
+    NavigationModuleDef(
         name="storefront",
         label="Editor del sitio",
         href="/admin/storefront",
@@ -56,11 +73,38 @@ NAVIGATION_REGISTRY: tuple[NavigationModuleDef, ...] = (
         permissions=(StorefrontPermissions.READ_DRAFT, StorefrontPermissions.EDIT),
     ),
     NavigationModuleDef(
+        name="zona-entrega",
+        label="Zonas de entrega",
+        href="/admin/zona-entrega",
+        section="admin",
+        # anyOf: quien solo LEE ve el mapa y las tarifas; editar revalida
+        # shipping:manage en cada endpoint.
+        permissions=(ShippingPermissions.READ, ShippingPermissions.MANAGE),
+    ),
+    NavigationModuleDef(
         name="codigos-descuento",
         label="Códigos de descuento",
         href="/admin/codigos-descuento",
         section="admin",
         permissions=(DiscountCodePermissions.READ,),
+    ),
+    NavigationModuleDef(
+        name="clientes",
+        label="Clientes",
+        href="/admin/clientes",
+        section="admin",
+        # anyOf: con lectura se busca y consulta la ficha; editar notas y
+        # ajustar créditos revalidan sus permisos en cada endpoint.
+        permissions=(ProfilePermissions.READ,),
+    ),
+    NavigationModuleDef(
+        name="finanzas",
+        label="Finanzas",
+        href="/admin/finanzas",
+        section="admin",
+        # anyOf: con solo lectura se ven resumen y libro; registrar/anular
+        # revalidan finances:record / finances:void en cada endpoint.
+        permissions=(FinancePermissions.READ,),
     ),
     NavigationModuleDef(
         name="reportes",
@@ -96,13 +140,6 @@ NAVIGATION_REGISTRY: tuple[NavigationModuleDef, ...] = (
         href="/panel/reparto",
         section="panel",
         permissions=(DeliveryPermissions.SELF_ASSIGN,),
-    ),
-    NavigationModuleDef(
-        name="tickets",
-        label="Tickets",
-        href="/panel/tickets",
-        section="panel",
-        permissions=(TicketPermissions.PRINT,),
     ),
 )
 

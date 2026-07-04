@@ -151,6 +151,27 @@ class PaymentsRoutesTest(unittest.TestCase):
         self.assertEqual(body["payment"]["status"], "paid")
         self.assertEqual(body["payment"]["change_amount"], "300.00")  # 500 - 200
 
+    def test_pos_payment_methods_lists_counter_methods(self) -> None:
+        """El POS ve los métodos available_pos (el listado público los oculta)."""
+        with _As("payments:record"):
+            body = self.client.get("/api/v1/pos/payment-methods").json()
+        self.assertEqual(
+            sorted(m["code"] for m in body), ["bank_transfer", "cash_counter"]
+        )
+        # Sin permiso no hay listado (es información operativa interna).
+        self.assertEqual(self.client.get("/api/v1/pos/payment-methods").status_code, 401)
+
+    def test_pos_sale_records_declared_source(self) -> None:
+        """La venta al momento puede originarse por teléfono/redes (1h)."""
+        payload = self._pos_payload(change_requested_for_amount="500")
+        payload["source"] = "phone"
+        with _As("orders:capture", "payments:record"):
+            response = self.client.post("/api/v1/pos/sales", json=payload)
+        self.assertEqual(response.status_code, 201, response.text)
+        body = response.json()
+        self.assertEqual(body["order"]["source"], "phone")
+        self.assertEqual(body["order"]["status"], "completed")
+
     def test_pos_rejects_credits_lines(self) -> None:
         """POS cobra dinero: el canje de créditos va por captura normal (§1.3)."""
         redeemable_id = uuid.uuid4()
@@ -238,16 +259,47 @@ class PaymentsRoutesTest(unittest.TestCase):
             self.assertEqual(body["public_code"], sale["order"]["public_code"])
             self.assertEqual(body["business"]["trade_name"], "Mi Restaurante")
             self.assertEqual(body["totals"]["total"], "200.00")
+            self.assertIsNone(body["totals"]["discount_code"])
             self.assertEqual(body["lines"][0]["name"], "Medio litro de boneless")
             self.assertEqual(body["payments"][0]["method"], "Efectivo en mostrador")
+            # Efectivo de mostrador cobrado: el ticket refleja lo recibido.
+            self.assertEqual(body["payments"][0]["received_amount"], "200.00")
             self.assertEqual(body["status_label"], "Entregado")
+
+            # Bitácora legible: vacía antes, con la impresión después.
+            empty = self.client.get(f"/api/v1/orders/{order_id}/ticket-prints")
+            self.assertEqual(empty.status_code, 200, empty.text)
+            self.assertEqual(empty.json(), [])
 
             printed = self.client.post(
                 f"/api/v1/orders/{order_id}/ticket-prints",
-                json={"print_type": "customer_receipt"},
+                json={"print_type": "customer_receipt", "copy_number": 2},
             )
-        self.assertEqual(printed.status_code, 201, printed.text)
-        self.assertEqual(printed.json()["print_type"], "customer_receipt")
+            self.assertEqual(printed.status_code, 201, printed.text)
+            self.assertEqual(printed.json()["print_type"], "customer_receipt")
+
+            logs = self.client.get(f"/api/v1/orders/{order_id}/ticket-prints").json()
+            self.assertEqual(len(logs), 1)
+            self.assertEqual(logs[0]["copy_number"], 2)
+            self.assertEqual(logs[0]["printed_by"], str(STAFF_ID))
+
+    def test_ticket_business_header_is_frozen_snapshot(self) -> None:
+        """§20: reimprimir tras un rebranding muestra el negocio del momento."""
+        from backend.app.models.business import BusinessProfile
+
+        with _As("orders:capture", "payments:record"):
+            sale = self.client.post("/api/v1/pos/sales", json=self._pos_payload()).json()
+        order_id = sale["order"]["id"]
+
+        with Session(self.engine) as session:
+            profile = session.exec(select(BusinessProfile)).one()
+            profile.trade_name = "Nombre Nuevo S.A."
+            session.add(profile)
+            session.commit()
+
+        with _As("tickets:print"):
+            body = self.client.get(f"/api/v1/orders/{order_id}/ticket").json()
+        self.assertEqual(body["business"]["trade_name"], "Mi Restaurante")
 
     def test_pos_requires_both_permissions(self) -> None:
         with _As("orders:capture"):

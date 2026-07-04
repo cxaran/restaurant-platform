@@ -208,6 +208,79 @@ class DeliveryServiceTest(unittest.TestCase):
             self.assertEqual(summary.deliveries_completed, 1)
             self.assertEqual(summary.shipping_charged, Decimal("30"))
 
+    def _add_payment(
+        self,
+        session: Session,
+        *,
+        allows_cash_change: bool,
+        status: str,
+        change_for: Decimal | None = None,
+    ):
+        from backend.app.models.payments import Payment, PaymentMethodConfig
+
+        method = PaymentMethodConfig(
+            code=f"m-{uuid.uuid4().hex[:6]}",
+            display_name="Efectivo" if allows_cash_change else "Transferencia",
+            allows_cash_change=allows_cash_change,
+            requires_manual_verification=not allows_cash_change,
+        )
+        session.add(method)
+        session.flush()
+        payment = Payment(
+            order_id=self.order_id,
+            payment_method_config_id=method.id,
+            payment_method_name_snapshot=method.display_name,
+            status=status,
+            expected_amount=Decimal("260"),
+            change_requested_for_amount=change_for,
+            change_amount=(change_for - Decimal("260")) if change_for else Decimal("0"),
+        )
+        session.add(payment)
+        session.flush()
+        return payment
+
+    def test_cash_on_delivery_collected_atomically_on_completion(self) -> None:
+        """Etapa 4: el efectivo pendiente queda PAGADO al marcar entregado (H9)."""
+        with Session(self.engine) as session:
+            payment = self._add_payment(
+                session, allows_cash_change=True, status="pending",
+                change_for=Decimal("500"),
+            )
+            assignment = take_delivery(session, self.delivery_id, self.courier_id)
+            start_delivery(session, assignment, actor_id=self.courier_id)
+            session.commit()
+
+            # En camino: el cliente ve el cambio que lleva el repartidor.
+            order = session.get(Order, self.order_id)
+            assert order is not None
+            info = public_courier_info(session, order)
+            assert info is not None
+            self.assertEqual(info["cash_change_amount"], Decimal("240"))
+
+            complete_delivery(session, assignment, actor_id=self.courier_id)
+            session.commit()
+            session.refresh(payment)
+            self.assertEqual(payment.status, "paid")
+            self.assertEqual(payment.received_amount, Decimal("260"))
+            session.refresh(order)
+            self.assertEqual(order.status, "completed")
+
+            summary = courier_daily_summary(session, self.courier_id)
+            self.assertEqual(summary.cash_collected, Decimal("260"))
+
+    def test_pending_transfer_never_paid_on_completion(self) -> None:
+        """H9: una transferencia sin verificar NO se cobra al entregar."""
+        with Session(self.engine) as session:
+            payment = self._add_payment(
+                session, allows_cash_change=False, status="pending_verification"
+            )
+            assignment = take_delivery(session, self.delivery_id, self.courier_id)
+            start_delivery(session, assignment, actor_id=self.courier_id)
+            complete_delivery(session, assignment, actor_id=self.courier_id)
+            session.commit()
+            session.refresh(payment)
+            self.assertEqual(payment.status, "pending_verification")
+
     def test_employee_can_complete_on_behalf(self) -> None:
         """Operación sin conexión (§19.6): otro usuario marca la entrega."""
         with Session(self.engine) as session:

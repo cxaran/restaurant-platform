@@ -2,13 +2,12 @@
 
 // Vista de reportes: dos tarjetas ("Ventas por hora" y "Más vendidos") sobre
 // los endpoints tipados /api/v1/reports/*. Barras simples con CSS (sin
-// librerías); las cifras se etiquetan como ventas registradas.
+// librerías) retintadas al lenguaje 1i (tt-card, tt-display, tokens); las
+// cifras se etiquetan como ventas registradas.
 
 import { useEffect, useState } from "react";
 
-import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Input } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/Table";
 import { ApiRequestError } from "@/core/api/api-error";
@@ -93,26 +92,29 @@ export function ReportsView() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="flex flex-wrap items-end gap-3">
-        <label className="text-sm font-medium text-[var(--tx2)]">
-          Desde
-          <Input
+    <div className="flex flex-col gap-3.5">
+      <div
+        className="tt-card flex flex-wrap items-end gap-3"
+        style={{ padding: "16px 20px" }}
+      >
+        <label className="flex flex-col gap-1">
+          <span className="tt-label">Desde</span>
+          <input
             type="date"
+            className="tt-input"
             value={dateFrom}
             max={dateTo || undefined}
             onChange={(event) => setDateFrom(event.target.value)}
-            className="mt-1"
           />
         </label>
-        <label className="text-sm font-medium text-[var(--tx2)]">
-          Hasta
-          <Input
+        <label className="flex flex-col gap-1">
+          <span className="tt-label">Hasta</span>
+          <input
             type="date"
+            className="tt-input"
             value={dateTo}
             min={dateFrom || undefined}
             onChange={(event) => setDateTo(event.target.value)}
-            className="mt-1"
           />
         </label>
         {salesByHour ? (
@@ -120,17 +122,17 @@ export function ReportsView() {
             Zona horaria del negocio: {salesByHour.timezone}
           </p>
         ) : null}
-      </Card>
+      </div>
 
       {error ? (
-        <p role="alert" className="m-0 text-sm font-semibold text-[var(--danger)]">
+        <p role="alert" className="m-0 text-sm font-semibold text-[var(--accent)]">
           {error}
         </p>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <h2 className="m-0 text-base font-semibold">Ventas por hora</h2>
+      <div className="grid gap-3.5 lg:grid-cols-2">
+        <div className="tt-card" style={{ padding: "18px 20px" }}>
+          <h2 className="m-0 text-[15px] font-extrabold">Ventas por hora</h2>
           <p className="mb-3 mt-1 text-xs text-[var(--tx3)]">
             Ventas registradas (dinero) por hora del día.
           </p>
@@ -146,19 +148,32 @@ export function ReportsView() {
               {salesByHour.items.map((item) => {
                 const amount = Number.parseFloat(item.money_total) || 0;
                 const width = Math.max(2, Math.round((amount / maxHourTotal) * 100));
+                const isPeak = amount === maxHourTotal;
                 return (
                   <li key={item.hour} className="flex items-center gap-2 text-sm">
-                    <span className="w-12 shrink-0 tabular-nums text-[var(--tx3)]">
+                    <span
+                      className="w-12 shrink-0 tabular-nums"
+                      style={{
+                        color: isPeak ? "var(--accent)" : "var(--tx3)",
+                        fontWeight: isPeak ? 800 : 400,
+                      }}
+                    >
                       {hourLabel(item.hour)}
                     </span>
-                    <span className="min-w-0 flex-1">
+                    <span
+                      className="min-w-0 flex-1 rounded-full"
+                      style={{ background: "var(--seg-bg)" }}
+                    >
                       <span
                         aria-hidden
-                        className="block h-4 rounded bg-[var(--accent)] opacity-80"
-                        style={{ width: `${width}%` }}
+                        className="block h-2.5 rounded-full"
+                        style={{
+                          width: `${width}%`,
+                          background: isPeak ? "var(--accent)" : "#C97E52",
+                        }}
                       />
                     </span>
-                    <span className="w-24 shrink-0 text-right font-semibold tabular-nums">
+                    <span className="w-24 shrink-0 text-right font-extrabold tabular-nums">
                       {formatMoney(item.money_total)}
                     </span>
                     <span className="w-20 shrink-0 text-right text-xs text-[var(--tx3)]">
@@ -169,10 +184,10 @@ export function ReportsView() {
               })}
             </ul>
           )}
-        </Card>
+        </div>
 
-        <Card>
-          <h2 className="m-0 text-base font-semibold">Más vendidos</h2>
+        <div className="tt-card" style={{ padding: "18px 20px" }}>
+          <h2 className="m-0 text-[15px] font-extrabold">Más vendidos</h2>
           <p className="mb-3 mt-1 text-xs text-[var(--tx3)]">
             Productos con más unidades y ventas registradas en el rango.
           </p>
@@ -209,7 +224,7 @@ export function ReportsView() {
               </Table>
             </div>
           )}
-        </Card>
+        </div>
       </div>
     </div>
   );

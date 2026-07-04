@@ -186,12 +186,21 @@ def complete_delivery(
     completion_note: Optional[str] = None,
     proof_file_id: Optional[uuid.UUID] = None,
 ) -> DeliveryAssignment:
-    """Marca entregado (repartidor o empleado en su nombre, §19.6)."""
+    """Marca entregado (repartidor o empleado en su nombre, §19.6).
+
+    Invariante de etapa 4: el efectivo contra entrega se cobra ATÓMICAMENTE con
+    la completion — los pagos cash pendientes (guardia H9) quedan pagados aquí
+    mismo; una transferencia sin verificar NUNCA se marca pagada al entregar.
+    """
+    from backend.app.services.payment_service import mark_paid, pending_cash_payments
+
     order = _order_of(session, assignment)
     delivery = session.get(OrderDelivery, assignment.order_delivery_id)
     now = utc_now()
 
     transition_order(session, order, "completed", actor_id=actor_id)
+    for payment in pending_cash_payments(session, order):
+        mark_paid(session, order, payment, actor_id=actor_id)
     if delivery is not None:
         delivery.delivered_at = now
         delivery.delivered_to_name = delivered_to_name
@@ -240,12 +249,20 @@ def public_courier_info(session: Session, order: Order) -> Optional[dict]:
             location = {"type": "Point", "coordinates": list(lonlat)}
             location_at = tracking.current_location_at
 
+    # «Lleva tu cambio de $X»: sólo cuando el cobro contra entrega es efectivo
+    # con billete declarado (H9); nunca para pagos ya cobrados o por verificar.
+    from backend.app.services.payment_service import collection_instruction
+
+    instruction = collection_instruction(session, order)
+    cash_change = instruction.change_amount if instruction.must_collect else None
+
     return {
         "name": assignment.courier_name_snapshot,
         "public_phone": assignment.courier_contact_phone_snapshot,
         "public_note": profile.courier_public_note if profile else None,
         "location": location,
         "location_at": location_at,
+        "cash_change_amount": cash_change,
     }
 
 

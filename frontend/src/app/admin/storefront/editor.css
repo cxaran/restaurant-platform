@@ -1,0 +1,452 @@
+/*
+ * Estilos del editor del sitio (/admin/storefront), pantallas 6a y 5a del
+ * handoff Tony-Tony. Aquí vive SOLO la composición local del editor (rejillas,
+ * tarjetas de elemento, inspector, swatches); los componentes base tt-* y los
+ * tokens están en globals.css y no se tocan.
+ */
+
+.sfe-root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---- Barra superior del editor (6a) ---- */
+.sfe-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.sfe-toolbar .tt-seg {
+  padding: 3px;
+}
+.sfe-toolbar .tt-seg-item {
+  flex: none;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+.sfe-spacer {
+  flex: 1;
+}
+.sfe-btn-sm {
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+.sfe-select,
+.sfe-input-sm {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tx);
+}
+.sfe-select:focus,
+.sfe-input-sm:focus {
+  outline: none;
+  border-color: var(--tx);
+}
+
+/* ---- Notas de estado (ámbar del handoff) y mensajes ---- */
+.sfe-note {
+  margin: 0;
+  border-radius: 12px;
+  padding: 9px 13px;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+  background: #fff3d6;
+  border: 1px solid #e8cfa0;
+  color: #7a5a14;
+}
+.sfe-note-ok {
+  background: #e3f0e7;
+  border-color: #bcd9c6;
+  color: #256341;
+}
+.sfe-note-danger {
+  background: var(--accent-dim);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ---- Rejilla principal estilo 6a: elementos · preview · inspector ---- */
+.sfe-grid {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+  grid-template-columns: 260px minmax(0, 1fr) 380px;
+}
+.sfe-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+@media (max-width: 1280px) {
+  .sfe-grid {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .sfe-grid .sfe-inspector-col {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 860px) {
+  .sfe-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Tarjeta de elemento (columna izquierda) ---- */
+.sfe-el {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.sfe-el[data-active="1"] {
+  border: 2px solid var(--accent);
+  padding: 9px 11px;
+  box-shadow: 0 4px 12px rgba(193, 39, 45, 0.12);
+}
+.sfe-el[data-hidden="1"] {
+  opacity: 0.6;
+}
+.sfe-el-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--tx);
+  padding: 0;
+}
+.sfe-el-name {
+  font-size: 13px;
+  font-weight: 700;
+}
+.sfe-el[data-active="1"] .sfe-el-name {
+  font-weight: 800;
+}
+.sfe-el-sub {
+  font-size: 11px;
+  color: var(--tx3);
+}
+.sfe-el[data-active="1"] .sfe-el-sub {
+  color: var(--accent);
+  font-weight: 700;
+}
+.sfe-el-grip {
+  color: var(--tx3);
+  font-size: 14px;
+  flex-shrink: 0;
+  user-select: none;
+}
+.sfe-icon-btn {
+  border: 1px solid var(--border2);
+  background: var(--panel);
+  color: var(--tx2);
+  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sfe-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sfe-icon-btn:not(:disabled):hover {
+  background: var(--panel2);
+}
+
+/* Botón/zona punteada ("+ Agregar elemento", subir imagen). */
+.sfe-dashed {
+  border: 1px dashed var(--tx3);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--tx3);
+  font: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+}
+.sfe-dashed:not(:disabled):hover {
+  color: var(--tx2);
+  border-color: var(--tx2);
+}
+.sfe-dashed:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Vista previa (centro) ---- */
+.sfe-preview-frame {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(28, 21, 18, 0.1);
+}
+
+/* ---- Inspector (columna derecha, 6a) ---- */
+.sfe-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sfe-panel-head {
+  padding: 14px 18px 11px;
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sfe-panel-body {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sfe-panel-foot {
+  padding: 12px 18px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+.sfe-panel .tt-seg-item {
+  padding: 7px 6px;
+  font-size: 12px;
+}
+
+/* ---- Formularios generados (SchemaForm) y campos del inspector ---- */
+.sfe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sfe-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sfe-flabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--tx3);
+}
+/* Campos compactos estilo 6a: fondo crema (panel2) y radio 10. */
+.sfe-form .tt-input,
+.sfe-panel .tt-input {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 10px;
+  background: var(--panel2);
+}
+.sfe-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+.sfe-group > legend {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--tx3);
+  padding: 0 4px;
+}
+.sfe-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tx);
+}
+.sfe-check input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+}
+.sfe-link-danger {
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
+}
+.sfe-danger {
+  color: var(--danger);
+}
+
+/* Interruptor (visibilidad) — verde al activarse, como el handoff. */
+.sfe-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: none;
+  background: var(--muted-btn);
+  cursor: pointer;
+  transition: background-color 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.sfe-switch[aria-checked="true"] {
+  background: var(--ok);
+}
+.sfe-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.sfe-switch[aria-checked="true"]::after {
+  left: 20px;
+}
+.sfe-switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ---- Media por slot ---- */
+.sfe-thumb {
+  width: 64px;
+  height: 48px;
+  border-radius: 8px;
+  background: var(--panel2);
+  border: 1px solid var(--border2);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* ---- Apariencia (5a): presets, swatches y chips ---- */
+.sfe-theme-grid {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+  grid-template-columns: 420px minmax(0, 1fr);
+}
+@media (max-width: 1100px) {
+  .sfe-theme-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.sfe-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sfe-preset {
+  flex: 1 1 120px;
+  min-width: 120px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  background: var(--panel);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--tx2);
+}
+.sfe-preset[data-active="1"] {
+  border: 2px solid var(--accent);
+  padding: 9px;
+  background: var(--panel2);
+  color: var(--tx);
+  font-weight: 800;
+}
+.sfe-preset-bars {
+  display: flex;
+  gap: 4px;
+}
+.sfe-preset-bar {
+  flex: 1;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--border2);
+}
+.sfe-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border2);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.sfe-swatch[data-active="1"] {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
+}
+/* El input color nativo, redondo como los swatches. */
+.sfe-swatch-custom {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px dashed var(--tx3);
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+}
+.sfe-swatch-custom::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+.sfe-swatch-custom::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
+}
+
+/* ---- Código del enlace de preview ---- */
+.sfe-code {
+  padding: 4px 8px;
+  background: var(--panel2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  word-break: break-all;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--tx2);
+}

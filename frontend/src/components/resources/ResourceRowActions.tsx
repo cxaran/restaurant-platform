@@ -14,6 +14,7 @@ import {
   shouldOpenDialog,
 } from "@/core/resources/resource-action";
 import { executeAction } from "@/core/resources/resource-action-client";
+import { forbiddenMutationMessage } from "@/core/resources/resource-mutation-client";
 
 const GENERIC_ERROR = "No se pudo completar la acción. Inténtalo nuevamente.";
 
@@ -89,9 +90,16 @@ export function ResourceRowActions({
           router.push("/login");
           return;
         }
-        if (error.status === 403 || error.status === 404) {
+        if (error.status === 404) {
+          // El recurso ya no existe: refrescar la lista es lo correcto.
           onDone();
           router.refresh();
+          return;
+        }
+        if (error.status === 403) {
+          // Un 403 al ejecutar la acción se MUESTRA (permiso perdido o rechazo
+          // CSRF); refrescar en silencio haría creer que la acción se aplicó.
+          onError(forbiddenMutationMessage(error));
           return;
         }
         // Errores por campo sólo cuando la acción captura datos (input_schema).

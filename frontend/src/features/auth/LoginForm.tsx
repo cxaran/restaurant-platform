@@ -156,7 +156,7 @@ export function LoginForm() {
             type="email"
             autoComplete="email"
             required
-            placeholder="doctor@ejemplo.com"
+            placeholder="correo@ejemplo.com"
             className={FIELD_INPUT}
           />
         </div>

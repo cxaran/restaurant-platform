@@ -15,8 +15,8 @@ export default async function AccountPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Mi cuenta</h1>
-        <p className="mt-1 text-sm text-slate-500">Administra tus datos personales y tu contraseña.</p>
+        <h1 className="text-xl font-semibold text-[var(--tx)]">Mi cuenta</h1>
+        <p className="mt-1 text-sm text-[var(--tx3)]">Administra tus datos personales y tu contraseña.</p>
       </div>
       <AccountProfileForm profile={profile} />
       <AccountPasswordForm />

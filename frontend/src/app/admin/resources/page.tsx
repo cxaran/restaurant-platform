@@ -12,7 +12,7 @@ export default async function ResourcesIndexPage() {
   const catalog = await getResourceCatalog();
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-slate-900">Recursos</h1>
+      <h1 className="text-xl font-semibold text-[var(--tx)]">Recursos</h1>
       <ResourceCatalog resources={catalog.resources} />
     </div>
   );

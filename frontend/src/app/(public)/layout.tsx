@@ -1,0 +1,130 @@
+import "../(storefront)/storefront.css";
+
+import type { Metadata } from "next";
+import { Alfa_Slab_One, Archivo, Baloo_2, Lora } from "next/font/google";
+import type { ReactNode } from "react";
+
+import { BrandLockup } from "@/components/storefront/BrandLockup";
+import { StorefrontThemeProvider } from "@/components/storefront/StorefrontThemeProvider";
+import { getPublicBusiness } from "@/core/restaurant-api/business";
+import {
+  businessFaviconMetadata,
+  resolveSafeImagePath,
+} from "@/core/restaurant-api/site-metadata";
+import { getPublicStorefrontPage } from "@/core/restaurant-api/storefront";
+import { FALLBACK_TOKENS } from "@/core/restaurant-api/view-models";
+import {
+  storefrontDemoEnabled,
+  TONY_DEMO_TOKENS,
+} from "@/core/storefront/demo-fixtures";
+
+export const dynamic = "force-dynamic";
+
+// Fuentes AUTORIZADAS del tema — el MISMO allowlist y variables que el layout
+// del storefront: el login es una extensión visual del sitio público.
+const slab = Alfa_Slab_One({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-sf-slab",
+});
+const sans = Archivo({ subsets: ["latin"], variable: "--font-sf-sans" });
+const serif = Lora({ subsets: ["latin"], variable: "--font-sf-serif" });
+const rounded = Baloo_2({ subsets: ["latin"], variable: "--font-sf-rounded" });
+
+// Mismo criterio que (storefront)/layout.tsx::resolveTheme — tokens del tema
+// publicado y, si no hay nada publicado, el fallback neutro (jamás marca fija).
+async function resolveThemeTokens() {
+  const result = await getPublicStorefrontPage("home");
+  if (result.status === "published" && result.page.theme_tokens) {
+    return result.page.theme_tokens;
+  }
+  return storefrontDemoEnabled() ? TONY_DEMO_TOKENS : FALLBACK_TOKENS;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  // La metadata jamás rompe las páginas de acceso: fallo → mínimos seguros.
+  try {
+    const business = await getPublicBusiness();
+    return {
+      title: business?.trade_name ? `Acceso · ${business.trade_name}` : "Acceso",
+      ...(await businessFaviconMetadata()),
+    };
+  } catch {
+    return { title: "Acceso" };
+  }
+}
+
+/**
+ * Layout de las páginas públicas de auth (login/registro/reset/unlock) según el
+ * handoff Tony-Tony (Turno 8, escenas 8a móvil / 8b web): panel de marca oscuro
+ * (banda superior redondeada en móvil, columna izquierda en escritorio) con la
+ * identidad DINÁMICA del negocio, y el formulario sobre la superficie del tema.
+ * Todo el color/forma sale de tokens `--sf-*`; nada de paleta fija aquí.
+ */
+export default async function PublicAuthLayout({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  const [business, tokens] = await Promise.all([
+    getPublicBusiness(),
+    resolveThemeTokens(),
+  ]);
+  // Logo dinámico SOLO si es raster verificado (§D): SVG/otros → monograma.
+  const safeLogoUrl = await resolveSafeImagePath(business?.logo_file_id);
+  const fontVars = `${slab.variable} ${sans.variable} ${serif.variable} ${rounded.variable}`;
+  const name = business?.trade_name ?? "Mi Restaurante";
+  const year = new Date().getFullYear();
+
+  return (
+    <StorefrontThemeProvider tokens={tokens} fontVars={fontVars}>
+      <div className="sf-auth">
+        <aside className="sf-auth-brand">
+          {/* Móvil (8a): marca apilada y centrada en la banda oscura. */}
+          <div className="sf-auth-brand-stack">
+            {safeLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- archivo dinámico servido por el backend
+              <img
+                src={safeLogoUrl}
+                alt=""
+                width={84}
+                height={84}
+                style={{ objectFit: "contain" }}
+              />
+            ) : (
+              <span aria-hidden className="sf-display sf-auth-monogram">
+                {name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="sf-display sf-auth-brand-name">{name}</span>
+            {business?.slogan ? (
+              <span className="sf-auth-brand-slogan">{business.slogan}</span>
+            ) : null}
+          </div>
+
+          {/* Escritorio (8b): lockup arriba, héroe al centro y pie legal. */}
+          <div className="sf-auth-brand-top">
+            <BrandLockup business={business} logoUrl={safeLogoUrl} compact />
+          </div>
+          <div className="sf-auth-brand-hero">
+            <p className="sf-display sf-auth-brand-headline">
+              Tu punto de venta,
+              <br />
+              en un solo lugar.
+            </p>
+            <p className="sf-auth-brand-copy">
+              Pedidos, cocina, envíos y caja del día. Entra con tu cuenta del
+              equipo.
+            </p>
+          </div>
+          <p className="sf-auth-brand-foot">
+            © {year} {name}
+            {business?.slogan ? ` · ${business.slogan}` : ""}
+          </p>
+        </aside>
+
+        <div className="sf-auth-content">
+          <main className="sf-auth-main">{children}</main>
+        </div>
+      </div>
+    </StorefrontThemeProvider>
+  );
+}

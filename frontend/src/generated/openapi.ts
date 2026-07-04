@@ -1594,7 +1594,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Orders */
+        /**
+         * List Orders
+         * @description Tablero interno paginado: filtros por estado/canal/fechas/cliente y
+         *     búsqueda por folio, cliente, quien recibe y dirección (envelope estándar).
+         */
         get: operations["list_orders_api_v1_orders_get"];
         put?: never;
         /** Checkout */
@@ -1650,6 +1654,27 @@ export interface paths {
         put?: never;
         /** Capture Order */
         post: operations["capture_order_api_v1_orders_capture_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/status-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Order Status Counts
+         * @description Conteo por estado con los MISMOS filtros del tablero (menos ``status``):
+         *     alimenta los chips «Nuevos · 3» sin traerse los pedidos.
+         */
+        get: operations["order_status_counts_api_v1_orders_status_counts_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1874,6 +1899,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/pos/payment-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pos Payment Methods
+         * @description Métodos ACTIVOS disponibles en mostrador (1h: efectivo/terminal/transferencia).
+         *
+         *     El listado público filtra ``available_online`` y deja fuera los métodos
+         *     exclusivos de mostrador (p. ej. efectivo en caja); el POS necesita los
+         *     ``available_pos``.
+         */
+        get: operations["list_pos_payment_methods_api_v1_pos_payment_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-method-configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Payment Method Configs
+         * @description Listado administrativo (motor de query): filtros y búsqueda por código/nombre.
+         */
+        get: operations["list_payment_method_configs_api_v1_payment_method_configs_get"];
+        put?: never;
+        /** Create Payment Method Config */
+        post: operations["create_payment_method_config_api_v1_payment_method_configs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payment-method-configs/{method_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Payment Method Config */
+        get: operations["get_payment_method_config_api_v1_payment_method_configs__method_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Payment Method Config
+         * @description PATCH parcial. El ``code`` es inmutable y no existe DELETE: desactivar
+         *     conserva los pagos históricos (FK RESTRICT sobre payments).
+         */
+        patch: operations["update_payment_method_config_api_v1_payment_method_configs__method_id__patch"];
+        trace?: never;
+    };
     "/api/v1/orders/{order_id}/payments": {
         parameters: {
             query?: never;
@@ -1950,7 +2042,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Ticket Prints
+         * @description Bitácora de impresiones del pedido (§20): el frontend deriva de aquí el
+         *     número de copia siguiente y la marca de REIMPRESIÓN.
+         */
+        get: operations["list_ticket_prints_api_v1_orders__order_id__ticket_prints_get"];
         put?: never;
         /** Log Ticket Print */
         post: operations["log_ticket_print_api_v1_orders__order_id__ticket_prints_post"];
@@ -2075,13 +2172,24 @@ export interface paths {
          *
          *     Sólo perfiles ``image``/``favicon``; cualquier otro tipo de archivo se
          *     comporta como inexistente. El binario es inmutable por id: cache largo.
+         *     Acepta HEAD (FastAPI no lo deriva del GET): el frontend verifica así el
+         *     content-type antes de referenciar el archivo como favicon/logo.
          */
         get: operations["read_public_file_api_v1_public_files__file_id__get"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
-        head?: never;
+        /**
+         * Read Public File
+         * @description Entrega pública de imágenes referidas por contenido público (menú, marca).
+         *
+         *     Sólo perfiles ``image``/``favicon``; cualquier otro tipo de archivo se
+         *     comporta como inexistente. El binario es inmutable por id: cache largo.
+         *     Acepta HEAD (FastAPI no lo deriva del GET): el frontend verifica así el
+         *     content-type antes de referenciar el archivo como favicon/logo.
+         */
+        head: operations["read_public_file_api_v1_public_files__file_id__head"];
         patch?: never;
         trace?: never;
     };
@@ -2252,8 +2360,17 @@ export interface paths {
         get: operations["get_zone_api_v1_shipping_zones__zone_id__get"];
         put?: never;
         post?: never;
-        /** Deactivate Zone */
-        delete: operations["deactivate_zone_api_v1_shipping_zones__zone_id__delete"];
+        /**
+         * Delete Zone
+         * @description Elimina la zona DEFINITIVAMENTE (sus tarifas caen en cascada).
+         *
+         *     El historial de pedidos NO depende de la zona viva: cada pedido congela el
+         *     monto cobrado y el nombre de la zona (snapshots en ``order_shipping``), y su
+         *     referencia viva cae a NULL al borrar (FK ON DELETE SET NULL). La
+         *     desactivación (PATCH ``is_active=false``) sigue disponible para pausar una
+         *     zona sin destruirla.
+         */
+        delete: operations["delete_zone_api_v1_shipping_zones__zone_id__delete"];
         options?: never;
         head?: never;
         /** Update Zone */
@@ -3085,6 +3202,10 @@ export interface components {
         /**
          * AvailableDeliveryItem
          * @description Elemento de la cola «listos para salir» (§19.5).
+         *
+         *     Incluye lo que el repartidor necesita para navegar y contactar SIN abrir
+         *     el pedido completo: teléfono del destinatario, referencias y coordenadas
+         *     (cuando el cliente/empleado fijó punto en mapa).
          */
         AvailableDeliveryItem: {
             /**
@@ -3109,6 +3230,15 @@ export interface components {
             collection_label: string;
             /** Ready Since */
             ready_since?: string | null;
+            /** Recipient Phone */
+            recipient_phone?: string | null;
+            /** References */
+            references?: string | null;
+            location?: components["schemas"]["GeoPoint"] | null;
+            /** Total Amount */
+            total_amount?: string | null;
+            /** Visible Notes */
+            visible_notes?: string[];
         };
         /**
          * BackupDriveStatus
@@ -3862,6 +3992,9 @@ export interface components {
         /**
          * CourierSummaryRead
          * @description Resumen DERIVADO del día del repartidor (§19.7): sin cajas ni cortes.
+         *
+         *     Incluye la disponibilidad vigente para que el panel arranque sincronizado
+         *     con el servidor (no con estado local).
          */
         CourierSummaryRead: {
             /** Deliveries Completed */
@@ -3870,6 +4003,11 @@ export interface components {
             cash_collected: string;
             /** Shipping Charged */
             shipping_charged: string;
+            /**
+             * Is Delivery Available
+             * @default false
+             */
+            is_delivery_available: boolean;
         };
         /** CreditAdjustmentCreate */
         CreditAdjustmentCreate: {
@@ -4876,6 +5014,15 @@ export interface components {
             collection_label: string;
             /** Ready Since */
             ready_since?: string | null;
+            /** Recipient Phone */
+            recipient_phone?: string | null;
+            /** References */
+            references?: string | null;
+            location?: components["schemas"]["GeoPoint"] | null;
+            /** Total Amount */
+            total_amount?: string | null;
+            /** Visible Notes */
+            visible_notes?: string[];
             /** Assignment Status */
             assignment_status: string;
         };
@@ -4929,6 +5076,8 @@ export interface components {
             lines?: components["schemas"]["OrderLineRead"][];
             delivery?: components["schemas"]["OrderDeliveryRead"] | null;
             courier?: components["schemas"]["PublicCourierInfo"] | null;
+            /** Visible Notes */
+            visible_notes?: components["schemas"]["OrderVisibleNoteRead"][];
         };
         /**
          * NavigationModule
@@ -4995,6 +5144,18 @@ export interface components {
         OffsetPage_ModifierGroupListItem_: {
             /** Items */
             items: components["schemas"]["ModifierGroupListItem"][];
+            pagination: components["schemas"]["OffsetPagination"];
+        };
+        /** OffsetPage[OrderListItem] */
+        OffsetPage_OrderListItem_: {
+            /** Items */
+            items: components["schemas"]["OrderListItem"][];
+            pagination: components["schemas"]["OffsetPagination"];
+        };
+        /** OffsetPage[PaymentMethodConfigListItem] */
+        OffsetPage_PaymentMethodConfigListItem_: {
+            /** Items */
+            items: components["schemas"]["PaymentMethodConfigListItem"][];
             pagination: components["schemas"]["OffsetPagination"];
         };
         /** OffsetPage[ProductListItem] */
@@ -5280,10 +5441,17 @@ export interface components {
             adjustments?: components["schemas"]["OrderAdjustmentRead"][];
             shipping?: components["schemas"]["OrderShippingRead"] | null;
             delivery?: components["schemas"]["OrderDeliveryRead"] | null;
+            /** Visible Notes */
+            visible_notes?: components["schemas"]["OrderVisibleNoteRead"][];
         };
         /**
          * OrderShippingFinalizeRequest
-         * @description Fija el envío: tarifa existente O monto manual con motivo (§17.2).
+         * @description Fija el envío (§17.2): tarifa existente O monto manual con motivo O
+         *     ubicación en mapa (el backend recotiza por polígono y fija el resultado).
+         *
+         *     ``location`` además PERSISTE el pin en la entrega (location_source
+         *     employee_selected); puede acompañar al monto manual cuando el punto queda
+         *     fuera de zona pero conviene guardar la ubicación de todos modos.
          */
         OrderShippingFinalizeRequest: {
             /** Shipping Rate Rule Id */
@@ -5292,6 +5460,7 @@ export interface components {
             final_amount?: number | string | null;
             /** Reason */
             reason?: string | null;
+            location?: components["schemas"]["GeoPoint"] | null;
         };
         /** OrderShippingRead */
         OrderShippingRead: {
@@ -5324,6 +5493,23 @@ export interface components {
             internal_note?: string | null;
             /** Customer Visible Note */
             customer_visible_note?: string | null;
+        };
+        /**
+         * OrderVisibleNoteRead
+         * @description Aclaración registrada en una transición (p. ej. al aprobar) y visible
+         *     fuera del equipo: la ven el cliente en su seguimiento y el repartidor en
+         *     su entrega, además del panel. La nota interna NUNCA sale por aquí.
+         */
+        OrderVisibleNoteRead: {
+            /** New Status */
+            new_status: string;
+            /** Note */
+            note: string;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
         };
         /** PaginationCapability */
         PaginationCapability: {
@@ -5382,6 +5568,155 @@ export interface components {
             card_last_four?: string | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** PaymentMethodConfigCreate */
+        PaymentMethodConfigCreate: {
+            /** Código (minúsculas, sin espacios) */
+            code: string;
+            /** Nombre visible */
+            display_name: string;
+            /** Instrucciones para el cliente */
+            instructions?: string | null;
+            /**
+             * Disponible en línea
+             * @default true
+             */
+            available_online: boolean;
+            /**
+             * Disponible en mostrador
+             * @default true
+             */
+            available_pos: boolean;
+            /**
+             * Requiere verificación manual
+             * @default false
+             */
+            requires_manual_verification: boolean;
+            /**
+             * Requiere referencia
+             * @default false
+             */
+            requires_transaction_reference: boolean;
+            /**
+             * Requiere banco
+             * @default false
+             */
+            requires_bank_name: boolean;
+            /**
+             * Requiere comprobante
+             * @default false
+             */
+            requires_payment_proof: boolean;
+            /**
+             * Permite cambio en efectivo
+             * @default false
+             */
+            allows_cash_change: boolean;
+            /**
+             * Orden
+             * @default 0
+             */
+            sort_order: number;
+        };
+        /**
+         * PaymentMethodConfigListItem
+         * @description Fila del listado administrativo genérico de métodos de pago.
+         */
+        PaymentMethodConfigListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Código */
+            code: string;
+            /** Nombre */
+            display_name: string;
+            /** En línea */
+            available_online: boolean;
+            /** Mostrador */
+            available_pos: boolean;
+            /** Verificación manual */
+            requires_manual_verification: boolean;
+            /** Da cambio */
+            allows_cash_change: boolean;
+            /** Activo */
+            is_active: boolean;
+            /** Orden */
+            sort_order: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** PaymentMethodConfigRead */
+        PaymentMethodConfigRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Display Name */
+            display_name: string;
+            /** Instructions */
+            instructions?: string | null;
+            /** Available Online */
+            available_online: boolean;
+            /** Available Pos */
+            available_pos: boolean;
+            /** Requires Manual Verification */
+            requires_manual_verification: boolean;
+            /** Requires Transaction Reference */
+            requires_transaction_reference: boolean;
+            /** Requires Bank Name */
+            requires_bank_name: boolean;
+            /** Requires Payment Proof */
+            requires_payment_proof: boolean;
+            /** Allows Cash Change */
+            allows_cash_change: boolean;
+            /** Is Active */
+            is_active: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * PaymentMethodConfigUpdate
+         * @description PATCH parcial; el ``code`` es INMUTABLE (los pagos históricos lo citan
+         *     vía snapshot y el checkout lo referencia — cambiarlo rompería enlaces).
+         */
+        PaymentMethodConfigUpdate: {
+            /** Nombre visible */
+            display_name?: string | null;
+            /** Instrucciones para el cliente */
+            instructions?: string | null;
+            /** Disponible en línea */
+            available_online?: boolean | null;
+            /** Disponible en mostrador */
+            available_pos?: boolean | null;
+            /** Requiere verificación manual */
+            requires_manual_verification?: boolean | null;
+            /** Requiere referencia */
+            requires_transaction_reference?: boolean | null;
+            /** Requiere banco */
+            requires_bank_name?: boolean | null;
+            /** Requiere comprobante */
+            requires_payment_proof?: boolean | null;
+            /** Permite cambio en efectivo */
+            allows_cash_change?: boolean | null;
+            /** Orden */
+            sort_order?: number | null;
+            /** Is Active */
+            is_active?: boolean | null;
         };
         /**
          * PaymentMethodPublic
@@ -5495,6 +5830,12 @@ export interface components {
         PosSaleRequest: {
             /** Lines */
             lines: components["schemas"]["OrderLineInput"][];
+            /**
+             * Source
+             * @default counter
+             * @enum {string}
+             */
+            source: "counter" | "phone" | "whatsapp" | "social" | "manual";
             /** Customer User Id */
             customer_user_id?: string | null;
             /** Customer Name */
@@ -5824,6 +6165,9 @@ export interface components {
         /**
          * PublicCourierInfo
          * @description Lo único del repartidor que ve el cliente, sólo en camino (§19.2).
+         *
+         *     ``cash_change_amount``: cambio que lleva el repartidor cuando el pedido se
+         *     cobra en efectivo contra entrega («lleva tu cambio de $X»).
          */
         PublicCourierInfo: {
             /** Name */
@@ -5835,6 +6179,8 @@ export interface components {
             location?: components["schemas"]["GeoPoint"] | null;
             /** Location At */
             location_at?: string | null;
+            /** Cash Change Amount */
+            cash_change_amount?: string | null;
         };
         /** PublicDaySlot */
         PublicDaySlot: {
@@ -7233,6 +7579,8 @@ export interface components {
             status: string;
             /** Expected Amount */
             expected_amount: string;
+            /** Received Amount */
+            received_amount?: string | null;
             /** Change Requested For Amount */
             change_requested_for_amount?: string | null;
             /** Change Amount */
@@ -7313,6 +7661,8 @@ export interface components {
             items_subtotal: string;
             /** Discounts */
             discounts: string;
+            /** Discount Code */
+            discount_code?: string | null;
             /** Shipping */
             shipping?: string | null;
             /** Total */
@@ -11375,8 +11725,14 @@ export interface operations {
     list_orders_api_v1_orders_get: {
         parameters: {
             query?: {
+                /** @description Uno o varios estados separados por coma. */
                 status?: string | null;
                 source?: string | null;
+                fulfillment_type?: string | null;
+                q?: string | null;
+                created_from?: string | null;
+                created_to?: string | null;
+                customer_user_id?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -11394,7 +11750,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrderListItem"][];
+                    "application/json": components["schemas"]["OffsetPage_OrderListItem_"];
                 };
             };
             /** @description Validation Error */
@@ -11531,6 +11887,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    order_status_counts_api_v1_orders_status_counts_get: {
+        parameters: {
+            query?: {
+                source?: string | null;
+                fulfillment_type?: string | null;
+                q?: string | null;
+                created_from?: string | null;
+                created_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -12017,6 +12412,190 @@ export interface operations {
             };
         };
     };
+    list_pos_payment_methods_api_v1_pos_payment_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodPublic"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_payment_method_configs_api_v1_payment_method_configs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Campos de orden separados por coma. Use '-' para orden descendente. */
+                sort?: string;
+                is_active?: boolean | null;
+                available_online?: boolean | null;
+                available_pos?: boolean | null;
+                requires_manual_verification?: boolean | null;
+                code?: string | null;
+                display_name?: string | null;
+                id_in?: string[] | null;
+                display_name_ne?: string | null;
+                display_name_contains?: string | null;
+                display_name_startswith?: string | null;
+                display_name_endswith?: string | null;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffsetPage_PaymentMethodConfigListItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_payment_method_config_api_v1_payment_method_configs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentMethodConfigCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_payment_method_config_api_v1_payment_method_configs__method_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                method_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_payment_method_config_api_v1_payment_method_configs__method_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                method_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentMethodConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodConfigRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_order_payments_api_v1_orders__order_id__payments_get: {
         parameters: {
             query?: never;
@@ -12181,6 +12760,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ticket_prints_api_v1_orders__order_id__ticket_prints_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                order_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketPrintRead"][];
                 };
             };
             /** @description Validation Error */
@@ -12371,6 +12983,37 @@ export interface operations {
         };
     };
     read_public_file_api_v1_public_files__file_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_public_file_api_v1_public_files__file_id__head: {
         parameters: {
             query?: never;
             header?: never;
@@ -12904,7 +13547,7 @@ export interface operations {
             };
         };
     };
-    deactivate_zone_api_v1_shipping_zones__zone_id__delete: {
+    delete_zone_api_v1_shipping_zones__zone_id__delete: {
         parameters: {
             query?: never;
             header?: never;

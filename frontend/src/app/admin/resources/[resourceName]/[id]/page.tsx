@@ -68,14 +68,14 @@ export default async function ResourceDetailPage({ params }: PageProps) {
       <BackLink href={listPath} label={capability.label} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm text-slate-500">{capability.label}</p>
-          <h1 className="text-xl font-semibold text-slate-900">Detalle</h1>
+          <p className="text-sm text-[var(--tx3)]">{capability.label}</p>
+          <h1 className="text-xl font-semibold text-[var(--tx)]">Detalle</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {editEnabled ? (
             <Link
               href={`${base}/edit`}
-              className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+              className="rounded-md bg-[var(--side-bg)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--tx2)]"
             >
               Editar
             </Link>
@@ -84,7 +84,7 @@ export default async function ResourceDetailPage({ params }: PageProps) {
             <Link
               key={relation.name}
               href={`${base}/${encodeURIComponent(relation.name)}`}
-              className="text-sm font-medium text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline"
+              className="text-sm font-medium text-[var(--tx2)] underline-offset-2 hover:text-[var(--tx)] hover:underline"
             >
               {relation.label}
             </Link>
@@ -92,7 +92,7 @@ export default async function ResourceDetailPage({ params }: PageProps) {
           {downloadUrl ? (
             <a
               href={downloadUrl}
-              className="text-sm font-medium text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline"
+              className="text-sm font-medium text-[var(--tx2)] underline-offset-2 hover:text-[var(--tx)] hover:underline"
             >
               Descargar archivo
             </a>
@@ -108,7 +108,7 @@ export default async function ResourceDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <section className="rounded-lg border border-slate-200 bg-white p-6">
+      <section className="rounded-lg border border-[var(--border)] bg-white p-6">
         <ResourceDetailFields fields={fields} values={detail} />
       </section>
 

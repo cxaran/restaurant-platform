@@ -32,7 +32,7 @@ export function ResourceEditTabs({
   ];
 
   return (
-    <nav aria-label="Secciones del recurso" className="flex flex-wrap gap-1 border-b border-slate-200">
+    <nav aria-label="Secciones del recurso" className="flex flex-wrap gap-1 border-b border-[var(--border)]">
       {tabs.map((tab) => {
         const isActive = tab.key === active;
         return (
@@ -42,8 +42,8 @@ export function ResourceEditTabs({
             aria-current={isActive ? "page" : undefined}
             className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${
               isActive
-                ? "border-slate-900 text-slate-900"
-                : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
+                ? "border-[var(--tx)] text-[var(--tx)]"
+                : "border-transparent text-[var(--tx3)] hover:border-[var(--border2)] hover:text-[var(--tx)]"
             }`}
           >
             {tab.label}

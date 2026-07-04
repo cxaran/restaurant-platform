@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
 /*
- * Design tokens (R1) — portados de el handoff de diseño (Platform Core.dc.html) (paleta purpura).
- * Fundacion de presentacion: define las CSS custom properties de tema (light/dark)
- * para que las rebanadas siguientes (R2+) las consuman. No restylea componentes aqui.
+ * Design tokens — paleta Tony-Tony (Tony-Tony-Etapa-1.dc.html): crema #F6EEDD,
+ * café #1C1512, rojo #C1272D. Fundacion de presentacion: define las CSS custom
+ * properties de tema (light/dark) que consumen /admin y /panel. Los paneles
+ * internos comparten el lenguaje visual del storefront (Alfa Slab One + Archivo).
  */
 
 /*
@@ -36,8 +37,9 @@
   --color-info: var(--info);
   --color-purple: var(--purple);
 
-  /* Fuente del diseno (Geist) ya cableada por next/font como --font-geist. */
-  --font-sans: var(--font-geist), system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Fuentes del diseno (Archivo cuerpo, Alfa Slab One display) via next/font. */
+  --font-sans: var(--font-tt-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-tt-slab), serif;
 
   /* Sombras del diseno -> utilidades shadow-*. (--shadow del diseno = shadow-overlay). */
   --shadow-soft: var(--soft);
@@ -53,60 +55,69 @@
 :root,
 [data-theme="light"] {
   color-scheme: light;
-  --bg: #faf9f8;
-  --bg2: #f6f5f3;
-  --panel: #ffffff;
-  --panel2: #f4f4f5;
-  --elev: #ffffff;
-  --border: #eae8e5;
-  --border2: #e0ddd9;
-  --tx: #292524;
-  --tx2: #57534e;
-  --tx3: #a8a29e;
-  --accent: #8b7ff0;
-  --accent-tx: #6655dd;
-  --accent-dim: rgba(139, 127, 240, 0.11);
-  --accent-bd: rgba(139, 127, 240, 0.32);
-  --on-accent: #ffffff;
-  --danger: #dc2626;
-  --warn: #b45309;
-  --ok: #059669;
+  --bg: #f6eedd;
+  --bg2: #ede4cf;
+  --panel: #fffdf8;
+  --panel2: #f6eedd;
+  --elev: #fffdf8;
+  --border: #e7dcc6;
+  --border2: #e0d4bc;
+  --tx: #1c1512;
+  --tx2: #4e4335;
+  --tx3: #9a8b71;
+  --accent: #c1272d;
+  --accent-tx: #a81f24;
+  --accent-dim: rgba(193, 39, 45, 0.1);
+  --accent-bd: rgba(193, 39, 45, 0.35);
+  --on-accent: #fbf5e9;
+  --danger: #c1272d;
+  --warn: #7a5a14;
+  --ok: #338553;
   --info: #2563eb;
   --purple: #7c3aed;
+  /* Cromo interno (1g/1i): header crema claro y control segmentado. */
+  --header-bg: #fbf5e9;
+  --seg-bg: #efe5ce;
+  --muted-btn: #e9e2d2;
+  --muted-btn-tx: #6e5f4b;
   --soft:
-    rgba(14, 63, 126, 0.04) 0px 0px 0px 1px, rgba(42, 51, 69, 0.04) 0px 1px 1px -0.5px,
-    rgba(42, 51, 70, 0.04) 0px 3px 3px -1.5px, rgba(42, 51, 70, 0.04) 0px 6px 6px -3px,
-    rgba(14, 63, 126, 0.04) 0px 12px 12px -6px, rgba(14, 63, 126, 0.04) 0px 24px 24px -12px;
+    rgba(28, 21, 18, 0.04) 0px 0px 0px 1px, rgba(28, 21, 18, 0.04) 0px 1px 1px -0.5px,
+    rgba(28, 21, 18, 0.04) 0px 3px 3px -1.5px, rgba(28, 21, 18, 0.04) 0px 6px 6px -3px,
+    rgba(28, 21, 18, 0.04) 0px 12px 12px -6px, rgba(28, 21, 18, 0.04) 0px 24px 24px -12px;
   --soft2:
-    rgba(14, 63, 126, 0.06) 0px 0px 0px 1px, rgba(42, 51, 69, 0.06) 0px 1px 1px -0.5px,
-    rgba(42, 51, 70, 0.06) 0px 3px 3px -1.5px, rgba(42, 51, 70, 0.06) 0px 6px 6px -3px,
-    rgba(14, 63, 126, 0.06) 0px 12px 12px -6px, rgba(14, 63, 126, 0.06) 0px 24px 24px -12px;
-  --shadow: 0 18px 50px rgba(41, 37, 36, 0.13);
-  --glow: 0 0 0 1px rgba(139, 127, 240, 0.2), 0 10px 34px rgba(139, 127, 240, 0.14);
+    rgba(28, 21, 18, 0.06) 0px 0px 0px 1px, rgba(28, 21, 18, 0.06) 0px 1px 1px -0.5px,
+    rgba(28, 21, 18, 0.06) 0px 3px 3px -1.5px, rgba(28, 21, 18, 0.06) 0px 6px 6px -3px,
+    rgba(28, 21, 18, 0.06) 0px 12px 12px -6px, rgba(28, 21, 18, 0.06) 0px 24px 24px -12px;
+  --shadow: 0 18px 50px rgba(28, 21, 18, 0.14);
+  --glow: 0 0 0 1px rgba(193, 39, 45, 0.2), 0 10px 34px rgba(193, 39, 45, 0.14);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #1a1715;
-  --bg2: #141110;
-  --panel: #272320;
-  --panel2: #36302b;
-  --elev: #322c28;
-  --border: #46403a;
-  --border2: #574f48;
-  --tx: #fafaf9;
-  --tx2: #d8d4d1;
-  --tx3: #b2aaa3;
-  --accent: #a59bf6;
-  --accent-tx: #cbc4fc;
-  --accent-dim: rgba(165, 155, 246, 0.17);
-  --accent-bd: rgba(165, 155, 246, 0.42);
-  --on-accent: #16121f;
-  --danger: #fca5a5;
-  --warn: #fcd34d;
-  --ok: #4ade80;
+  --bg: #171210;
+  --bg2: #120e0c;
+  --panel: #241d17;
+  --panel2: #2f261e;
+  --elev: #2a221b;
+  --border: #3e342a;
+  --border2: #4c4034;
+  --tx: #f6eedd;
+  --tx2: #d9cdb4;
+  --tx3: #9a8b71;
+  --accent: #d64a50;
+  --accent-tx: #e8888c;
+  --accent-dim: rgba(214, 74, 80, 0.16);
+  --accent-bd: rgba(214, 74, 80, 0.42);
+  --on-accent: #fbf5e9;
+  --danger: #e06b6b;
+  --warn: #e8cfa0;
+  --ok: #63b98a;
   --info: #7cb8ff;
   --purple: #c4b5fd;
+  --header-bg: #1f1913;
+  --seg-bg: #3a3127;
+  --muted-btn: #3a3127;
+  --muted-btn-tx: #c9bca1;
   --soft:
     rgba(255, 255, 255, 0.07) 0 0 0 1px, rgba(0, 0, 0, 0.2) 0px 1px 2px,
     rgba(0, 0, 0, 0.24) 0px 6px 16px -4px, rgba(0, 0, 0, 0.3) 0px 18px 40px -12px;
@@ -114,7 +125,23 @@
     rgba(255, 255, 255, 0.09) 0 0 0 1px, rgba(0, 0, 0, 0.26) 0px 1px 2px,
     rgba(0, 0, 0, 0.32) 0px 8px 22px -4px, rgba(0, 0, 0, 0.4) 0px 22px 48px -12px;
   --shadow: 0 20px 54px rgba(0, 0, 0, 0.5);
-  --glow: 0 0 0 1px rgba(165, 155, 246, 0.3), 0 10px 34px rgba(165, 155, 246, 0.18);
+  --glow: 0 0 0 1px rgba(214, 74, 80, 0.3), 0 10px 34px rgba(214, 74, 80, 0.18);
+}
+
+/*
+ * Sidebar de los paneles internos (1g/1i/7b): SIEMPRE café oscuro, en ambos
+ * temas, como identidad fija de la marca.
+ */
+:root,
+[data-theme="light"],
+[data-theme="dark"] {
+  --side-bg: #1c1512;
+  --side-tx: #c9bca1;
+  --side-tx2: #9a8b71;
+  --side-strong: #f6eedd;
+  --side-active: #c1272d;
+  --side-active-tx: #fbf5e9;
+  --side-border: rgba(201, 188, 161, 0.2);
 }
 
 * {
@@ -125,8 +152,187 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--tx);
-  font-family: var(--font-geist), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--font-tt-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * ====================================================================
+ * Sistema de componentes Tony-Tony (tt-*) para los paneles internos.
+ * Portado del handoff Tony-Tony-Etapa-1.dc.html (pantallas 1g/1h/1i/4a/5a/6a/7b):
+ * botones, chips, control segmentado, badges de estado, tarjetas e inputs.
+ * ====================================================================
+ */
+.tt-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+}
+
+.tt-label {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--tx3);
+}
+
+.tt-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.tt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 18px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--tx);
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 0.15s, background-color 0.15s, transform 0.05s;
+}
+.tt-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.tt-btn:not(:disabled):active { transform: translateY(1px); }
+.tt-btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 6px 18px rgba(193, 39, 45, 0.3);
+}
+.tt-btn-primary:not(:disabled):hover { filter: brightness(1.06); }
+.tt-btn-success {
+  background: var(--ok);
+  color: #f0f8f2;
+  box-shadow: 0 6px 16px rgba(51, 133, 83, 0.3);
+}
+.tt-btn-success:not(:disabled):hover { filter: brightness(1.06); }
+.tt-btn-dark {
+  background: var(--side-bg);
+  color: var(--side-strong);
+}
+.tt-btn-outline {
+  border: 2px solid var(--tx);
+  padding: 9px 16px;
+  background: transparent;
+  color: var(--tx);
+}
+.tt-btn-outline:not(:disabled):hover { background: var(--panel2); }
+.tt-btn-outline-accent {
+  border: 2px solid var(--accent);
+  padding: 9px 16px;
+  background: transparent;
+  color: var(--accent);
+}
+.tt-btn-outline-accent:not(:disabled):hover { background: var(--accent-dim); }
+.tt-btn-ghost {
+  border: 1px solid var(--border2);
+  padding: 10px 17px;
+  background: var(--panel);
+  color: var(--tx2);
+  font-weight: 700;
+}
+.tt-btn-ghost:not(:disabled):hover { background: var(--panel2); }
+.tt-btn-muted {
+  background: var(--muted-btn);
+  color: var(--muted-btn-tx);
+}
+
+.tt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  color: var(--tx2);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s, color 0.15s;
+}
+.tt-chip[data-active="1"] {
+  background: var(--side-bg);
+  border-color: var(--side-bg);
+  color: var(--side-strong);
+  font-weight: 800;
+}
+.tt-chip-accent[data-active="1"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.tt-seg {
+  display: flex;
+  background: var(--seg-bg);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+}
+.tt-seg-item {
+  flex: 1;
+  text-align: center;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-btn-tx);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.tt-seg-item[data-active="1"] {
+  background: var(--side-bg);
+  color: var(--side-strong);
+  font-weight: 800;
+}
+
+.tt-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.tt-badge-new { background: var(--accent); color: var(--on-accent); }
+.tt-badge-warn { background: #fff3d6; color: #7a5a14; }
+.tt-badge-ok { background: #e3f0e7; color: #256341; }
+.tt-badge-done { background: var(--muted-btn); color: var(--muted-btn-tx); }
+
+.tt-input {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--tx);
+  outline: none;
+  width: 100%;
+}
+.tt-input:focus { border-color: var(--tx); }
+
+/* Al imprimir (tickets) el cromo del shell no debe salir. */
+@media print {
+  .tt-shell-side,
+  .tt-shell-header,
+  .mc-sidebar-backdrop {
+    display: none !important;
+  }
 }
 
 textarea::placeholder,

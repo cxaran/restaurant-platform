@@ -86,9 +86,9 @@ export function AccountProfileForm({ profile }: Readonly<{ profile: UserProfileR
     <form
       onSubmit={onSubmit}
       aria-label="Datos de perfil"
-      className="space-y-4 rounded-lg border border-slate-200 bg-white p-6"
+      className="space-y-4 rounded-lg border border-[var(--border)] bg-white p-6"
     >
-      <h2 className="text-lg font-semibold text-slate-900">Datos de perfil</h2>
+      <h2 className="text-lg font-semibold text-[var(--tx)]">Datos de perfil</h2>
 
       {success ? (
         <div role="status" className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
@@ -133,7 +133,7 @@ function Field({
   const errorId = hasErrors ? `${id}-error` : undefined;
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-900">
+      <label htmlFor={id} className="block text-sm font-medium text-[var(--tx)]">
         {label}
       </label>
       <input
@@ -145,9 +145,9 @@ function Field({
         aria-required="true"
         aria-invalid={hasErrors || undefined}
         aria-describedby={errorId}
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none"
+        className="w-full rounded-md border border-[var(--border2)] px-3 py-2 text-sm text-[var(--tx)] shadow-sm focus:border-[var(--tx3)] focus:outline-none"
       />
-      {help ? <p className="text-xs text-slate-500">{help}</p> : null}
+      {help ? <p className="text-xs text-[var(--tx3)]">{help}</p> : null}
       <FieldError id={errorId} message={errors?.join(" ")} />
     </div>
   );

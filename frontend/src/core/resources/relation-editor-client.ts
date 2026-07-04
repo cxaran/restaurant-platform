@@ -82,6 +82,51 @@ async function fetchJson(path: string, cookie: string): Promise<unknown> {
   }
 }
 
+function isOffsetPage(value: unknown): value is {
+  items: unknown[];
+  pagination: { has_next?: unknown };
+} {
+  return (
+    isPlainObject(value) &&
+    Array.isArray(value.items) &&
+    isPlainObject(value.pagination)
+  );
+}
+
+// Límite máximo del motor de query (OffsetQuerySchema) y tope defensivo de
+// páginas: 30 × 100 filas cubren con holgura cualquier catálogo relacional real.
+const PAGE_LIMIT = 100;
+const MAX_PAGES = 30;
+
+/**
+ * Igual que ``fetchJson`` pero, si la respuesta es una página offset (formato
+ * ``{items, pagination}``), sigue ``has_next`` y acumula TODAS las filas: sin
+ * esto el editor solo mostraría la primera página (20 opciones) y la selección
+ * inicial quedaría trunca. Respuestas no paginadas pasan intactas.
+ */
+async function fetchJsonAllPages(path: string, cookie: string): Promise<unknown> {
+  const first = await fetchJson(path, cookie);
+  if (first === null || !isOffsetPage(first)) {
+    return first;
+  }
+  const items = [...first.items];
+  let hasNext = first.pagination.has_next === true;
+  let pages = 1;
+  while (hasNext && pages < MAX_PAGES) {
+    const page = await fetchJson(
+      `${path}?limit=${PAGE_LIMIT}&offset=${items.length}`,
+      cookie,
+    );
+    if (page === null || !isOffsetPage(page) || page.items.length === 0) {
+      break;
+    }
+    items.push(...page.items);
+    hasNext = page.pagination.has_next === true;
+    pages += 1;
+  }
+  return { items };
+}
+
 function parseSelected(
   raw: unknown,
   relation: ResourceRelationCapability,
@@ -188,8 +233,8 @@ export async function getRelationEditorData(
 
   const cookie = (await cookies()).toString();
   const [selectionRaw, optionsRaw] = await Promise.all([
-    fetchJson(selectionUrl, cookie),
-    fetchJson(relation.options.url, cookie),
+    fetchJsonAllPages(selectionUrl, cookie),
+    fetchJsonAllPages(relation.options.url, cookie),
   ]);
   if (selectionRaw === null || optionsRaw === null) {
     return null;

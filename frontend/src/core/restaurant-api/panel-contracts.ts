@@ -23,3 +23,10 @@ export type PosSaleResult = components["schemas"]["PosSaleResult"];
 // Tickets (GET /orders/{id}/ticket responde TicketRead)
 export type TicketRead = components["schemas"]["TicketRead"];
 export type TicketPrintCreate = components["schemas"]["TicketPrintCreate"];
+export type TicketPrintRead = components["schemas"]["TicketPrintRead"];
+
+// POS / captura de pedidos sin cobro (POST /orders/capture responde OrderRead)
+export type CaptureRequest = components["schemas"]["CaptureRequest"];
+export type PosPaymentInput = components["schemas"]["PosPaymentInput"];
+// Métodos visibles al elegir cómo pagar (GET /payment-methods).
+export type PaymentMethodPublic = components["schemas"]["PaymentMethodPublic"];

@@ -121,6 +121,7 @@ class SecurityCatalogTest(unittest.TestCase):
                 "payments:record",
                 "payments:verify",
                 "payments:refund",
+                "payments:manage_methods",
                 "tickets:print",
                 "deliveries:read",
                 "deliveries:assign",

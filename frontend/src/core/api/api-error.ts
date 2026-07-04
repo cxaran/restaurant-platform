@@ -35,6 +35,16 @@ export function normalizeApiError(status: number, value: unknown): ApiErrorBody 
     return value;
   }
 
+  // Un 413 fuera del envelope viene de un proxy (nginx) que cortó la subida
+  // antes de llegar al backend: el mensaje genérico confunde ("no se pudo
+  // procesar la respuesta") cuando el problema real es el tamaño del archivo.
+  if (status === 413) {
+    return {
+      code: "http_413",
+      message: "El archivo supera el tamaño máximo que acepta el servidor",
+    };
+  }
+
   return {
     code: `http_${status}`,
     message: "No se pudo procesar la respuesta del servidor",

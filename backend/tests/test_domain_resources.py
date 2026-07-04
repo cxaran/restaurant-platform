@@ -246,11 +246,11 @@ class DomainResourcesTest(unittest.TestCase):
     # --- Navegación de módulos especializados (parte B) ---
 
     def test_navigation_modules_projected_by_permissions(self) -> None:
+        # tickets:print ya no proyecta módulo: la impresión es DIRECTA desde
+        # pedidos/POS y /panel/tickets se eliminó.
         with _As("deliveries:self_assign", "tickets:print"):
             body = self.client.get("/api/v1/resources").json()
-        self.assertEqual(
-            [m["name"] for m in body["navigation_modules"]], ["reparto", "tickets"]
-        )
+        self.assertEqual([m["name"] for m in body["navigation_modules"]], ["reparto"])
         self.assertEqual(body["resources"], [])
 
     def test_navigation_modules_empty_without_permissions(self) -> None:

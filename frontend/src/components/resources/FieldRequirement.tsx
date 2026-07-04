@@ -14,5 +14,5 @@ export function RequiredHint({ required }: Readonly<{ required?: boolean }>) {
       </span>
     );
   }
-  return <span className="font-normal text-slate-400"> (opcional)</span>;
+  return <span className="font-normal text-[var(--tx3)]"> (opcional)</span>;
 }

@@ -48,7 +48,7 @@ export default async function ResourcePage({ params, searchParams }: PageProps) 
     return (
       <div className="space-y-4">
         <BackLink href="/admin/resources" label="Recursos" />
-        <h1 className="text-xl font-semibold text-slate-900">{capability.label}</h1>
+        <h1 className="text-xl font-semibold text-[var(--tx)]">{capability.label}</h1>
         <GroupedCatalog label={capability.label} catalog={catalog} />
       </div>
     );

@@ -163,6 +163,47 @@ class OrderRoutesTest(unittest.TestCase):
         self.assertEqual(other, [])
         self.assertEqual(detail.status_code, 404)
 
+    def test_internal_list_paginates_searches_and_counts(self) -> None:
+        """Tablero interno: envelope paginado, búsqueda (folio/cliente/dirección
+        vía entrega) y conteos por estado con los mismos filtros."""
+        with _As(CUSTOMER_ID):
+            for name in ("María López", "Jorge Salas", "Ana Cruz"):
+                response = self.client.post(
+                    "/api/v1/orders",
+                    json=self._checkout_payload(customer_name=name),
+                )
+                self.assertEqual(response.status_code, 201, response.text)
+
+        with _As(uuid.uuid4(), "orders:read"):
+            page = self.client.get("/api/v1/orders?limit=2&offset=0").json()
+            self.assertEqual(len(page["items"]), 2)
+            self.assertEqual(page["pagination"]["total"], 3)
+            self.assertTrue(page["pagination"]["has_next"])
+
+            rest = self.client.get("/api/v1/orders?limit=2&offset=2").json()
+            self.assertEqual(len(rest["items"]), 1)
+            self.assertFalse(rest["pagination"]["has_next"])
+
+            # Búsqueda por nombre de cliente y por folio.
+            by_name = self.client.get("/api/v1/orders?q=jorge").json()
+            self.assertEqual(by_name["pagination"]["total"], 1)
+            self.assertEqual(by_name["items"][0]["customer_name_snapshot"], "Jorge Salas")
+            by_code = self.client.get(
+                f"/api/v1/orders?q={by_name['items'][0]['public_code']}"
+            ).json()
+            self.assertEqual(by_code["pagination"]["total"], 1)
+
+            # Filtro por estado (coma-separado) y rango de fechas.
+            submitted = self.client.get("/api/v1/orders?status=submitted,approved").json()
+            self.assertEqual(submitted["pagination"]["total"], 3)
+            past = self.client.get("/api/v1/orders?created_to=2000-01-01T00:00:00").json()
+            self.assertEqual(past["pagination"]["total"], 0)
+
+            counts = self.client.get("/api/v1/orders/status-counts").json()
+            self.assertEqual(counts, {"submitted": 3})
+            counts_q = self.client.get("/api/v1/orders/status-counts?q=ana").json()
+            self.assertEqual(counts_q, {"submitted": 1})
+
     def test_quantities_must_be_strict_positive_integers(self) -> None:
         """H1 vía HTTP: 0.5, "1", true, 0 y negativos → 422 de validación."""
         for bad in (0.5, "1", True, 0, -1, "1.0", 1.5):

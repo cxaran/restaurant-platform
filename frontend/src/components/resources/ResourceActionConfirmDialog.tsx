@@ -109,10 +109,10 @@ export function ResourceActionConfirmDialog({
 
   const header = (
     <>
-      <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+      <h2 id={titleId} className="text-lg font-semibold text-[var(--tx)]">
         {confirmation.title}
       </h2>
-      <p id={messageId} className="text-sm text-slate-600">
+      <p id={messageId} className="text-sm text-[var(--tx2)]">
         {confirmation.message}
       </p>
       {confirmation.destructive ? (
@@ -137,7 +137,7 @@ export function ResourceActionConfirmDialog({
         type="button"
         onClick={onCancel}
         disabled={pending}
-        className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        className="rounded-md border border-[var(--border2)] px-4 py-2 text-sm font-medium text-[var(--tx2)] transition hover:bg-[var(--panel2)] disabled:cursor-not-allowed disabled:opacity-60"
       >
         Cancelar
       </button>
@@ -156,7 +156,7 @@ export function ResourceActionConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onKeyDown={onKeyDown}
     >
       <div
@@ -165,7 +165,7 @@ export function ResourceActionConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={messageId}
-        className="w-full max-w-md space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-lg"
+        className="w-full max-w-md space-y-4 rounded-lg border border-[var(--border)] bg-white p-6 shadow-lg"
       >
         {hasFields ? (
           <form className="space-y-4" onSubmit={onSubmit} noValidate>

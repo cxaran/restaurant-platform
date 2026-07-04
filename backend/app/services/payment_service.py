@@ -196,20 +196,31 @@ class CollectionInstruction:
     label: str
 
 
-def collection_instruction(session: Session, order: Order) -> CollectionInstruction:
-    payments = session.exec(select(Payment).where(Payment.order_id == order.id)).all()
-
+def _is_cash_payment(session: Session, payment: Payment) -> bool:
     # H9: «cobrar en efectivo» SOLO si el método del pago pendiente realmente
     # es de cobro contra entrega (allows_cash_change) — jamás derivarlo del
     # simple status=pending (una transferencia sin verificar NO se cobra).
-    def _is_cash(payment: Payment) -> bool:
-        if payment.change_requested_for_amount is not None:
-            return True
-        method = session.get(PaymentMethodConfig, payment.payment_method_config_id)
-        return bool(method and method.allows_cash_change)
+    if payment.change_requested_for_amount is not None:
+        return True
+    method = session.get(PaymentMethodConfig, payment.payment_method_config_id)
+    return bool(method and method.allows_cash_change)
+
+
+def pending_cash_payments(session: Session, order: Order) -> list[Payment]:
+    """Pagos en efectivo pendientes de cobro contra entrega (guardia H9)."""
+    payments = session.exec(select(Payment).where(Payment.order_id == order.id)).all()
+    return [
+        payment
+        for payment in payments
+        if payment.status == "pending" and _is_cash_payment(session, payment)
+    ]
+
+
+def collection_instruction(session: Session, order: Order) -> CollectionInstruction:
+    payments = session.exec(select(Payment).where(Payment.order_id == order.id)).all()
 
     pending = [payment for payment in payments if payment.status == "pending"]
-    pending_cash = [payment for payment in pending if _is_cash(payment)]
+    pending_cash = [payment for payment in pending if _is_cash_payment(session, payment)]
 
     if pending and not pending_cash:
         return CollectionInstruction(

@@ -12,7 +12,12 @@ from backend.app.schemas.base import ApiReadSchema, ApiWriteSchema
 
 
 class AvailableDeliveryItem(ApiReadSchema):
-    """Elemento de la cola «listos para salir» (§19.5)."""
+    """Elemento de la cola «listos para salir» (§19.5).
+
+    Incluye lo que el repartidor necesita para navegar y contactar SIN abrir
+    el pedido completo: teléfono del destinatario, referencias y coordenadas
+    (cuando el cliente/empleado fijó punto en mapa).
+    """
 
     order_id: UUID
     order_delivery_id: UUID
@@ -22,6 +27,13 @@ class AvailableDeliveryItem(ApiReadSchema):
     zone_name: Optional[str] = None
     collection_label: str
     ready_since: Optional[datetime] = None
+    recipient_phone: Optional[str] = None
+    references: Optional[str] = None
+    location: Optional[GeoPoint] = None
+    total_amount: Optional[Decimal] = None
+    # Aclaraciones del equipo visibles fuera del panel (p. ej. al aprobar):
+    # el repartidor las ve aquí; el cliente en su seguimiento (§15.4).
+    visible_notes: list[str] = Field(default_factory=list)
 
 
 class MyActiveDelivery(AvailableDeliveryItem):
@@ -67,18 +79,28 @@ class LocationReportRequest(ApiWriteSchema):
 
 
 class CourierSummaryRead(ApiReadSchema):
-    """Resumen DERIVADO del día del repartidor (§19.7): sin cajas ni cortes."""
+    """Resumen DERIVADO del día del repartidor (§19.7): sin cajas ni cortes.
+
+    Incluye la disponibilidad vigente para que el panel arranque sincronizado
+    con el servidor (no con estado local).
+    """
 
     deliveries_completed: int
     cash_collected: Decimal
     shipping_charged: Decimal
+    is_delivery_available: bool = False
 
 
 class PublicCourierInfo(ApiReadSchema):
-    """Lo único del repartidor que ve el cliente, sólo en camino (§19.2)."""
+    """Lo único del repartidor que ve el cliente, sólo en camino (§19.2).
+
+    ``cash_change_amount``: cambio que lleva el repartidor cuando el pedido se
+    cobra en efectivo contra entrega («lleva tu cambio de $X»).
+    """
 
     name: str
     public_phone: Optional[str] = None
     public_note: Optional[str] = None
     location: Optional[GeoPoint] = None
     location_at: Optional[datetime] = None
+    cash_change_amount: Optional[Decimal] = None

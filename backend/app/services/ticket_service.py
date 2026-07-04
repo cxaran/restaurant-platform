@@ -20,9 +20,38 @@ from sqlmodel import select
 
 
 def build_ticket_payload(session: Session, order: Order) -> dict:
-    profile = get_business_profile(session)
-    settings_row = get_business_settings(session)
+    # Branding: preferir el snapshot congelado al crear el pedido; pedidos
+    # históricos (snapshot NULL) caen al perfil/ajustes vivos.
+    snapshot = order.business_snapshot or {}
+    if snapshot:
+        business = {
+            "trade_name": snapshot.get("trade_name") or "",
+            "slogan": snapshot.get("slogan"),
+            "logo_file_id": snapshot.get("logo_file_id"),
+            "footer_text": snapshot.get("footer_text"),
+        }
+    else:
+        profile = get_business_profile(session)
+        settings_row = get_business_settings(session)
+        business = {
+            "trade_name": profile.trade_name,
+            "slogan": profile.slogan,
+            "logo_file_id": profile.logo_file_id,
+            "footer_text": settings_row.ticket_footer_text,
+        }
+
     payments = session.exec(select(Payment).where(Payment.order_id == order.id)).all()
+
+    # Descuento con su código (la spec pide que APAREZCA en el ticket): la
+    # redención activa (reserved|consumed) guarda snapshots inmutables.
+    from backend.app.models.discounts import DiscountCodeRedemption
+
+    redemption = session.exec(
+        select(DiscountCodeRedemption).where(
+            DiscountCodeRedemption.order_id == order.id,
+            DiscountCodeRedemption.status.in_(["reserved", "consumed"]),  # pyright: ignore[reportAttributeAccessIssue]
+        )
+    ).first()
 
     attended_by: Optional[str] = None
     if order.created_by is not None:
@@ -32,12 +61,7 @@ def build_ticket_payload(session: Session, order: Order) -> dict:
 
     delivery = order.delivery
     return {
-        "business": {
-            "trade_name": profile.trade_name,
-            "slogan": profile.slogan,
-            "logo_file_id": profile.logo_file_id,
-            "footer_text": settings_row.ticket_footer_text,
-        },
+        "business": business,
         "public_code": order.public_code,
         "created_at": order.created_at,
         "source": order.source,
@@ -85,6 +109,7 @@ def build_ticket_payload(session: Session, order: Order) -> dict:
         "totals": {
             "items_subtotal": order.items_subtotal_amount,
             "discounts": order.discount_total_amount,
+            "discount_code": redemption.code_snapshot if redemption else None,
             "shipping": order.shipping_total_amount,
             "total": order.total_money_amount,
             "credits_earned": order.credits_earned_total_snapshot,
@@ -95,6 +120,7 @@ def build_ticket_payload(session: Session, order: Order) -> dict:
                 "method": payment.payment_method_name_snapshot,
                 "status": payment.status,
                 "expected_amount": payment.expected_amount,
+                "received_amount": payment.received_amount,
                 "change_requested_for_amount": payment.change_requested_for_amount,
                 "change_amount": payment.change_amount,
             }

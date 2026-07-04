@@ -5,7 +5,7 @@ from backend.app.core.database import SessionDep
 from backend.app.core.settings import settings
 from backend.app.models.user import User
 from backend.app.schemas.auth import RegisterCompleteRequest
-from backend.app.utils.email import send_email
+from backend.app.services.email_service import send_system_email
 
 from .security import generate_token, get_password_hash, get_user_by_email, save_user
 from .token_store import delete_token_pair, get_subject, set_token_pair
@@ -24,7 +24,8 @@ async def send_registration_token(
     ttl = settings.email_token_expire_minutes * 60
     set_token_pair(REGISTER_TOKEN_KEY, str(email), token, ttl)
 
-    await send_email(
+    await send_system_email(
+        session,
         subject="Solicitud de registro",
         email_to=email,
         message=f"Tu token de registro es: {token}",

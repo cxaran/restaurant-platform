@@ -3,7 +3,10 @@ name: restaurant-platform-e2e
 x-backend-environment: &backend-environment
   ENVIRONMENT: local
   SECRET_KEY: e2e-secret-key-change-me
-  TRUSTED_BROWSER_ORIGINS: http://127.0.0.1:31080
+  # Además del nginx del stack (31080), se confía en el dev server local del
+  # frontend (next dev en :3000 proxyeando /api a este stack): sin él, toda
+  # mutación desde el dev server muere en el CSRF con 403 csrf_origin_invalid.
+  TRUSTED_BROWSER_ORIGINS: http://127.0.0.1:31080,http://localhost:3000,http://127.0.0.1:3000
   ACCESS_TOKEN_EXPIRE_MINUTES: "30"
   EMAIL_TOKEN_EXPIRE_MINUTES: "30"
   TRYS_BEFORE_LOCK: "5"

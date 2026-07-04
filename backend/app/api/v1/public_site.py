@@ -122,19 +122,23 @@ def quote_public_shipping(
 
 
 @router.get("/files/{file_id}")
-def read_public_file(file_id: uuid.UUID, session: SessionDep) -> Response:
+@router.head("/files/{file_id}")
+def read_public_file(file_id: uuid.UUID, session: SessionDep, request: Request) -> Response:
     """Entrega pública de imágenes referidas por contenido público (menú, marca).
 
     Sólo perfiles ``image``/``favicon``; cualquier otro tipo de archivo se
     comporta como inexistente. El binario es inmutable por id: cache largo.
+    Acepta HEAD (FastAPI no lo deriva del GET): el frontend verifica así el
+    content-type antes de referenciar el archivo como favicon/logo.
     """
     stored = get_active_file(session, file_id)
     if stored is None or stored.kind not in _PUBLIC_FILE_KINDS:
         api_error(status.HTTP_404_NOT_FOUND, "archivo_no_encontrado", "Archivo no encontrado")
 
     filename_ascii = stored.original_filename.encode("ascii", "ignore").decode() or "archivo"
+    # HEAD: mismos headers sin cuerpo (h11 exige no enviar body en HEAD).
     return Response(
-        content=stored.file_content,
+        content=b"" if request.method == "HEAD" else stored.file_content,
         media_type=stored.mime_type,
         headers={
             "Content-Disposition": (

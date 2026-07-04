@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Metadata } from "next";
 
+import { getPublicBusiness } from "./business";
 import type { PublicBusiness } from "./contracts";
 import type { StorefrontPageVM } from "./view-models";
 
@@ -46,6 +47,21 @@ export async function resolveSafeFaviconPath(
   }
 }
 
+/**
+ * Favicon institucional para las secciones sin head propio (panel, admin, auth):
+ * el LOGO del negocio, con la misma política raster segura. Cualquier fallo →
+ * metadata vacía (queda el head estático del root layout).
+ */
+export async function businessFaviconMetadata(): Promise<Metadata> {
+  try {
+    const business = await getPublicBusiness();
+    const icon = await resolveSafeFaviconPath(business?.logo_file_id);
+    return icon ? { icons: { icon } } : {};
+  } catch {
+    return {};
+  }
+}
+
 /** Cadena de resolución del head (§45.1): página → sitio → negocio. */
 export async function buildStorefrontMetadata(
   business: PublicBusiness | null,
@@ -53,7 +69,10 @@ export async function buildStorefrontMetadata(
 ): Promise<Metadata> {
   const title = page?.meta.title ?? business?.trade_name ?? "Restaurante";
   const description = page?.meta.description ?? business?.slogan ?? undefined;
-  const favicon = await resolveSafeFaviconPath(page?.meta.favicon_file_id);
+  // Favicon: el de la página publicada y, en su defecto, el logo del negocio.
+  const favicon =
+    (await resolveSafeFaviconPath(page?.meta.favicon_file_id)) ??
+    (await resolveSafeFaviconPath(business?.logo_file_id));
   const ogImage = page?.meta.og_image_file_id
     ? `/api/v1/public/files/${page.meta.og_image_file_id}`
     : undefined;

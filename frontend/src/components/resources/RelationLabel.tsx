@@ -43,7 +43,7 @@ export function RelationLabel({
   }, [target, value]);
 
   if (!value) {
-    return <span className="text-slate-400">—</span>;
+    return <span className="text-[var(--tx3)]">—</span>;
   }
-  return <span className="text-slate-900">{label ?? value}</span>;
+  return <span className="text-[var(--tx)]">{label ?? value}</span>;
 }

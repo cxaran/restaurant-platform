@@ -8,20 +8,15 @@ import type {
   CreditTotalsRead,
 } from "@/core/restaurant-api/contracts";
 
+import { CreditMovementsList } from "./CreditMovementsList";
+import { CreditsHero } from "./CreditsHero";
+
 export const dynamic = "force-dynamic";
 
-// Tarjeta de créditos del cliente (§58.3): tres agregaciones QUE CALCULA EL
-// BACKEND desde el ledger — este frontend jamás deriva saldos. Tipos: los
-// generados del OpenAPI (contracts.ts), nunca contratos replicados a mano.
-
-const ENTRY_LABELS: Record<string, string> = {
-  earn: "Créditos ganados",
-  redeem_reservation: "Canje reservado",
-  redemption_release: "Canje liberado",
-  earn_reversal: "Reverso por reembolso",
-  redemption_refund: "Devolución de canje",
-  manual_adjustment: "Ajuste",
-};
+// Créditos del cliente alineados al bloque de créditos de la escena 3a:
+// tarjeta de saldo grande en display + movimientos con signo/color. Las tres
+// agregaciones las CALCULA EL BACKEND desde el ledger — este frontend jamás
+// deriva saldos. Tipos: los generados del OpenAPI (contracts.ts).
 
 export default async function CreditosPage() {
   const session = await getSession();
@@ -62,50 +57,15 @@ export default async function CreditosPage() {
           </p>
         </div>
       ) : (
-        <>
-          <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
-            {(
-              [
-                ["Disponibles", totals.available],
-                ["Ganados", totals.earned],
-                ["Canjeados", totals.redeemed],
-              ] as const
-            ).map(([label, value]) => (
-              <div key={label} className="sf-card" style={{ padding: "18px 20px", textAlign: "center" }}>
-                <div className="sf-display" style={{ fontSize: 30, color: "var(--sf-brand)" }}>
-                  {value}
-                </div>
-                <div className="sf-muted" style={{ fontSize: 13, fontWeight: 700 }}>{label}</div>
-              </div>
-            ))}
-          </div>
-          <h2 className="sf-display" style={{ fontSize: 20, margin: "24px 0 10px" }}>Movimientos</h2>
-          {movements.length === 0 ? (
-            <p className="sf-muted" style={{ fontSize: 14 }}>
-              Aún no tienes movimientos: gana créditos comprando en el menú.
-            </p>
-          ) : (
-            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              {movements.map((movement) => (
-                <li key={movement.id} className="sf-card" style={{ padding: "12px 16px", display: "flex", gap: 12, alignItems: "center", fontSize: 14 }}>
-                  <span style={{ flex: 1 }}>
-                    {ENTRY_LABELS[movement.entry_type] ?? movement.entry_type}
-                    {movement.description ? (
-                      <span className="sf-muted"> · {movement.description}</span>
-                    ) : null}
-                  </span>
-                  <span className="sf-muted" style={{ fontSize: 12 }}>
-                    {new Date(movement.occurred_at).toLocaleDateString("es-MX")}
-                  </span>
-                  <span style={{ fontWeight: 900, color: movement.credit_delta > 0 ? "var(--sf-success)" : "var(--sf-brand)" }}>
-                    {movement.credit_delta > 0 ? "+" : ""}
-                    {movement.credit_delta}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <CreditsHero totals={totals} />
+          <section>
+            <h2 className="sf-section-label" style={{ margin: "0 0 8px" }}>
+              Movimientos de créditos
+            </h2>
+            <CreditMovementsList movements={movements} />
+          </section>
+        </div>
       )}
     </div>
   );

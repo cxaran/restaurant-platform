@@ -1,12 +1,15 @@
 "use client";
 
-// Configurador de producto con modificadores: bottom-sheet en móvil y modal
-// centrado en desktop. La validación local solo guía al cliente; el backend
-// recalcula precios y vuelve a validar grupos en el checkout.
+// Diálogo para EDITAR una línea ya agregada al carrito sin salir de él:
+// bottom-sheet en móvil y modal centrado en desktop. Agregar desde el menú
+// ocurre en la página de detalle del producto (/menu/[productId]); ambos
+// comparten la misma lógica de validación (core/storefront/configurator.ts)
+// y los mismos campos de grupos (ModifierGroupFields). El backend recalcula
+// precios y vuelve a validar grupos en el checkout.
 
 import { useEffect, useId, useRef, useState } from "react";
 
-import type { PublicModifierGroup, PublicProduct } from "@/core/restaurant-api/contracts";
+import type { PublicProduct } from "@/core/restaurant-api/contracts";
 import { formatMoney, publicFileUrl } from "@/core/restaurant-api/theme";
 import { useCart, type CartLine, type CartMode } from "@/core/storefront/cart";
 import { redemptionPrice } from "@/core/storefront/credits-cart";
@@ -17,110 +20,10 @@ import {
   isValidUnitCount,
   selectionToCartModifiers,
   validateSelection,
-  type GroupSelection,
   type ProductSelection,
 } from "@/core/storefront/configurator";
+import { ModifierGroupFields } from "./ModifierGroupFields";
 import { QuantityStepper } from "./QuantityStepper";
-
-function groupCounterLabel(group: PublicModifierGroup, count: number): string {
-  if (group.selection_type === "single") {
-    return group.is_required ? `${count} de 1 · obligatorio` : `${count} de 1`;
-  }
-  if (group.max_selections !== null && group.max_selections !== undefined) {
-    return `${count} de ${group.min_selections}–${group.max_selections}`;
-  }
-  return group.min_selections > 0
-    ? `${count} seleccionadas · mínimo ${group.min_selections}`
-    : `${count} seleccionadas`;
-}
-
-function GroupControls({
-  group,
-  entries,
-  creditsMode,
-  onChange,
-}: Readonly<{
-  group: PublicModifierGroup;
-  entries: GroupSelection;
-  /** En canje con créditos los modificadores con costo monetario no se pueden elegir. */
-  creditsMode: boolean;
-  onChange: (next: GroupSelection) => void;
-}>) {
-  const single = group.selection_type === "single";
-  const atMax =
-    !single &&
-    group.max_selections !== null &&
-    group.max_selections !== undefined &&
-    entries.length >= group.max_selections;
-  const inputName = useId();
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {single && !group.is_required ? (
-        <label className="sf-option" data-checked={entries.length === 0}>
-          <input
-            type="radio"
-            name={inputName}
-            checked={entries.length === 0}
-            onChange={() => onChange([])}
-          />
-          <span style={{ fontWeight: 600 }}>Sin selección</span>
-        </label>
-      ) : null}
-      {group.options.map((option) => {
-        const checked = entries.some((entry) => entry.option_id === option.id);
-        const adjustment = Number.parseFloat(option.price_adjustment);
-        const monetary = Number.isFinite(adjustment) && adjustment !== 0;
-        // En canje: opción con costo bloqueada. Si venía marcada (línea previa)
-        // se deja QUITAR — solo se impide elegirla, nunca quedar atrapado.
-        const creditsBlocked = creditsMode && monetary;
-        const blocked = (!single && atMax && !checked) || (creditsBlocked && !checked);
-        return (
-          <label
-            key={option.id}
-            className="sf-option"
-            data-checked={checked}
-            data-disabled={blocked}
-          >
-            <input
-              type={single ? "radio" : "checkbox"}
-              name={single ? inputName : undefined}
-              checked={checked}
-              disabled={blocked}
-              onChange={() => {
-                if (single) {
-                  onChange([{ option_id: option.id, quantity: 1 }]);
-                } else if (checked) {
-                  onChange(entries.filter((entry) => entry.option_id !== option.id));
-                } else {
-                  onChange([...entries, { option_id: option.id, quantity: 1 }]);
-                }
-              }}
-            />
-            <span style={{ flex: 1 }}>
-              <span style={{ fontWeight: 700 }}>{option.name}</span>
-              {option.description ? (
-                <span className="sf-muted" style={{ display: "block", fontSize: 13 }}>
-                  {option.description}
-                </span>
-              ) : null}
-            </span>
-            {monetary ? (
-              <span style={{ fontWeight: 700, whiteSpace: "nowrap", textAlign: "right" }}>
-                {adjustment > 0 ? "+" : "−"}
-                {formatMoney(Math.abs(adjustment))}
-                {creditsBlocked ? (
-                  <span className="sf-muted" style={{ display: "block", fontSize: 11, fontWeight: 600 }}>
-                    No disponible en canje
-                  </span>
-                ) : null}
-              </span>
-            ) : null}
-          </label>
-        );
-      })}
-    </div>
-  );
-}
 
 export function ProductConfigurator({
   product,
@@ -160,7 +63,6 @@ export function ProductConfigurator({
   }, [onClose]);
 
   const problems = validateSelection(product, selection);
-  const problemByGroup = new Map(problems.map((problem) => [problem.group_id, problem]));
   const unitEstimate = estimatedUnitPrice(product, selection);
   const withAdjustments = hasPriceAdjustments(product, selection);
   const imageUrl = publicFileUrl(product.image_file_ids[0] ?? null);
@@ -250,51 +152,15 @@ export function ProductConfigurator({
         </div>
 
         <div className="sf-modal-body">
-          {product.modifier_groups.map((group) => {
-            const entries = selection[group.id] ?? [];
-            const problem = problemByGroup.get(group.id);
-            return (
-              <fieldset
-                key={group.id}
-                style={{ border: "none", margin: "0 0 18px", padding: 0 }}
-              >
-                <legend
-                  style={{
-                    display: "flex",
-                    width: "100%",
-                    alignItems: "baseline",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    padding: 0,
-                    marginBottom: 8,
-                  }}
-                >
-                  <span style={{ fontWeight: 800, fontSize: 15 }}>
-                    {group.name}
-                    {group.is_required ? (
-                      <span style={{ color: "var(--sf-brand)" }}> *</span>
-                    ) : null}
-                  </span>
-                  <span className="sf-muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
-                    {groupCounterLabel(group, entries.length)}
-                  </span>
-                </legend>
-                <GroupControls
-                  group={group}
-                  entries={entries}
-                  creditsMode={creditsMode}
-                  onChange={(next) =>
-                    setSelection((current) => ({ ...current, [group.id]: next }))
-                  }
-                />
-                {problem ? (
-                  <p className="sf-error" role="alert" style={{ margin: "8px 0 0", fontSize: 13 }}>
-                    {problem.message}
-                  </p>
-                ) : null}
-              </fieldset>
-            );
-          })}
+          <ModifierGroupFields
+            product={product}
+            selection={selection}
+            problems={problems}
+            creditsMode={creditsMode}
+            onGroupChange={(groupId, next) =>
+              setSelection((current) => ({ ...current, [groupId]: next }))
+            }
+          />
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}>Cantidad</span>

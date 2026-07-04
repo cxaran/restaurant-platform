@@ -351,7 +351,7 @@ class PermissionsCatalogTest(unittest.TestCase):
         with _As("permissions:read"):
             groups = client.get("/api/v1/permissions").json()
         names = [group["name"] for group in groups]
-        self.assertEqual(names, ["users", "roles", "permissions", "system_settings", "backups", "audit_events", "files", "business", "catalog", "shipping", "orders"])
+        self.assertEqual(names, ["users", "roles", "permissions", "system_settings", "backups", "audit_events", "files", "business", "catalog", "shipping", "orders", "payments", "tickets"])
         for group in groups:
             self.assertTrue(group["label"])
             for permission in group["permissions"]:

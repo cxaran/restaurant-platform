@@ -29,6 +29,13 @@ from .orders import (
     OrderShippingHistory,
     OrderStatusHistory,
 )
+from .payments import (
+    Payment,
+    PaymentAttachment,
+    PaymentMethodConfig,
+    PaymentRefund,
+    TicketPrintLog,
+)
 from .profiles import CustomerProfile, StaffProfile
 from .setup import PlatformSetup
 from .shipping import DeliveryZone, ShippingRateRule
@@ -61,6 +68,10 @@ __all__ = [
     "OrderShipping",
     "OrderShippingHistory",
     "OrderStatusHistory",
+    "Payment",
+    "PaymentAttachment",
+    "PaymentMethodConfig",
+    "PaymentRefund",
     "PlatformSetup",
     "Product",
     "ProductCategory",
@@ -73,6 +84,7 @@ __all__ = [
     "StaffProfile",
     "StoredFile",
     "SystemSettings",
+    "TicketPrintLog",
     "User",
     "UserAddress",
     "UserIdentity",

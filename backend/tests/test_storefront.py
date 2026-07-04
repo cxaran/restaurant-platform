@@ -502,6 +502,199 @@ class ScheduledPublishTest(unittest.TestCase):
             self.assertEqual(page.published_revision_id, scheduled.id)
             self.assertEqual(scheduled.status, "published")
 
+    def test_superseded_schedule_is_cancelled_not_published(self) -> None:
+        """§1.9: una publicación posterior a la programación cancela la campaña
+        vieja — jamás pisa los cambios recientes."""
+        from datetime import timedelta
+
+        from backend.app.services.storefront_service import (
+            get_or_create_draft,
+            publish_due_scheduled,
+            publish_revision,
+            schedule_draft,
+        )
+        from backend.app.utils.utc_now import utc_now
+
+        with Session(self.engine) as session:
+            page = session.exec(select(StorefrontPage)).one()
+            draft = get_or_create_draft(session, page, created_by=None)
+            session.add(
+                StorefrontPageSection(
+                    page_revision_id=draft.id, template_key="storefront.hero",
+                    template_version=1, sort_order=10, content_config=HERO_CONTENT,
+                )
+            )
+            session.flush()
+            session.refresh(draft)
+            scheduled = schedule_draft(
+                session, page, publish_at=utc_now() + timedelta(minutes=5), actor_id=None
+            )
+            session.commit()
+
+            # Alguien publica una revisión MÁS RECIENTE después de programar.
+            newer = get_or_create_draft(session, page, created_by=None)
+            session.add(
+                StorefrontPageSection(
+                    page_revision_id=newer.id, template_key="storefront.hero",
+                    template_version=1, sort_order=10, content_config=HERO_CONTENT,
+                )
+            )
+            session.flush()
+            session.refresh(newer)
+            publish_revision(session, page, newer, actor_id=None)
+            session.commit()
+
+            # Vence la programación vieja: NO publica; queda cancelada con razón.
+            scheduled.scheduled_publish_at = utc_now() - timedelta(seconds=1)
+            session.add(scheduled)
+            session.flush()
+            self.assertEqual(publish_due_scheduled(session), 0)
+            session.commit()
+            session.refresh(page)
+            session.refresh(scheduled)
+            self.assertEqual(page.published_revision_id, newer.id)
+            self.assertEqual(scheduled.status, "draft")
+            self.assertIsNone(scheduled.scheduled_publish_at)
+            self.assertIn("más reciente", scheduled.schedule_cancelled_reason or "")
+
+            # Auditoría del evento (nombres de campos, sin valores).
+            from backend.app.models.audit_event import AuditEvent
+
+            events = session.exec(
+                select(AuditEvent).where(AuditEvent.action == "schedule_superseded")
+            ).all()
+            self.assertEqual(len(events), 1)
+
+
+class PreviewLinkTest(unittest.TestCase):
+    """Enlace de preview firmado: read-only, temporal, invalidado al publicar."""
+
+    def setUp(self) -> None:
+        self.engine = _engine()
+        with Session(self.engine) as session:
+            session.add(StorefrontPage(page_key="home", slug="/", page_type="storefront_home"))
+            session.commit()
+
+        def override_db():
+            with Session(self.engine) as session:
+                yield session
+
+        from backend.app.auth.auth_dependencies import get_current_user
+        from backend.app.core.database import get_db
+        from backend.app.schemas.user import SessionUser
+
+        app.dependency_overrides[get_db] = override_db
+        self._user = SessionUser(
+            id=uuid.uuid4(), name="A", last_name="B", email="a@b.mx",
+            permissions={"storefront:preview", "storefront:read_draft"},
+        )
+        app.dependency_overrides[get_current_user] = lambda: self._user
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
+    def test_preview_link_lifecycle(self) -> None:
+        # Crear enlace exige permiso; el token resuelve el payload SIN sesión.
+        created = self.client.post("/api/v1/storefront/pages/home/preview-link")
+        self.assertEqual(created.status_code, 200, created.text)
+        body = created.json()
+        self.assertIn("token", body)
+        self.assertTrue(body["url"].startswith("/api/v1/public/storefront/preview/"))
+
+        app.dependency_overrides.pop(
+            __import__(
+                "backend.app.auth.auth_dependencies", fromlist=["get_current_user"]
+            ).get_current_user,
+            None,
+        )
+        public = self.client.get(body["url"])
+        self.assertEqual(public.status_code, 200, public.text)
+        payload = public.json()
+        self.assertEqual(payload["page_key"], "home")
+        self.assertIn("sections", payload)
+
+        # Token corrupto → 404 uniforme.
+        broken = self.client.get(body["url"] + "x")
+        self.assertEqual(broken.status_code, 404)
+
+        # Al publicar la revisión, el enlace deja de resolver (invalidación).
+        from backend.app.services.storefront_service import (
+            get_page,
+            get_or_create_draft,
+            publish_revision,
+        )
+
+        with Session(self.engine) as session:
+            page = get_page(session, "home")
+            assert page is not None
+            draft = get_or_create_draft(session, page, created_by=None)
+            session.add(
+                StorefrontPageSection(
+                    page_revision_id=draft.id, template_key="storefront.hero",
+                    template_version=1, sort_order=10, content_config=HERO_CONTENT,
+                )
+            )
+            session.flush()
+            session.refresh(draft)
+            publish_revision(session, page, draft, actor_id=None)
+            session.commit()
+        gone = self.client.get(body["url"])
+        self.assertEqual(gone.status_code, 404)
+
+    def test_preview_link_requires_permission(self) -> None:
+        from backend.app.auth.auth_dependencies import get_current_user
+        from backend.app.schemas.user import SessionUser
+
+        app.dependency_overrides[get_current_user] = lambda: SessionUser(
+            id=uuid.uuid4(), name="A", last_name="B", email="a@b.mx", permissions=set()
+        )
+        response = self.client.post("/api/v1/storefront/pages/home/preview-link")
+        self.assertEqual(response.status_code, 403)
+
+
+class ContentTemplatesTest(unittest.TestCase):
+    """Plantillas de contenido de la Etapa 6: registradas y con schema."""
+
+    def test_content_templates_registered_with_schema(self) -> None:
+        from backend.app.storefront.templates import (
+            TEMPLATES,
+            TemplateValidationError,
+            validate_section_configs,
+        )
+
+        for key in (
+            "storefront.content.image_text",
+            "storefront.content.info_cards",
+            "storefront.content.faq",
+        ):
+            self.assertIn(key, TEMPLATES)
+
+        # Config válida pasa; CTA peligroso se rechaza vía validación recursiva.
+        validate_section_configs(
+            "storefront.content.info_cards", 1,
+            content={"cards": [{"title": "Envíos", "description": "Zona centro"}]},
+            style={}, data_binding={}, behavior={},
+        )
+        with self.assertRaises(TemplateValidationError):
+            validate_section_configs(
+                "storefront.content.image_text", 1,
+                content={
+                    "title": "Hola", "body": "Texto",
+                    "cta": {
+                        "label": "Ir", "link_type": "external_https",
+                        "target": "http://inseguro.example",
+                    },
+                },
+                style={}, data_binding={}, behavior={},
+            )
+        with self.assertRaises(TemplateValidationError):
+            validate_section_configs(
+                "storefront.content.faq", 1,
+                content={"items": [], "html": "<script>"},
+                style={}, data_binding={}, behavior={},
+            )
+
 
 class LayoutSchemaExposureTest(unittest.TestCase):
     def test_layout_endpoint_exposes_contract_schemas(self) -> None:

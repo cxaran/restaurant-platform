@@ -5,10 +5,11 @@ revisiones publicadas (§47) y los borradores se previsualizan con permiso.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from typing import Optional
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Query as FastQuery, Response, status
 from pydantic import Field
 from sqlmodel import select
 
@@ -26,8 +27,13 @@ from backend.app.schemas.base import ApiPatchSchema, ApiReadSchema, ApiWriteSche
 from backend.app.security.groups.storefront import StorefrontPermissions
 from backend.app.services.config_audit import record_config_change
 from backend.app.services.file_service import get_active_file
+from backend.app.schemas.storefront_public import (
+    PreviewLinkResult,
+    PublicStorefrontPage,
+)
 from backend.app.services.storefront_service import (
     publish_due_scheduled,
+    revision_preview_payload,
     schedule_draft,
     unschedule_revision,
     StorefrontRuleError,
@@ -612,6 +618,77 @@ def unschedule_page(
     commit_or_conflict(session, "No fue posible cancelar la programación.")
 
 
+@router.post(
+    "/storefront/pages/{page_key}/preview-link", response_model=PreviewLinkResult
+)
+def create_preview_link(
+    page_key: str,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: StorefrontPermissions.PREVIEW.requiere,
+    minutes: int = FastQuery(default=60, ge=5, le=1440),
+) -> PreviewLinkResult:
+    """Enlace de preview FIRMADO y temporal (§ Etapa 6.9): token opaco de solo
+    lectura, alcance mínimo (una revisión de una página), expiración ≤ 24 h.
+    Se invalida solo: al publicar/archivar la revisión deja de resolverse."""
+    import jwt as pyjwt
+
+    from backend.app.core.settings import settings
+
+    page = _page_or_404(session, page_key)
+    draft = get_or_create_draft(session, page, created_by=current_user.id)
+    session.commit()
+    expires = datetime.now(dt_timezone.utc) + timedelta(minutes=minutes)
+    token = pyjwt.encode(
+        {
+            "aud": "storefront-preview",
+            "page_key": page.page_key,
+            "revision_id": str(draft.id),
+            "exp": expires,
+        },
+        settings.secret_key.get_secret_value(),
+        algorithm=settings.algorithm,
+    )
+    return PreviewLinkResult(
+        token=token,
+        url=f"/api/v1/public/storefront/preview/{token}",
+        expires_at=expires.isoformat(),
+        revision_number=draft.revision_number,
+    )
+
+
+@router.get(
+    "/public/storefront/preview/{token}", response_model=PublicStorefrontPage
+)
+def public_preview_by_token(token: str, session: SessionDep) -> dict:
+    """Consumo del enlace firmado: SIN sesión, solo lectura, sin datos privados.
+
+    404 uniforme ante token inválido/expirado o revisión ya publicada/archivada
+    (no revela si el enlace existió)."""
+    import jwt as pyjwt
+
+    from backend.app.core.settings import settings
+
+    invalid = ("preview_invalido", "El enlace de preview no es válido o ya expiró.")
+    try:
+        data = pyjwt.decode(
+            token,
+            settings.secret_key.get_secret_value(),
+            algorithms=[settings.algorithm],
+            audience="storefront-preview",
+        )
+        revision_id = uuid.UUID(str(data["revision_id"]))
+    except (pyjwt.PyJWTError, KeyError, ValueError):
+        api_error(status.HTTP_404_NOT_FOUND, *invalid)
+    revision = session.get(StorefrontPageRevision, revision_id)
+    if revision is None or revision.status not in ("draft", "scheduled"):
+        api_error(status.HTTP_404_NOT_FOUND, *invalid)
+    page = session.get(StorefrontPage, revision.page_id)
+    if page is None or page.page_key != data.get("page_key"):
+        api_error(status.HTTP_404_NOT_FOUND, *invalid)
+    return revision_preview_payload(session, page, revision)
+
+
 @router.get("/storefront/pages/{page_key}/preview")
 def preview_draft(
     page_key: str,
@@ -640,7 +717,7 @@ def preview_draft(
 # Sitio público (sólo publicado, §47)
 # ---------------------------------------------------------------------------
 
-@router.get("/public/storefront/{page_key}")
+@router.get("/public/storefront/{page_key}", response_model=PublicStorefrontPage)
 def public_storefront_page(page_key: str, session: SessionDep, response: Response) -> dict:
     settings_row = get_storefront_settings(session)
     if not settings_row.storefront_enabled:

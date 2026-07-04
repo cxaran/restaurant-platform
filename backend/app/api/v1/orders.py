@@ -291,6 +291,15 @@ def _my_order_read(session: SessionDep, order: Order) -> MyOrderRead:
         fulfillment_type=order.fulfillment_type,
         purchase_mode=order.purchase_mode,
         items_subtotal_amount=order.items_subtotal_amount,
+        discount_total_amount=order.discount_total_amount,
+        discount_code_label=next(
+            (
+                adj.reason
+                for adj in order.adjustments
+                if adj.adjustment_type == "discount_code"
+            ),
+            None,
+        ),
         shipping_amount=shipping_amount,
         shipping_pending_review=pending_review,
         total_money_amount=order.total_money_amount,

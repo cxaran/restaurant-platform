@@ -248,6 +248,48 @@ def public_page_payload(session: Session, page_key: str) -> dict:
     }
 
 
+def revision_preview_payload(
+    session: Session, page: StorefrontPage, revision: StorefrontPageRevision
+) -> dict:
+    """Payload de PREVIEW de una revisión concreta, con la MISMA forma que el
+    payload público (mismo renderer §47). A diferencia del público, no aplica
+    ventanas de visibilidad temporal: la visibilidad real la decide el servidor
+    al publicar; el preview muestra todo lo marcado visible."""
+    profile = get_business_profile(session)
+    settings_row = get_storefront_settings(session)
+    sections = [
+        {
+            "template_key": section.template_key,
+            "template_version": section.template_version,
+            "sort_order": section.sort_order,
+            "content": section.content_config,
+            "style": section.style_config,
+            "behavior": section.behavior_config,
+            "data": _resolve_binding(session, section),
+            "media": serialize_section_media(section),
+        }
+        for section in sorted(revision.sections, key=lambda s: s.sort_order)
+        if section.is_visible
+    ]
+    layout = active_layout(session)
+    return {
+        "page_key": page.page_key,
+        "slug": page.slug,
+        "meta": {
+            "title": revision.page_title or settings_row.site_title or profile.trade_name,
+            "description": revision.meta_description or settings_row.site_description,
+            "og_image_file_id": revision.og_image_file_id or settings_row.social_image_file_id,
+            "favicon_file_id": settings_row.favicon_file_id,
+        },
+        "layout": (
+            {"header": layout.header_config, "footer": layout.footer_config}
+            if layout is not None
+            else None
+        ),
+        "sections": sections,
+    }
+
+
 def schedule_draft(
     session: Session,
     page: StorefrontPage,
@@ -265,6 +307,8 @@ def schedule_draft(
         )
     draft.status = "scheduled"
     draft.scheduled_publish_at = publish_at
+    draft.scheduled_at = utc_now()
+    draft.schedule_cancelled_reason = None
     draft.updated_at = utc_now()
     session.add(draft)
     session.flush()
@@ -276,17 +320,34 @@ def unschedule_revision(session: Session, revision: StorefrontPageRevision) -> N
         raise StorefrontRuleError("no_programada", "La revisión no está programada.")
     revision.status = "draft"
     revision.scheduled_publish_at = None
+    revision.scheduled_at = None
     revision.updated_at = utc_now()
     session.add(revision)
     session.flush()
 
 
+def _demote_scheduled(
+    session: Session, revision: StorefrontPageRevision, reason: str
+) -> None:
+    """Regresa una programación a borrador dejando la razón LEGIBLE (§1.9)."""
+    revision.status = "draft"
+    revision.scheduled_publish_at = None
+    revision.schedule_cancelled_reason = reason
+    revision.updated_at = utc_now()
+    session.add(revision)
+
+
 def publish_due_scheduled(session: Session) -> int:
     """Publica las revisiones programadas vencidas (la llama la tarea Taskiq).
 
-    Si una revisión ya no valida (el catálogo cambió), vuelve a borrador en vez
-    de reintentar por siempre: el editor la ve y decide.
+    Regla de supersesión (§1.9 GOALS): si la página publicó OTRA revisión
+    DESPUÉS de que ésta se programó, la programación vieja se cancela — una
+    campaña antigua jamás pisa cambios recientes. Si la revisión ya no valida
+    (el catálogo cambió), vuelve a borrador en vez de reintentar por siempre.
+    En ambos casos queda auditoría y una razón legible para el editor.
     """
+    from backend.app.services.config_audit import record_config_change
+
     due = session.exec(
         select(StorefrontPageRevision).where(
             StorefrontPageRevision.status == "scheduled",
@@ -298,14 +359,48 @@ def publish_due_scheduled(session: Session) -> int:
         page = session.get(StorefrontPage, revision.page_id)
         if page is None:
             continue
+
+        # Supersesión: ¿alguien publicó algo más reciente después de programar?
+        superseding = None
+        if page.published_revision_id is not None:
+            current = session.get(StorefrontPageRevision, page.published_revision_id)
+            if (
+                current is not None
+                and current.id != revision.id
+                and current.published_at is not None
+                and revision.scheduled_at is not None
+                and current.published_at.replace(tzinfo=None)
+                > revision.scheduled_at.replace(tzinfo=None)
+            ):
+                superseding = current
+        if superseding is not None:
+            _demote_scheduled(
+                session,
+                revision,
+                "Cancelada automáticamente: se publicó una versión más reciente "
+                "después de programar esta revisión.",
+            )
+            record_config_change(
+                session,
+                actor_user_id=None,
+                entity_type="storefront_page_revision",
+                entity_id=revision.id,
+                action="schedule_superseded",
+                changed_fields=("status", "scheduled_publish_at", "schedule_cancelled_reason"),
+            )
+            continue
+
         try:
             publish_revision(session, page, revision, actor_id=revision.created_by)
             revision.scheduled_publish_at = None
+            revision.schedule_cancelled_reason = None
             published += 1
-        except StorefrontRuleError:
-            revision.status = "draft"
-            revision.updated_at = utc_now()
-            session.add(revision)
+        except StorefrontRuleError as exc:
+            _demote_scheduled(
+                session,
+                revision,
+                f"No se publicó: {exc.message} Corrige el borrador y reprograma.",
+            )
     session.flush()
     return published
 
@@ -342,6 +437,12 @@ def list_pages(session: Session) -> list[dict]:
                 StorefrontPageRevision.status == "draft",
             )
         ).first()
+        scheduled = session.exec(
+            select(StorefrontPageRevision).where(
+                StorefrontPageRevision.page_id == page.id,
+                StorefrontPageRevision.status == "scheduled",
+            )
+        ).first()
         result.append(
             {
                 "page_key": page.page_key,
@@ -357,6 +458,16 @@ def list_pages(session: Session) -> list[dict]:
                 ),
                 "has_draft": draft is not None,
                 "draft_revision_number": draft.revision_number if draft else None,
+                # Estado real de programación (§1.9): el editor muestra si hay
+                # una publicación en espera y por qué se canceló la anterior.
+                "scheduled_publish_at": (
+                    scheduled.scheduled_publish_at.isoformat()
+                    if scheduled and scheduled.scheduled_publish_at
+                    else None
+                ),
+                "schedule_cancelled_reason": (
+                    draft.schedule_cancelled_reason if draft else None
+                ),
             }
         )
     return result

@@ -246,6 +246,10 @@ class MyOrderRead(ApiReadSchema):
     fulfillment_type: str
     purchase_mode: str
     items_subtotal_amount: Decimal
+    # Descuento por código (Etapa 5): monto aplicado y etiqueta snapshot
+    # («Código VERANO100») — histórico, nunca la definición vigente.
+    discount_total_amount: Decimal = Decimal("0")
+    discount_code_label: Optional[str] = None
     shipping_amount: Optional[Decimal] = None
     shipping_pending_review: bool
     total_money_amount: Optional[Decimal] = None

@@ -163,6 +163,45 @@ class DeliveryBannerContent(_Config):
     description: Optional[str] = Field(default=None, max_length=300)
 
 
+# --- Plantillas de contenido (Etapa 6 RC): texto controlado, jamás HTML ---
+
+class ImageTextContent(_Config):
+    # La imagen llega por el slot de media de la sección (§43), no por config.
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=600)
+    cta: Optional[Cta] = None
+
+
+class ImageTextStyle(_Config):
+    color_scheme: ColorScheme = "surface"
+    image_position: Literal["left", "right"] = "left"
+
+
+class InfoCard(_Config):
+    title: str = Field(min_length=1, max_length=80)
+    description: Optional[str] = Field(default=None, max_length=300)
+    cta: Optional[Cta] = None
+
+
+class InfoCardsContent(_Config):
+    title: Optional[str] = Field(default=None, max_length=120)
+    cards: list[InfoCard] = Field(min_length=1, max_length=6)
+
+
+class InfoCardsStyle(_Config):
+    color_scheme: ColorScheme = "surface_muted"
+
+
+class FaqItem(_Config):
+    question: str = Field(min_length=1, max_length=160)
+    answer: str = Field(min_length=1, max_length=600)
+
+
+class FaqContent(_Config):
+    title: Optional[str] = Field(default=None, max_length=120)
+    items: list[FaqItem] = Field(min_length=1, max_length=12)
+
+
 # ---------------------------------------------------------------------------
 # Layout (§44): header/footer con contratos propios, versionados aparte
 # ---------------------------------------------------------------------------
@@ -271,6 +310,33 @@ TEMPLATES: dict[str, TemplateDef] = {
             label="Banner de servicio a domicilio",
             content_model=DeliveryBannerContent,
             style_model=PromoBannerStyle,
+            data_binding_model=_Empty,
+            behavior_model=SectionBehavior,
+        ),
+        TemplateDef(
+            key="storefront.content.image_text",
+            version=1,
+            label="Imagen y texto",
+            content_model=ImageTextContent,
+            style_model=ImageTextStyle,
+            data_binding_model=_Empty,
+            behavior_model=SectionBehavior,
+        ),
+        TemplateDef(
+            key="storefront.content.info_cards",
+            version=1,
+            label="Tarjetas informativas",
+            content_model=InfoCardsContent,
+            style_model=InfoCardsStyle,
+            data_binding_model=_Empty,
+            behavior_model=SectionBehavior,
+        ),
+        TemplateDef(
+            key="storefront.content.faq",
+            version=1,
+            label="Preguntas frecuentes",
+            content_model=FaqContent,
+            style_model=_Empty,
             data_binding_model=_Empty,
             behavior_model=SectionBehavior,
         ),

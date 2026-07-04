@@ -212,6 +212,16 @@ class StorefrontPageRevision(Base):
     scheduled_publish_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    scheduled_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Cuándo se PROGRAMÓ (regla de supersesión §1.9: una publicación posterior la cancela).",
+    )
+    schedule_cancelled_reason: Mapped[Optional[str]] = mapped_column(
+        String(200),
+        nullable=True,
+        comment="Razón legible cuando la programación se canceló automáticamente.",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

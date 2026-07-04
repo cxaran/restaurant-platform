@@ -218,19 +218,34 @@ def create_refund(
             raise FinanceRuleError(
                 "cantidad_invalida", "Cantidad reembolsada fuera de rango para la línea."
             )
+        credits_earned_reversed = int(
+            line.credits_awarded_per_unit_snapshot * int(item.refunded_quantity)
+        )
+        credits_refunded = int(
+            (line.credit_redemption_price_per_unit_snapshot or 0)
+            * int(item.refunded_quantity)
+        )
         session.add(
             OrderLineRefundAllocation(
                 payment_refund_id=refund.id,
                 order_line_id=line.id,
                 refunded_quantity=item.refunded_quantity,
                 money_refunded_amount=item.money_refunded_amount,
-                # Reverso de créditos ganados (§22.5): el asiento del ledger
-                # se engancha en la etapa 8; aquí queda el dato exacto.
-                credits_earned_reversed_total=int(
-                    line.credits_awarded_per_unit_snapshot * int(item.refunded_quantity)
-                ),
+                credits_refunded_total=credits_refunded,
+                credits_earned_reversed_total=credits_earned_reversed,
                 reason=item.reason,
             )
+        )
+        # §22.5: asientos del ledger (import tardío: evita ciclo).
+        from backend.app.services.credit_service import on_refund_allocation
+
+        on_refund_allocation(
+            session,
+            order,
+            order_line_id=line.id,
+            credits_earned_reversed=credits_earned_reversed,
+            credits_refunded=credits_refunded,
+            actor_id=processed_by,
         )
 
     original_income = session.exec(

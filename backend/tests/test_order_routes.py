@@ -154,7 +154,7 @@ class OrderRoutesTest(unittest.TestCase):
         self.assertEqual(other, [])
         self.assertEqual(detail.status_code, 404)
 
-    def test_checkout_rejects_credit_redemption_for_now(self) -> None:
+    def test_checkout_credits_on_non_redeemable_product_rejected(self) -> None:
         payload = self._checkout_payload(
             lines=[{
                 "product_id": str(self.product_id),
@@ -165,7 +165,7 @@ class OrderRoutesTest(unittest.TestCase):
         with _As(CUSTOMER_ID):
             response = self.client.post("/api/v1/orders", json=payload)
         self.assertEqual(response.status_code, 422)
-        self.assertEqual(response.json()["code"], "canje_no_disponible")
+        self.assertEqual(response.json()["code"], "producto_no_canjeable")
 
     def test_capture_requires_permission(self) -> None:
         payload = {

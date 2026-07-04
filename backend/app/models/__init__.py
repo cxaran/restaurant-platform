@@ -19,6 +19,7 @@ from .catalog import (
     ProductInclusion,
     ProductModifierGroup,
 )
+from .credits import CreditLedgerEntry, CreditRedemption
 from .deliveries import CourierLocationEvent, CourierTrackingSession, DeliveryAssignment
 from .finances import (
     FinancialCategory,
@@ -65,6 +66,8 @@ __all__ = [
     "BusinessWeeklyHours",
     "CourierLocationEvent",
     "CourierTrackingSession",
+    "CreditLedgerEntry",
+    "CreditRedemption",
     "CustomerProfile",
     "DeliveryAssignment",
     "DeliveryZone",

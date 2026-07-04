@@ -84,14 +84,6 @@ _PRE_APPROVAL_STATUSES = (
 # ---------------------------------------------------------------------------
 
 def _to_cart(lines: list[OrderLineInput]) -> list[CartLineInput]:
-    for line in lines:
-        if line.purchase_mode == "credits":
-            # El canje exige ledger y reserva transaccional (etapa 8).
-            api_error(
-                status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "canje_no_disponible",
-                "El canje con créditos aún no está habilitado.",
-            )
     return [
         CartLineInput(
             product_id=line.product_id,
@@ -309,6 +301,16 @@ def _rule_error(exc: OrderRuleError):
     api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
 
 
+def _reserve_credits_or_422(session: SessionDep, order) -> None:
+    """Reserva los canjes del pedido (§22.3); saldo insuficiente → 422 estable."""
+    from backend.app.services.credit_service import CreditRuleError, reserve_order_redemptions
+
+    try:
+        reserve_order_redemptions(session, order)
+    except CreditRuleError as exc:
+        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
+
+
 # ---------------------------------------------------------------------------
 # Cliente: checkout y sus pedidos
 # ---------------------------------------------------------------------------
@@ -359,6 +361,7 @@ def checkout(
     except OrderRuleError as exc:
         _rule_error(exc)
 
+    _reserve_credits_or_422(session, order)
     if payload.fulfillment_type == "delivery":
         _compose_delivery_and_shipping(session, order, payload.delivery, from_staff=False)
 
@@ -431,6 +434,7 @@ def capture_order(
     if payload.internal_note:
         order.internal_note = payload.internal_note
         session.add(order)
+    _reserve_credits_or_422(session, order)
     if payload.fulfillment_type == "delivery":
         _compose_delivery_and_shipping(session, order, payload.delivery, from_staff=True)
 

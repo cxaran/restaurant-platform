@@ -2,6 +2,7 @@ from backend.app.security.groups.audit_events import AuditEventPermissions
 from backend.app.security.groups.backups import BackupPermissions
 from backend.app.security.groups.business import BusinessPermissions
 from backend.app.security.groups.catalog import CatalogPermissions
+from backend.app.security.groups.credits import CreditPermissions
 from backend.app.security.groups.deliveries import DeliveryPermissions
 from backend.app.security.groups.files import FilePermissions
 from backend.app.security.groups.finances import FinancePermissions
@@ -31,6 +32,7 @@ SECURITY_GROUPS: list[type[SecurityGroup]] = [
     TicketPermissions,
     DeliveryPermissions,
     FinancePermissions,
+    CreditPermissions,
 ]
 
 

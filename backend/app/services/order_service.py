@@ -131,11 +131,17 @@ def transition_order(
         order.approved_at = now
     elif new_status == "completed":
         order.completed_at = now
-        # Hook etapa 8: acreditar créditos ganados y consumir canjes (§22).
+        # §22: consumir canjes y acreditar créditos ganados (import tardío: sin ciclo).
+        from backend.app.services.credit_service import on_order_completed
+
+        on_order_completed(session, order, actor_id=actor_id)
     elif new_status == "cancelled":
         order.cancelled_at = now
         order.cancelled_by = actor_id
-        # Hook etapa 8: liberar reservas de canje (§22.3).
+        # §22.3: liberar las reservas de canje.
+        from backend.app.services.credit_service import on_order_cancelled
+
+        on_order_cancelled(session, order, actor_id=actor_id)
 
     session.add(
         OrderStatusHistory(

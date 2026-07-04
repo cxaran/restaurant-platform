@@ -8,6 +8,7 @@ from backend.app.api.v1.bootstrap import router as bootstrap_router
 from backend.app.api.v1.business import router as business_router
 from backend.app.api.v1.catalog import router as catalog_router
 from backend.app.api.v1.courier import router as courier_router
+from backend.app.api.v1.credits import router as credits_router
 from backend.app.api.v1.files import router as files_router
 from backend.app.api.v1.finances import router as finances_router
 from backend.app.api.v1.orders import router as orders_router
@@ -31,6 +32,7 @@ router.include_router(bootstrap_router)
 router.include_router(business_router)
 router.include_router(catalog_router)
 router.include_router(courier_router)
+router.include_router(credits_router)
 router.include_router(files_router)
 router.include_router(finances_router)
 router.include_router(orders_router)

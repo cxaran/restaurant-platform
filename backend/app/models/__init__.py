@@ -19,6 +19,7 @@ from .catalog import (
     ProductInclusion,
     ProductModifierGroup,
 )
+from .deliveries import CourierLocationEvent, CourierTrackingSession, DeliveryAssignment
 from .orders import (
     Order,
     OrderAdjustment,
@@ -56,7 +57,10 @@ __all__ = [
     "BusinessSpecialDate",
     "BusinessSpecialDateSlot",
     "BusinessWeeklyHours",
+    "CourierLocationEvent",
+    "CourierTrackingSession",
     "CustomerProfile",
+    "DeliveryAssignment",
     "DeliveryZone",
     "ModifierGroup",
     "ModifierOption",

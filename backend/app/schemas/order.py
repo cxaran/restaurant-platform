@@ -14,6 +14,7 @@ from pydantic import Field
 
 from backend.app.schemas.address import GeoPoint
 from backend.app.schemas.base import ApiReadSchema, ApiWriteSchema
+from backend.app.schemas.delivery import PublicCourierInfo
 
 
 # ---------------------------------------------------------------------------
@@ -223,3 +224,5 @@ class MyOrderRead(ApiReadSchema):
     created_at: datetime
     lines: list[OrderLineRead] = Field(default_factory=list)
     delivery: Optional[OrderDeliveryRead] = None
+    # Visible SOLO con el pedido en camino y asignación vigente (§19.2).
+    courier: Optional[PublicCourierInfo] = None

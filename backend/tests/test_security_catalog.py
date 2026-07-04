@@ -34,6 +34,7 @@ from backend.app.security.groups.audit_events import AuditEventPermissions  # no
 from backend.app.security.groups.backups import BackupPermissions  # noqa: E402
 from backend.app.security.groups.business import BusinessPermissions  # noqa: E402
 from backend.app.security.groups.catalog import CatalogPermissions  # noqa: E402
+from backend.app.security.groups.deliveries import DeliveryPermissions  # noqa: E402
 from backend.app.security.groups.files import FilePermissions  # noqa: E402
 from backend.app.security.groups.orders import OrderPermissions  # noqa: E402
 from backend.app.security.groups.payments import PaymentPermissions, TicketPermissions  # noqa: E402
@@ -62,6 +63,7 @@ class SecurityCatalogTest(unittest.TestCase):
                 OrderPermissions,
                 PaymentPermissions,
                 TicketPermissions,
+                DeliveryPermissions,
             ],
         )
 
@@ -110,6 +112,10 @@ class SecurityCatalogTest(unittest.TestCase):
                 "payments:verify",
                 "payments:refund",
                 "tickets:print",
+                "deliveries:read",
+                "deliveries:assign",
+                "deliveries:self_assign",
+                "deliveries:complete_for_courier",
             ],
         )
 

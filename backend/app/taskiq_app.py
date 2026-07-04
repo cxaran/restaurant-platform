@@ -60,3 +60,4 @@ scheduler = TaskiqScheduler(
 # Registro EXPLÍCITO de tareas (imports al final: las tareas importan ``broker`` de
 # este módulo, ya definido en este punto). El scheduler ve sus labels vía el broker.
 from backend.app.jobs.tasks import backups as _backups_tasks  # noqa: E402,F401
+from backend.app.jobs.tasks import deliveries as _deliveries_tasks  # noqa: E402,F401

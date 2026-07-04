@@ -264,7 +264,13 @@ def _order_read(order: Order) -> OrderRead:
     )
 
 
-def _my_order_read(order: Order) -> MyOrderRead:
+def _my_order_read(session: SessionDep, order: Order) -> MyOrderRead:
+    # Repartidor visible SOLO en camino (§19.2); import tardío para evitar ciclo.
+    from backend.app.schemas.delivery import PublicCourierInfo
+    from backend.app.services.delivery_service import public_courier_info
+
+    courier_data = public_courier_info(session, order)
+    courier = PublicCourierInfo.model_validate(courier_data) if courier_data else None
     shipping = order.shipping
     shipping_amount = order.shipping_total_amount
     pending_review = False
@@ -288,6 +294,7 @@ def _my_order_read(order: Order) -> MyOrderRead:
         created_at=order.created_at,
         lines=[_line_read(line) for line in sorted(order.lines, key=lambda l: l.sort_order)],
         delivery=_delivery_read(order.delivery),
+        courier=courier,
     )
 
 
@@ -357,7 +364,7 @@ def checkout(
 
     commit_or_conflict(session, "No fue posible registrar el pedido.")
     session.refresh(order)
-    return _my_order_read(order)
+    return _my_order_read(session, order)
 
 
 @router.get("/mine", response_model=list[MyOrderRead])
@@ -372,7 +379,7 @@ def list_my_orders(
         .order_by(Order.created_at.desc())  # pyright: ignore[reportAttributeAccessIssue]
         .limit(limit)
     ).all()
-    return [_my_order_read(order) for order in orders]
+    return [_my_order_read(session, order) for order in orders]
 
 
 @router.get("/mine/{order_id}", response_model=MyOrderRead)
@@ -384,7 +391,7 @@ def get_my_order(
     order = session.get(Order, order_id)
     if order is None or order.customer_user_id != current_user.id:
         api_error(status.HTTP_404_NOT_FOUND, "resource_not_found", _NOT_FOUND)
-    return _my_order_read(order)
+    return _my_order_read(session, order)
 
 
 # ---------------------------------------------------------------------------

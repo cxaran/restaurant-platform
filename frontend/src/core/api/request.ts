@@ -35,6 +35,16 @@ function buildRequestInit(init: ApiRequestInit = {}): RequestInit {
   };
 }
 
+// Un 204 (u otra respuesta sin cuerpo) puede llegar con content-type JSON
+// (FastAPI lo emite así): parsear con .json() lanzaría SyntaxError y una
+// operación exitosa se mostraría como error. Se lee el texto y solo se parsea
+// si hay contenido.
+async function parseJsonBody(response: Response): Promise<unknown> {
+  if (response.status === 204 || !hasJsonBody(response)) return null;
+  const text = await response.text();
+  return text ? (JSON.parse(text) as unknown) : null;
+}
+
 export async function requestJson<T>(url: string, init: ApiRequestInit = {}): Promise<T> {
   let response: Response;
 
@@ -44,7 +54,7 @@ export async function requestJson<T>(url: string, init: ApiRequestInit = {}): Pr
     throw new ApiRequestError(0, networkApiError());
   }
 
-  const payload = hasJsonBody(response) ? ((await response.json()) as unknown) : null;
+  const payload = await parseJsonBody(response);
 
   if (!response.ok) {
     throw new ApiRequestError(response.status, normalizeApiError(response.status, payload));

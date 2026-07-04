@@ -62,12 +62,25 @@ def get_page(session: Session, page_key: str) -> Optional[StorefrontPage]:
 def get_or_create_draft(
     session: Session, page: StorefrontPage, *, created_by: Optional[uuid.UUID]
 ) -> StorefrontPageRevision:
-    """Borrador vigente de la página; si no hay, se CLONA la publicada (§46)."""
+    """Borrador vigente de la página; si no hay, se CLONA la publicada (§46).
+
+    La creación se SERIALIZA con un lock sobre la fila de la página: dos
+    peticiones concurrentes (p. ej. el editor pide borrador y preview en
+    paralelo) clonaban DOS borradores con el mismo revision_number y el
+    editor/publicación quedaban apuntando a filas distintas.
+    """
+    session.exec(
+        select(StorefrontPage.id)
+        .where(StorefrontPage.id == page.id)
+        .with_for_update()
+    ).first()
     draft = session.exec(
-        select(StorefrontPageRevision).where(
+        select(StorefrontPageRevision)
+        .where(
             StorefrontPageRevision.page_id == page.id,
             StorefrontPageRevision.status == "draft",
         )
+        .order_by(StorefrontPageRevision.created_at.desc())  # pyright: ignore[reportAttributeAccessIssue]
     ).first()
     if draft is not None:
         return draft

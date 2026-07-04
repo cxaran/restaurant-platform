@@ -1,7 +1,13 @@
 import type { PublicBusiness } from "@/core/restaurant-api/contracts";
+import type { StorefrontLayoutVM } from "@/core/restaurant-api/view-models";
 
-export function StorefrontFooter({ business }: Readonly<{ business: PublicBusiness | null }>) {
-  const phones = business?.phones ?? [];
+export function StorefrontFooter({
+  business,
+  layout = null,
+}: Readonly<{ business: PublicBusiness | null; layout?: StorefrontLayoutVM }>) {
+  const showPhones = layout?.footer?.show_phones !== false;
+  const note = typeof layout?.footer?.note === "string" ? layout.footer.note : null;
+  const phones = showPhones ? business?.phones ?? [] : [];
   return (
     <footer
       style={{
@@ -29,7 +35,7 @@ export function StorefrontFooter({ business }: Readonly<{ business: PublicBusine
           >
             {business?.trade_name ?? "Mi Restaurante"}
           </span>
-          {business?.slogan ? <span>{business.slogan}</span> : null}
+          {note ? <span>{note}</span> : business?.slogan ? <span>{business.slogan}</span> : null}
         </div>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontWeight: 600 }}>
           {phones.map((phone) => (

@@ -28,6 +28,7 @@ async function fallbackSections(): Promise<StorefrontSectionVM[]> {
       },
       style: { color_scheme: "surface", content_alignment: "left", height: "compact" },
       behavior: {},
+      media: {},
       data: null,
     },
     {
@@ -37,6 +38,7 @@ async function fallbackSections(): Promise<StorefrontSectionVM[]> {
       content: { title: "Nuestros favoritos" },
       style: {},
       behavior: {},
+      media: {},
       data: null,
     },
   ];

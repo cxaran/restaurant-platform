@@ -21,12 +21,16 @@ export function HeroCarousel({
   background,
   color,
   alignment,
+  mediaUrl = null,
+  mediaAlt = "",
   renderCta,
 }: Readonly<{
   slides: HeroSlideVM[];
   background: string;
   color: string;
   alignment: "left" | "center";
+  mediaUrl?: string | null;
+  mediaAlt?: string;
   renderCta: (cta: unknown, variant: "solid" | "outline") => ReactNode;
 }>) {
   const [index, setIndex] = useState(0);
@@ -79,11 +83,24 @@ export function HeroCarousel({
           </div>
         </div>
         {slide.variant === "split" ? (
-          <div className="sf-imgbox" style={{ minHeight: 220, alignSelf: "stretch" }} aria-hidden>
+          <div
+            className="sf-imgbox"
+            style={{ minHeight: 220, alignSelf: "stretch" }}
+            aria-hidden={mediaUrl ? undefined : true}
+          >
             {/* Slot de imagen del hero: se renderiza cuando el payload publicado
                 incluya media. La ADMINISTRACIÓN de media aún no tiene API
                 (plan §4) — sin botones de carga simulada. */}
-            <span className="sf-display" style={{ fontSize: 52, opacity: 0.18 }}>◐</span>
+            {mediaUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- media publicada del backend
+              <img
+                src={mediaUrl}
+                alt={mediaAlt}
+                style={{ maxWidth: "100%", maxHeight: 320, objectFit: "contain" }}
+              />
+            ) : (
+              <span className="sf-display" style={{ fontSize: 52, opacity: 0.18 }}>◐</span>
+            )}
           </div>
         ) : null}
       </div>

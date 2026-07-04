@@ -28,6 +28,7 @@ export function tonyDemoHomePage(): StorefrontPageVM {
   return {
     page_key: "home",
     slug: "/",
+    layout: null,
     meta: { title: null, description: null, og_image_file_id: null, favicon_file_id: null },
     theme_tokens: TONY_DEMO_TOKENS,
     sections: [
@@ -38,6 +39,7 @@ export function tonyDemoHomePage(): StorefrontPageVM {
         content: {},
         style: {},
         behavior: { show_free_shipping: true, show_service_note: true },
+        media: {},
         data: { free_shipping_from_amount: "350.00" },
       },
       {
@@ -60,6 +62,7 @@ export function tonyDemoHomePage(): StorefrontPageVM {
         },
         style: { height: "compact", content_alignment: "left", color_scheme: "surface" },
         behavior: {},
+        media: {},
         data: null,
       },
       {
@@ -69,6 +72,7 @@ export function tonyDemoHomePage(): StorefrontPageVM {
         content: { title: "Los más pedidos" },
         style: { layout: "grid", color_scheme: "surface" },
         behavior: {},
+        media: {},
         // data null → la sección resuelve productos reales desde /public/menu
         data: null,
       },
@@ -79,6 +83,7 @@ export function tonyDemoHomePage(): StorefrontPageVM {
         content: { title: "Horario" },
         style: {},
         behavior: {},
+        media: {},
         data: null,
       },
       {
@@ -88,6 +93,7 @@ export function tonyDemoHomePage(): StorefrontPageVM {
         content: { title: "Contacto", show_whatsapp: true },
         style: {},
         behavior: {},
+        media: {},
         data: null,
       },
     ],

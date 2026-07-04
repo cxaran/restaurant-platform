@@ -15,16 +15,19 @@ const MODULES: {
   label: string;
   detail: string;
   anyOf: string[];
+  href?: string;
 }[] = [
   {
     label: "Pedidos (cola y preparación)",
-    detail: "Pantalla operativa en el siguiente incremento del frontend.",
+    detail: "Cola en vivo con transiciones por permiso.",
     anyOf: ["orders:read"],
+    href: "/panel/pedidos",
   },
   {
     label: "Punto de venta",
-    detail: "Pantalla operativa en el siguiente incremento del frontend.",
+    detail: "Venta de mostrador en una llamada.",
     anyOf: ["orders:capture", "payments:record"],
+    href: "/panel/pos",
   },
   {
     label: "Reparto (mis entregas)",
@@ -62,15 +65,30 @@ export default async function PanelPage() {
           <Link href="/" style={{ fontWeight: 700 }}>Ir al sitio</Link>
         </div>
       ) : (
-        visible.map((module) => (
-          <CapabilityGate
-            key={module.label}
-            title={module.label}
-            state={{ kind: "not_implemented", detail: module.detail }}
-          >
-            {null}
-          </CapabilityGate>
-        ))
+        visible.map((module) =>
+          module.href ? (
+            <Link
+              key={module.label}
+              href={module.href}
+              style={{
+                border: "1px solid rgba(0,0,0,0.2)", borderRadius: 12,
+                padding: "16px 18px", textDecoration: "none", color: "inherit",
+                display: "block",
+              }}
+            >
+              <span style={{ fontWeight: 800 }}>{module.label}</span>
+              <span style={{ display: "block", fontSize: 13, opacity: 0.75 }}>{module.detail}</span>
+            </Link>
+          ) : (
+            <CapabilityGate
+              key={module.label}
+              title={module.label}
+              state={{ kind: "not_implemented", detail: module.detail }}
+            >
+              {null}
+            </CapabilityGate>
+          ),
+        )
       )}
 
       <nav style={{ display: "flex", gap: 16, fontSize: 14, fontWeight: 600 }}>

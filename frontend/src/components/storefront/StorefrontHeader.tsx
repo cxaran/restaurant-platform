@@ -7,11 +7,32 @@ import { useCart } from "@/core/storefront/cart";
 import type { PublicBusiness } from "@/core/restaurant-api/contracts";
 import { formatMoney } from "@/core/restaurant-api/theme";
 import { BrandLockup } from "./BrandLockup";
+import { ctaHref } from "./SectionRenderer";
+import type { StorefrontLayoutVM } from "@/core/restaurant-api/view-models";
 
 export function StorefrontHeader({
   business,
   logoUrl = null,
-}: Readonly<{ business: PublicBusiness | null; logoUrl?: string | null }>) {
+  layout = null,
+}: Readonly<{
+  business: PublicBusiness | null;
+  logoUrl?: string | null;
+  layout?: StorefrontLayoutVM;
+}>) {
+  // Navegación del layout PUBLICADO (§44); fallback a los enlaces base.
+  const navLinks = (
+    Array.isArray(layout?.header?.nav_links) ? layout.header.nav_links : []
+  )
+    .map((cta) => ({
+      label:
+        typeof (cta as { label?: string }).label === "string"
+          ? ((cta as { label: string }).label)
+          : null,
+      href: ctaHref(cta),
+    }))
+    .filter((link): link is { label: string; href: string } =>
+      Boolean(link.label && link.href),
+    );
   const session = usePublicSession();
   const { count, subtotalHint } = useCart();
   const isOpen = business?.is_open_now ?? false;
@@ -38,12 +59,26 @@ export function StorefrontHeader({
           style={{ display: "flex", gap: 16, fontSize: 14, fontWeight: 600, flex: 1 }}
           className="sf-header-nav"
         >
-          <Link href="/menu" style={{ color: "inherit", textDecoration: "none" }}>
-            Menú
-          </Link>
-          <Link href="/pedidos" style={{ color: "inherit", textDecoration: "none" }}>
-            Mis pedidos
-          </Link>
+          {navLinks.length > 0 ? (
+            navLinks.map((link) => (
+              <Link
+                key={`${link.label}-${link.href}`}
+                href={link.href}
+                style={{ color: "inherit", textDecoration: "none" }}
+              >
+                {link.label}
+              </Link>
+            ))
+          ) : (
+            <>
+              <Link href="/menu" style={{ color: "inherit", textDecoration: "none" }}>
+                Menú
+              </Link>
+              <Link href="/pedidos" style={{ color: "inherit", textDecoration: "none" }}>
+                Mis pedidos
+              </Link>
+            </>
+          )}
         </nav>
         <span
           style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 }}

@@ -36,11 +36,12 @@ const rounded = Baloo_2({ subsets: ["latin"], variable: "--font-sf-rounded" });
 
 async function resolveTheme() {
   const result = await getPublicStorefrontPage("home");
+  const layout = result.status === "published" ? result.page.layout : null;
   if (result.status === "published" && result.page.theme_tokens) {
-    return { tokens: result.page.theme_tokens, home: result };
+    return { tokens: result.page.theme_tokens, layout };
   }
   const tokens = storefrontDemoEnabled() ? TONY_DEMO_TOKENS : FALLBACK_TOKENS;
-  return { tokens, home: result };
+  return { tokens, layout };
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -62,7 +63,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function StorefrontLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const [business, session, { tokens }] = await Promise.all([
+  const [business, session, { tokens, layout }] = await Promise.all([
     getPublicBusiness(),
     getSession(),
     resolveTheme(),
@@ -75,9 +76,9 @@ export default async function StorefrontLayout({
     <PublicSessionProvider initialSession={session}>
       <CartProvider>
         <StorefrontThemeProvider tokens={tokens} fontVars={fontVars}>
-          <StorefrontHeader business={business} logoUrl={safeLogoUrl} />
+          <StorefrontHeader business={business} logoUrl={safeLogoUrl} layout={layout} />
           <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>{children}</main>
-          <StorefrontFooter business={business} />
+          <StorefrontFooter business={business} layout={layout} />
         </StorefrontThemeProvider>
       </CartProvider>
     </PublicSessionProvider>

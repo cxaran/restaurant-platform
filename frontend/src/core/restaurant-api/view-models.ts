@@ -11,6 +11,14 @@ export type ThemeTokens = {
   effects: { card_shadow?: string; button_style?: string };
 };
 
+export type SectionMediaSlotVM = {
+  desktop_file_id: string | null;
+  mobile_file_id: string | null;
+  alt_text: string | null;
+  focal_point_x: number | null;
+  focal_point_y: number | null;
+};
+
 export type StorefrontSectionVM = {
   template_key: string;
   template_version: number;
@@ -19,11 +27,18 @@ export type StorefrontSectionVM = {
   style: Record<string, unknown>;
   behavior: Record<string, unknown>;
   data: Record<string, unknown> | null;
+  media: Record<string, SectionMediaSlotVM>;
 };
+
+export type StorefrontLayoutVM = {
+  header: Record<string, unknown>;
+  footer: Record<string, unknown>;
+} | null;
 
 export type StorefrontPageVM = {
   page_key: string;
   slug: string;
+  layout: StorefrontLayoutVM;
   meta: {
     title: string | null;
     description: string | null;
@@ -61,6 +76,22 @@ export function parseThemeTokens(value: unknown): ThemeTokens | null {
   };
 }
 
+function parseSectionMedia(value: unknown): Record<string, SectionMediaSlotVM> {
+  if (!isRecord(value)) return {};
+  const media: Record<string, SectionMediaSlotVM> = {};
+  for (const [slot, raw] of Object.entries(value)) {
+    if (!isRecord(raw)) continue;
+    media[slot] = {
+      desktop_file_id: asStringOrNull(raw.desktop_file_id),
+      mobile_file_id: asStringOrNull(raw.mobile_file_id),
+      alt_text: asStringOrNull(raw.alt_text),
+      focal_point_x: typeof raw.focal_point_x === "number" ? raw.focal_point_x : null,
+      focal_point_y: typeof raw.focal_point_y === "number" ? raw.focal_point_y : null,
+    };
+  }
+  return media;
+}
+
 export function parseStorefrontPage(value: unknown): StorefrontPageVM | null {
   if (!isRecord(value) || typeof value.page_key !== "string") return null;
   const meta = asRecord(value.meta);
@@ -76,13 +107,18 @@ export function parseStorefrontPage(value: unknown): StorefrontPageVM | null {
         style: asRecord(raw.style),
         behavior: asRecord(raw.behavior),
         data: isRecord(raw.data) ? raw.data : null,
+        media: parseSectionMedia(raw.media),
       });
     }
   }
   sections.sort((a, b) => a.sort_order - b.sort_order);
+  const layoutRaw = asRecord(value.layout);
   return {
     page_key: value.page_key,
     slug: typeof value.slug === "string" ? value.slug : "/",
+    layout: isRecord(value.layout)
+      ? { header: asRecord(layoutRaw.header), footer: asRecord(layoutRaw.footer) }
+      : null,
     meta: {
       title: asStringOrNull(meta.title),
       description: asStringOrNull(meta.description),

@@ -1584,6 +1584,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/profiles/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Profile */
+        get: operations["my_profile_api_v1_profiles_me_get"];
+        /** Upsert My Profile */
+        put: operations["upsert_my_profile_api_v1_profiles_me_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profiles/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search Customers */
+        get: operations["search_customers_api_v1_profiles_customers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profiles/customers/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Customer Profile */
+        get: operations["read_customer_profile_api_v1_profiles_customers__user_id__get"];
+        /** Upsert Customer Profile */
+        put: operations["upsert_customer_profile_api_v1_profiles_customers__user_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profiles/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Staff Profiles */
+        get: operations["list_staff_profiles_api_v1_profiles_staff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profiles/staff/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Upsert Staff Profile */
+        put: operations["upsert_staff_profile_api_v1_profiles_staff__user_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/profiles/staff/me/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set My Availability
+         * @description El propio repartidor marca si está disponible AHORA (§19.5).
+         */
+        patch: operations["set_my_availability_api_v1_profiles_staff_me_availability_patch"];
+        trace?: never;
+    };
     "/api/v1/payment-methods": {
         parameters: {
             query?: never;
@@ -1988,6 +2095,79 @@ export interface paths {
         /** List Templates */
         get: operations["list_templates_api_v1_storefront_templates_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storefront/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Storefront Pages
+         * @description Listado real de páginas con su estado de publicación y borrador (§41).
+         */
+        get: operations["list_storefront_pages_api_v1_storefront_pages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storefront/sections/{section_id}/media/{slot_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Upsert Section Media */
+        put: operations["upsert_section_media_api_v1_storefront_sections__section_id__media__slot_key__put"];
+        post?: never;
+        /** Delete Section Media */
+        delete: operations["delete_section_media_api_v1_storefront_sections__section_id__media__slot_key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storefront/pages/{page_key}/draft/sections/sort": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sort Draft Sections */
+        post: operations["sort_draft_sections_api_v1_storefront_pages__page_key__draft_sections_sort_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storefront/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Layout */
+        get: operations["read_layout_api_v1_storefront_layout_get"];
+        /** Update Layout */
+        put: operations["update_layout_api_v1_storefront_layout_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3340,11 +3520,6 @@ export interface components {
             /** Authorization Url */
             authorization_url: string;
         };
-        /** CourierAvailabilityUpdate */
-        CourierAvailabilityUpdate: {
-            /** Is Available */
-            is_available: boolean;
-        };
         /**
          * CourierSummaryRead
          * @description Resumen DERIVADO del día del repartidor (§19.7): sin cajas ni cortes.
@@ -3447,6 +3622,66 @@ export interface components {
             earned: number;
             /** Redeemed */
             redeemed: number;
+        };
+        /** CustomerProfileRead */
+        CustomerProfileRead: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Full Name */
+            full_name: string;
+            /** Phone */
+            phone: string;
+            /** Phone Normalized */
+            phone_normalized: string;
+            /** Email */
+            email?: string | null;
+            /** Internal Notes */
+            internal_notes?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * CustomerProfileSelfRead
+         * @description Vista del propio cliente: sin notas internas (§8.2).
+         */
+        CustomerProfileSelfRead: {
+            /** Full Name */
+            full_name: string;
+            /** Phone */
+            phone: string;
+            /** Email */
+            email?: string | null;
+        };
+        /**
+         * CustomerProfileSelfUpsert
+         * @description El cliente edita lo suyo; jamás las notas internas.
+         */
+        CustomerProfileSelfUpsert: {
+            /** Full Name */
+            full_name: string;
+            /** Phone */
+            phone: string;
+            /** Email */
+            email?: string | null;
+        };
+        /** CustomerProfileUpsert */
+        CustomerProfileUpsert: {
+            /** Full Name */
+            full_name: string;
+            /** Phone */
+            phone: string;
+            /** Email */
+            email?: string | null;
+            /** Internal Notes */
+            internal_notes?: string | null;
         };
         /**
          * DeliveryInput
@@ -3849,6 +4084,20 @@ export interface components {
             /** Placeholder */
             placeholder: string;
             type: components["schemas"]["FieldValueType"];
+        };
+        /**
+         * LayoutPublishRequest
+         * @description Header/footer (§44): contratos validados en código, versionados.
+         */
+        LayoutPublishRequest: {
+            /** Header Config */
+            header_config?: {
+                [key: string]: unknown;
+            };
+            /** Footer Config */
+            footer_config?: {
+                [key: string]: unknown;
+            };
         };
         /** LocationReportRequest */
         LocationReportRequest: {
@@ -4367,6 +4616,11 @@ export interface components {
         OrderTransitionRequest: {
             /** New Status */
             new_status: string;
+            /**
+             * Acknowledge Paid Payments
+             * @default false
+             */
+            acknowledge_paid_payments: boolean;
             /** Reason Code */
             reason_code?: string | null;
             /** Internal Note */
@@ -5480,6 +5734,22 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * SectionMediaUpsert
+         * @description Media por slot (§43): imágenes verificadas del banco de archivos.
+         */
+        SectionMediaUpsert: {
+            /** Desktop File Id */
+            desktop_file_id?: string | null;
+            /** Mobile File Id */
+            mobile_file_id?: string | null;
+            /** Alt Text */
+            alt_text?: string | null;
+            /** Focal Point X */
+            focal_point_x?: number | null;
+            /** Focal Point Y */
+            focal_point_y?: number | null;
+        };
         /** SectionRead */
         SectionRead: {
             /**
@@ -5517,6 +5787,14 @@ export interface components {
             behavior_config: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * SectionsSortRequest
+         * @description Reorden ATÓMICO (§49): el set completo de secciones del borrador.
+         */
+        SectionsSortRequest: {
+            /** Section Ids */
+            section_ids: string[];
         };
         /**
          * SendTestEmailRequest
@@ -5745,6 +6023,53 @@ export interface components {
             reason?: string | null;
             /** Slots */
             slots?: components["schemas"]["SpecialDateSlotInput"][] | null;
+        };
+        /** StaffProfileRead */
+        StaffProfileRead: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Contact Phone */
+            contact_phone?: string | null;
+            /** Public Contact Phone */
+            public_contact_phone?: string | null;
+            /** Photo File Id */
+            photo_file_id?: string | null;
+            /** Can Deliver */
+            can_deliver: boolean;
+            /** Is Delivery Available */
+            is_delivery_available: boolean;
+            /** Courier Public Note */
+            courier_public_note?: string | null;
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** StaffProfileUpsert */
+        StaffProfileUpsert: {
+            /** Display Name */
+            display_name: string;
+            /** Contact Phone */
+            contact_phone?: string | null;
+            /** Public Contact Phone */
+            public_contact_phone?: string | null;
+            /** Photo File Id */
+            photo_file_id?: string | null;
+            /**
+             * Can Deliver
+             * @default false
+             */
+            can_deliver: boolean;
+            /** Courier Public Note */
+            courier_public_note?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
         };
         /**
          * StoredFileRead
@@ -6457,6 +6782,16 @@ export interface components {
          * @enum {string}
          */
         WidgetType: "text" | "email" | "password" | "switch" | "textarea" | "multiselect" | "select" | "number" | "date" | "daterange" | "datetime" | "time";
+        /** CourierAvailabilityUpdate */
+        backend__app__schemas__delivery__CourierAvailabilityUpdate: {
+            /** Is Available */
+            is_available: boolean;
+        };
+        /** CourierAvailabilityUpdate */
+        backend__app__schemas__profile__CourierAvailabilityUpdate: {
+            /** Is Delivery Available */
+            is_delivery_available?: boolean | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -8803,7 +9138,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CourierAvailabilityUpdate"];
+                "application/json": components["schemas"]["backend__app__schemas__delivery__CourierAvailabilityUpdate"];
             };
         };
         responses: {
@@ -10000,6 +10335,282 @@ export interface operations {
             };
         };
     };
+    my_profile_api_v1_profiles_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerProfileSelfRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_my_profile_api_v1_profiles_me_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerProfileSelfUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerProfileSelfRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_customers_api_v1_profiles_customers_get: {
+        parameters: {
+            query?: {
+                phone?: string | null;
+                q?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerProfileRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_customer_profile_api_v1_profiles_customers__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_customer_profile_api_v1_profiles_customers__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerProfileUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_staff_profiles_api_v1_profiles_staff_get: {
+        parameters: {
+            query?: {
+                can_deliver?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffProfileRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_staff_profile_api_v1_profiles_staff__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffProfileUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_my_availability_api_v1_profiles_staff_me_availability_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["backend__app__schemas__profile__CourierAvailabilityUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_public_payment_methods_api_v1_payment_methods_get: {
         parameters: {
             query?: never;
@@ -10988,6 +11599,220 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_storefront_pages_api_v1_storefront_pages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_section_media_api_v1_storefront_sections__section_id__media__slot_key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+                slot_key: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SectionMediaUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_section_media_api_v1_storefront_sections__section_id__media__slot_key__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                section_id: string;
+                slot_key: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sort_draft_sections_api_v1_storefront_pages__page_key__draft_sections_sort_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                page_key: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SectionsSortRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_layout_api_v1_storefront_layout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_layout_api_v1_storefront_layout_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LayoutPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

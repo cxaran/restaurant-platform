@@ -11,7 +11,7 @@ import { AddToCartButton } from "./MenuView";
 
 type SectionProps = Readonly<{ section: StorefrontSectionVM; preview?: boolean }>;
 
-function ctaHref(cta: unknown): string | null {
+export function ctaHref(cta: unknown): string | null {
   // §F: SOLO tipos de CTA conocidos; jamás href libre desde datos remotos.
   // Un tipo desconocido o un target inválido NO se renderiza (null), nunca se
   // "corrige" hacia una URL. Bloqueados por construcción: javascript:, data:,
@@ -105,12 +105,15 @@ function HeroSection({ section }: SectionProps) {
   if (slides.length === 0) return null;
   const style = section.style as { color_scheme?: string; content_alignment?: string };
   const scheme = sectionScheme(style.color_scheme);
+  const mainMedia = section.media.main ?? section.media.hero ?? null;
   return (
     <HeroCarousel
       slides={slides}
       background={scheme.background}
       color={scheme.color}
       alignment={style.content_alignment === "center" ? "center" : "left"}
+      mediaUrl={publicFileUrl(mainMedia?.desktop_file_id ?? mainMedia?.mobile_file_id)}
+      mediaAlt={mainMedia?.alt_text ?? ""}
       renderCta={(cta, variant) => <CtaLink cta={cta} variant={variant} />}
     />
   );
@@ -310,6 +313,97 @@ function ContactSection({ section }: SectionProps) {
   );
 }
 
+type BoundCategory = { id?: string; name?: string; description?: string | null };
+
+function CategoriesSection({ section, preview }: SectionProps) {
+  const content = section.content as { title?: string };
+  const categories = Array.isArray(section.data?.categories)
+    ? (section.data?.categories as BoundCategory[])
+    : [];
+  if (categories.length === 0 && !preview) return null;
+  return (
+    <section className="sf-container" style={{ paddingBlock: 22 }}>
+      {content.title ? (
+        <h2 className="sf-display" style={{ fontSize: 26, margin: "0 0 12px" }}>
+          {content.title}
+        </h2>
+      ) : null}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {categories.map((category) => (
+          <Link
+            key={category.id ?? category.name}
+            className="sf-chip"
+            href="/menu"
+            style={{ textDecoration: "none" }}
+          >
+            {category.name}
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CreditsBannerSection({ section }: SectionProps) {
+  // §35.2: invita al programa; los números reales viven en /creditos.
+  const content = section.content as { title?: string; description?: string; cta?: unknown };
+  if (!content.title) return null;
+  const scheme = sectionScheme((section.style as { color_scheme?: string }).color_scheme ?? "brand");
+  return (
+    <section className="sf-container" style={{ paddingBlock: 18 }}>
+      <div
+        className="sf-card"
+        style={{
+          background: scheme.background, color: scheme.color, border: "none",
+          display: "flex", flexWrap: "wrap", alignItems: "center",
+          justifyContent: "space-between", gap: 16, padding: "22px 26px",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 240, flex: 1 }}>
+          <div className="sf-display" style={{ fontSize: 22 }}>{content.title}</div>
+          {content.description ? (
+            <div style={{ fontSize: 14, opacity: 0.85 }}>{content.description}</div>
+          ) : null}
+        </div>
+        <CtaLink
+          cta={content.cta ?? { label: "Mis créditos", link_type: "credits_page" }}
+          variant="solid"
+        />
+      </div>
+    </section>
+  );
+}
+
+function DeliveryBannerSection({ section }: SectionProps) {
+  // §35.3: el umbral es DERIVADO del backend; sin datos no se inventa nada.
+  const content = section.content as { title?: string; description?: string };
+  const enabled = section.data?.delivery_enabled === true;
+  const threshold = section.data?.free_shipping_from_amount;
+  if (!enabled) return null;
+  const scheme = sectionScheme((section.style as { color_scheme?: string }).color_scheme ?? "dark");
+  return (
+    <section className="sf-container" style={{ paddingBlock: 18 }}>
+      <div
+        className="sf-card"
+        style={{
+          background: scheme.background, color: scheme.color, border: "none",
+          padding: "22px 26px", display: "flex", flexDirection: "column", gap: 6,
+        }}
+      >
+        <div className="sf-display" style={{ fontSize: 22 }}>
+          {content.title ?? "Servicio a domicilio"}
+        </div>
+        <div style={{ fontSize: 14, opacity: 0.85 }}>
+          {content.description ?? "Te lo llevamos hasta tu puerta."}
+          {typeof threshold === "string"
+            ? ` Envío gratis desde ${formatMoney(threshold)}.`
+            : ""}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function UnknownTemplateFallback({ section, preview }: SectionProps) {
   // En el sitio público una plantilla desconocida no rompe nada: se omite.
   // En preview se señala para que el editor sepa qué falta.
@@ -331,6 +425,9 @@ const REGISTRY: Record<string, (props: SectionProps) => React.ReactNode> = {
   "storefront.catalog.featured_products": FeaturedProductsSection,
   "storefront.business.hours": HoursSection,
   "storefront.business.contact": ContactSection,
+  "storefront.catalog.categories": CategoriesSection,
+  "storefront.banner.credits": CreditsBannerSection,
+  "storefront.banner.delivery": DeliveryBannerSection,
 };
 
 export const SUPPORTED_TEMPLATE_KEYS = Object.keys(REGISTRY);

@@ -24,7 +24,7 @@ export default async function RelationEditorPage({ params }: PageProps) {
     notFound();
   }
 
-  const listPath = `/resources/${encodeURIComponent(resourceName)}`;
+  const listPath = `/admin/resources/${encodeURIComponent(resourceName)}`;
 
   return (
     <div className="space-y-6">

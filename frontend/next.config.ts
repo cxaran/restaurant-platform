@@ -25,6 +25,21 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // Compatibilidad tras la reestructura de entornos (público en /, operación
+  // en /panel, administración en /admin). Estas rutas antiguas NO deben usarse
+  // en navegación, CTAs ni metadata nuevas; solo amortiguan enlaces guardados.
+  async redirects() {
+    return [
+      { source: "/sitio", destination: "/", permanent: false },
+      { source: "/sitio/:path*", destination: "/:path*", permanent: false },
+      { source: "/resources", destination: "/admin/resources", permanent: false },
+      { source: "/resources/:path*", destination: "/admin/resources/:path*", permanent: false },
+      { source: "/backups", destination: "/admin/backups", permanent: false },
+      { source: "/backups/:path*", destination: "/admin/backups/:path*", permanent: false },
+      { source: "/account", destination: "/admin/account", permanent: false },
+      { source: "/storefront", destination: "/admin/storefront", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -56,7 +56,7 @@ export function BackupDriveFilesView({
           </p>
         </div>
         <Link
-          href="/backups"
+          href="/admin/backups"
           className="rounded-[8px] border border-[var(--border2)] bg-[var(--panel2)] px-3 py-2 text-xs font-semibold text-[var(--tx)] transition hover:opacity-90"
         >
           Actualizar

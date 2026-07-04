@@ -47,7 +47,7 @@ export default async function ResourcePage({ params, searchParams }: PageProps) 
     }
     return (
       <div className="space-y-4">
-        <BackLink href="/resources" label="Recursos" />
+        <BackLink href="/admin/resources" label="Recursos" />
         <h1 className="text-xl font-semibold text-slate-900">{capability.label}</h1>
         <GroupedCatalog label={capability.label} catalog={catalog} />
       </div>
@@ -67,7 +67,7 @@ export default async function ResourcePage({ params, searchParams }: PageProps) 
     notFound();
   }
 
-  const basePath = `/resources/${encodeURIComponent(resourceName)}`;
+  const basePath = `/admin/resources/${encodeURIComponent(resourceName)}`;
   const search = parseSearchField(rawSearchParams, list);
 
   const { pagination } = page;
@@ -103,7 +103,7 @@ export default async function ResourcePage({ params, searchParams }: PageProps) 
 
   return (
     <div className="space-y-4">
-      <BackLink href="/resources" label="Recursos" />
+      <BackLink href="/admin/resources" label="Recursos" />
       <ResourceToolbar
         label={capability.label}
         resourceName={resourceName}

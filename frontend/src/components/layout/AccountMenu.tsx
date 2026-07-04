@@ -30,7 +30,7 @@ export function AccountMenu() {
   return (
     <div className="flex items-center gap-3">
       <Link
-        href="/account"
+        href="/admin/account"
         className="text-sm font-medium text-slate-700 underline-offset-2 hover:text-slate-900 hover:underline"
       >
         Mi cuenta

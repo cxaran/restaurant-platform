@@ -264,7 +264,7 @@ export function ResourceTable({
 
   function itemHref(id: string, ...segments: string[]): string {
     const tail = segments.map((segment) => encodeURIComponent(segment)).join("/");
-    return `/resources/${encodeURIComponent(resourceName)}/${encodeURIComponent(id)}/${tail}`;
+    return `/admin/resources/${encodeURIComponent(resourceName)}/${encodeURIComponent(id)}/${tail}`;
   }
 
   return (
@@ -387,7 +387,7 @@ export function ResourceTable({
                               <RowActionsFlyout lead={renderRowLead ? renderRowLead(id, row) : undefined}>
                                 {detailEnabled ? (
                                   <Link
-                                    href={`/resources/${encodeURIComponent(resourceName)}/${encodeURIComponent(id)}`}
+                                    href={`/admin/resources/${encodeURIComponent(resourceName)}/${encodeURIComponent(id)}`}
                                     data-row-detail
                                     className={ACTION_LINK_CLASS}
                                   >
@@ -421,7 +421,7 @@ export function ResourceTable({
                                 {relatedLists.map((related) => (
                                   <Link
                                     key={related.resource}
-                                    href={`/resources/${encodeURIComponent(related.resource)}?${encodeURIComponent(related.parameter_name)}=${encodeURIComponent(id)}`}
+                                    href={`/admin/resources/${encodeURIComponent(related.resource)}?${encodeURIComponent(related.parameter_name)}=${encodeURIComponent(id)}`}
                                     className={ACTION_LINK_CLASS}
                                   >
                                     {related.label}

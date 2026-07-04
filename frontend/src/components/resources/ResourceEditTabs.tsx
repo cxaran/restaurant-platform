@@ -21,7 +21,7 @@ export function ResourceEditTabs({
   relations: ResourceRelationCapability[];
   active: "general" | string;
 }>) {
-  const base = `/resources/${encodeURIComponent(resourceName)}/${encodeURIComponent(id)}`;
+  const base = `/admin/resources/${encodeURIComponent(resourceName)}/${encodeURIComponent(id)}`;
   const tabs: { key: string; label: string; href: string }[] = [
     { key: "general", label: "Datos generales", href: `${base}/edit` },
     ...relations.map((relation) => ({

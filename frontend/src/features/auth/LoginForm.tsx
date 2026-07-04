@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { ApiRequestError } from "@/core/api/api-error";
 import { login, verifyLogin } from "@/core/auth/public-auth-client";
@@ -17,6 +17,7 @@ const FIELD_INPUT =
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -28,8 +29,12 @@ export function LoginForm() {
   } | null>(null);
 
   function finishLogin() {
+    // Solo rutas internas de un segmento inicial ("/checkout", "/pedidos/…"):
+    // nunca URLs absolutas ni "//host" — evita open-redirect.
+    const next = searchParams.get("next");
+    const target = next && /^\/(?!\/)/.test(next) ? next : "/";
     startTransition(() => {
-      router.replace("/");
+      router.replace(target);
       router.refresh();
     });
   }

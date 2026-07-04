@@ -84,7 +84,7 @@ export function SetupChecklistBanner({
           ))}
           <div className="mt-2 flex items-center justify-between">
             <Link
-              href="/resources/system_settings"
+              href="/admin/resources/system_settings"
               className="text-xs text-[var(--tx3)] hover:underline"
             >
               Configuración del sistema

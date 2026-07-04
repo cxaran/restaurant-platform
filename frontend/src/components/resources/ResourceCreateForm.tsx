@@ -64,7 +64,7 @@ export function ResourceCreateForm({
   const [pending, setPending] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const listPath = `/resources/${encodeURIComponent(resourceName)}`;
+  const listPath = `/admin/resources/${encodeURIComponent(resourceName)}`;
   const fileField = create.transport === "multipart" ? create.file_field ?? null : null;
   const allowedFields = new Set(create.fields.map((field) => field.name));
   if (fileField) {

@@ -47,7 +47,7 @@ export function ResourceCatalog({
         <li key={resource.name}>
           {resource.view === "table" ? (
             <Link
-              href={`/resources/${encodeURIComponent(resource.name)}`}
+              href={`/admin/resources/${encodeURIComponent(resource.name)}`}
               className="block rounded-lg border border-slate-200 bg-white p-5 transition hover:border-slate-300 hover:shadow-sm"
             >
               <CardContent resource={resource} />

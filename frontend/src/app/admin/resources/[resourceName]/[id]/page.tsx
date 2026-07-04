@@ -46,7 +46,7 @@ export default async function ResourceDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const base = `/resources/${encodeURIComponent(resourceName)}/${encodeURIComponent(id)}`;
+  const base = `/admin/resources/${encodeURIComponent(resourceName)}/${encodeURIComponent(id)}`;
   const fields = displayFields(capability);
 
   // Misma señal RBAC que la lista: el botón de editar sólo si hay forma de actualización
@@ -61,7 +61,7 @@ export default async function ResourceDetailPage({ params }: PageProps) {
     ? fillPlaceholder(capability.file_download.url_template, placeholder, id)
     : null;
 
-  const listPath = `/resources/${encodeURIComponent(resourceName)}`;
+  const listPath = `/admin/resources/${encodeURIComponent(resourceName)}`;
 
   return (
     <div className="space-y-6">

@@ -194,7 +194,7 @@ export function ResourceListControls({
     return null;
   }
 
-  const action = `/resources/${encodeURIComponent(resourceName)}`;
+  const action = `/admin/resources/${encodeURIComponent(resourceName)}`;
   const effectiveMin = Math.max(search.min_length ?? 0, 1);
 
   return (

@@ -12,20 +12,20 @@ import type { SessionUser } from "@/core/auth/types";
 
 // Recursos con página propia fuera del listado genérico (p. ej. el visor de respaldos).
 const CUSTOM_RESOURCE_ROUTES: Record<string, string> = {
-  backup_settings: "/backups",
-  backup_runs: "/backups",
+  backup_settings: "/admin/backups",
+  backup_runs: "/admin/backups",
 };
 
 function resourceHref(name: string): string {
-  return CUSTOM_RESOURCE_ROUTES[name] ?? `/resources/${encodeURIComponent(name)}`;
+  return CUSTOM_RESOURCE_ROUTES[name] ?? `/admin/resources/${encodeURIComponent(name)}`;
 }
 
 function deriveTitle(pathname: string, resources: ResourceCatalogType): string {
-  if (pathname === "/") return "Inicio";
-  if (pathname.startsWith("/account")) return "Mi cuenta";
-  if (pathname.startsWith("/backups")) return "Respaldos";
-  if (pathname.startsWith("/resources/")) {
-    const name = decodeURIComponent(pathname.split("/")[2] ?? "");
+  if (pathname === "/admin") return "Inicio";
+  if (pathname.startsWith("/admin/account")) return "Mi cuenta";
+  if (pathname.startsWith("/admin/backups")) return "Respaldos";
+  if (pathname.startsWith("/admin/resources/")) {
+    const name = decodeURIComponent(pathname.split("/")[3] ?? "");
     return resources.find((resource) => resource.name === name)?.label ?? "Recursos";
   }
   return "Restaurant Platform";
@@ -71,16 +71,16 @@ export function PlatformShell({
         onClick={() => setNavOpen(false)}
       />
       <aside className="mc-sidebar z-40 flex w-64 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--panel)]">
-        <Link href="/" className="flex items-center gap-3 px-5 py-4" onClick={() => setNavOpen(false)}>
+        <Link href="/admin" className="flex items-center gap-3 px-5 py-4" onClick={() => setNavOpen(false)}>
           <AnimatedOrb size={30} />
           <span className="text-base font-semibold tracking-tight">Restaurant Platform</span>
         </Link>
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Recursos">
           <Link
-            href="/"
+            href="/admin"
             onClick={() => setNavOpen(false)}
             className={`block rounded-[10px] px-3 py-2 text-sm font-medium transition ${
-              pathname === "/"
+              pathname === "/admin"
                 ? "bg-[var(--panel2)] text-[var(--tx)]"
                 : "text-[var(--tx2)] hover:bg-[var(--panel2)] hover:text-[var(--tx)]"
             }`}

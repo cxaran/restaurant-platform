@@ -118,6 +118,11 @@ def mark_paid(
     session.add(payment)
     session.flush()
     recompute_order_payment_status(session, order)
+
+    # §21.4: UN ingreso financiero por pago cobrado (import tardío: evita ciclo).
+    from backend.app.services.finance_service import record_payment_income
+
+    record_payment_income(session, order, payment)
     return payment
 
 

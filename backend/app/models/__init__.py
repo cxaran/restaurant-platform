@@ -20,6 +20,12 @@ from .catalog import (
     ProductModifierGroup,
 )
 from .deliveries import CourierLocationEvent, CourierTrackingSession, DeliveryAssignment
+from .finances import (
+    FinancialCategory,
+    FinancialEntry,
+    FinancialEntryAttachment,
+    OrderLineRefundAllocation,
+)
 from .orders import (
     Order,
     OrderAdjustment,
@@ -62,6 +68,9 @@ __all__ = [
     "CustomerProfile",
     "DeliveryAssignment",
     "DeliveryZone",
+    "FinancialCategory",
+    "FinancialEntry",
+    "FinancialEntryAttachment",
     "ModifierGroup",
     "ModifierOption",
     "Order",
@@ -69,6 +78,7 @@ __all__ = [
     "OrderDelivery",
     "OrderLine",
     "OrderLineModifier",
+    "OrderLineRefundAllocation",
     "OrderShipping",
     "OrderShippingHistory",
     "OrderStatusHistory",

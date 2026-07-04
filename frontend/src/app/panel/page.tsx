@@ -1,60 +1,44 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 
-import { CapabilityGate } from "@/components/storefront/CapabilityGate";
 import { requireSession } from "@/core/auth/session";
+import type { NavigationModule, ResourceCatalog } from "@/core/api/contracts";
+import { serverApi } from "@/core/api/server-client";
 
 export const dynamic = "force-dynamic";
 
 // /panel: entorno OPERATIVO diario (cajero, cocina, reparto, supervisor).
-// No es un admin reducido ni una app por rol: es un shell común cuyos módulos
-// se derivan de capabilities reales — jamás de `role === "x"`. Las pantallas
-// operativas (cola de pedidos, POS, reparto, tickets) son el siguiente
-// incremento del frontend: aquí se declaran sin simular funcionalidad, y la
-// autorización real sigue siendo del backend en cada llamada.
-const MODULES: {
-  label: string;
-  detail: string;
-  anyOf: string[];
-  href?: string;
-}[] = [
-  {
-    label: "Pedidos (cola y preparación)",
-    detail: "Cola en vivo con transiciones por permiso.",
-    anyOf: ["orders:read"],
-    href: "/panel/pedidos",
-  },
-  {
-    label: "Punto de venta",
-    detail: "Venta de mostrador en una llamada.",
-    anyOf: ["orders:capture", "payments:record"],
-    href: "/panel/pos",
-  },
-  {
-    label: "Entregas",
-    detail: "Despacho: cola de envíos listos y asignación manual de repartidor.",
-    anyOf: ["deliveries:read", "deliveries:assign"],
-    href: "/panel/entregas",
-  },
-  {
-    label: "Reparto (mis entregas)",
-    detail: "Cola de envíos, entrega en curso y resumen del día.",
-    anyOf: ["deliveries:self_assign", "deliveries:read"],
-    href: "/panel/reparto",
-  },
-  {
-    label: "Tickets",
-    detail: "Reimpresión de tickets con bitácora.",
-    anyOf: ["tickets:print"],
-    href: "/panel/tickets",
-  },
-];
+// No es un admin reducido ni una app por rol: los módulos vienen del catálogo
+// de navegación del backend (GET /api/v1/resources → navigation_modules con
+// section === "panel"), ya proyectados por permisos. El cliente NO decide
+// permisos ni conoce URLs especializadas: si el backend lo devuelve, se
+// muestra; la autorización real sigue siendo del backend en cada llamada.
+
+// Descripciones puramente COSMÉTICAS por nombre de módulo (no autorizan ni
+// enrutan nada); un módulo nuevo del backend se muestra igual sin detalle.
+const MODULE_DETAILS: Record<string, string> = {
+  pedidos: "Cola en vivo con transiciones por permiso.",
+  pos: "Venta de mostrador en una llamada.",
+  entregas: "Despacho: cola de envíos listos y asignación manual de repartidor.",
+  reparto: "Cola de envíos, entrega en curso y resumen del día.",
+  tickets: "Reimpresión de tickets con bitácora.",
+};
+
+async function getPanelModules(): Promise<NavigationModule[] | null> {
+  try {
+    const catalog = await serverApi<ResourceCatalog>("/api/v1/resources", {
+      cookie: (await cookies()).toString(),
+    });
+    return catalog.navigation_modules.filter((module_) => module_.section === "panel");
+  } catch {
+    // Sin catálogo no se inventa una lista local: se informa el error.
+    return null;
+  }
+}
 
 export default async function PanelPage() {
   const session = await requireSession();
-  const permissions = new Set(session.permissions ?? []);
-  const visible = MODULES.filter((module) =>
-    module.anyOf.some((permission) => permissions.has(permission)),
-  );
+  const modules = await getPanelModules();
 
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "32px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -65,7 +49,14 @@ export default async function PanelPage() {
         </p>
       </header>
 
-      {visible.length === 0 ? (
+      {modules === null ? (
+        <div role="alert" style={{ border: "1px solid rgba(179,38,30,0.5)", borderRadius: 12, padding: 22 }}>
+          <p style={{ margin: "0 0 10px", fontWeight: 600 }}>
+            No fue posible cargar el catálogo de módulos. Intenta de nuevo más tarde.
+          </p>
+          <Link href="/panel" style={{ fontWeight: 700 }}>Reintentar</Link>
+        </div>
+      ) : modules.length === 0 ? (
         <div style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 12, padding: 22 }}>
           <p style={{ margin: "0 0 10px", fontWeight: 600 }}>
             Tu cuenta no tiene módulos operativos asignados.
@@ -73,30 +64,24 @@ export default async function PanelPage() {
           <Link href="/" style={{ fontWeight: 700 }}>Ir al sitio</Link>
         </div>
       ) : (
-        visible.map((module) =>
-          module.href ? (
-            <Link
-              key={module.label}
-              href={module.href}
-              style={{
-                border: "1px solid rgba(0,0,0,0.2)", borderRadius: 12,
-                padding: "16px 18px", textDecoration: "none", color: "inherit",
-                display: "block",
-              }}
-            >
-              <span style={{ fontWeight: 800 }}>{module.label}</span>
-              <span style={{ display: "block", fontSize: 13, opacity: 0.75 }}>{module.detail}</span>
-            </Link>
-          ) : (
-            <CapabilityGate
-              key={module.label}
-              title={module.label}
-              state={{ kind: "not_implemented", detail: module.detail }}
-            >
-              {null}
-            </CapabilityGate>
-          ),
-        )
+        modules.map((module_) => (
+          <Link
+            key={module_.name}
+            href={module_.href}
+            style={{
+              border: "1px solid rgba(0,0,0,0.2)", borderRadius: 12,
+              padding: "16px 18px", textDecoration: "none", color: "inherit",
+              display: "block",
+            }}
+          >
+            <span style={{ fontWeight: 800 }}>{module_.label}</span>
+            {MODULE_DETAILS[module_.name] ? (
+              <span style={{ display: "block", fontSize: 13, opacity: 0.75 }}>
+                {MODULE_DETAILS[module_.name]}
+              </span>
+            ) : null}
+          </Link>
+        ))
       )}
 
       <nav style={{ display: "flex", gap: 16, fontSize: 14, fontWeight: 600 }}>

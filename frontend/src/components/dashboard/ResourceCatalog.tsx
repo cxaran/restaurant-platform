@@ -1,10 +1,6 @@
 import Link from "next/link";
 
-import type {
-  ResourceCapability,
-  ResourceCatalog as ResourceCatalogType,
-  ResourceView,
-} from "@/core/api/contracts";
+import type { ResourceCapability, ResourceView } from "@/core/api/contracts";
 
 const VIEW_DESCRIPTION: Record<ResourceView, string> = {
   table: "Módulo con listado administrativo",
@@ -32,7 +28,7 @@ function CardContent({ resource }: Readonly<{ resource: ResourceCapability }>) {
 
 export function ResourceCatalog({
   resources,
-}: Readonly<{ resources: ResourceCatalogType }>) {
+}: Readonly<{ resources: ResourceCapability[] }>) {
   if (resources.length === 0) {
     return (
       <p className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">

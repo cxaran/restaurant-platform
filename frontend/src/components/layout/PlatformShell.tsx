@@ -7,7 +7,10 @@ import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/layout/AccountMenu";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { AnimatedOrb } from "@/components/ui/AnimatedOrb";
-import type { ResourceCatalog as ResourceCatalogType } from "@/core/api/contracts";
+import type {
+  NavigationModule,
+  ResourceCatalog as ResourceCatalogType,
+} from "@/core/api/contracts";
 import type { SessionUser } from "@/core/auth/types";
 
 // Recursos con página propia fuera del listado genérico (p. ej. el visor de respaldos).
@@ -20,38 +23,54 @@ function resourceHref(name: string): string {
   return CUSTOM_RESOURCE_ROUTES[name] ?? `/admin/resources/${encodeURIComponent(name)}`;
 }
 
-function deriveTitle(pathname: string, resources: ResourceCatalogType): string {
+function deriveTitle(
+  pathname: string,
+  catalog: ResourceCatalogType,
+  modules: NavigationModule[],
+): string {
   if (pathname === "/admin") return "Inicio";
   if (pathname.startsWith("/admin/account")) return "Mi cuenta";
   if (pathname.startsWith("/admin/backups")) return "Respaldos";
   if (pathname.startsWith("/admin/resources/")) {
     const name = decodeURIComponent(pathname.split("/")[3] ?? "");
-    return resources.find((resource) => resource.name === name)?.label ?? "Recursos";
+    return (
+      catalog.resources.find((resource) => resource.name === name)?.label ?? "Recursos"
+    );
   }
+  // Módulos especializados: el título sale del label que declara el backend.
+  const module_ = modules.find(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
+  if (module_) return module_.label;
   return "Restaurant Platform";
 }
 
 /**
  * Cromo autenticado del producto: sidebar fija en escritorio (drawer en móvil vía las
  * clases .mc-sidebar de globals.css), header con el título derivado de la ruta y el
- * contenido con scroll propio. La navegación se deriva del CONTRATO de recursos
- * visible para la sesión (RBAC del backend); no hay rutas cableadas por rol.
+ * contenido con scroll propio. La navegación se deriva del CONTRATO del catálogo
+ * (recursos + módulos especializados con sus href del backend, RBAC ya proyectado);
+ * no hay rutas cableadas por rol ni URLs especializadas conocidas por el cliente.
  */
 export function PlatformShell({
   session,
-  resources,
+  catalog,
   children,
 }: Readonly<{
   session: SessionUser;
-  resources: ResourceCatalogType;
+  catalog: ResourceCatalogType;
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
-  const title = deriveTitle(pathname, resources);
+  // Módulos especializados de la sección admin, en el orden del backend.
+  const adminModules = catalog.navigation_modules.filter(
+    (module_) => module_.section === "admin",
+  );
+  const title = deriveTitle(pathname, catalog, adminModules);
   // El visor de respaldos agrupa sus dos recursos en una sola entrada.
   const seen = new Set<string>();
-  const navItems = resources.filter((resource) => {
+  const navItems = catalog.resources.filter((resource) => {
     const href = resourceHref(resource.name);
     if (seen.has(href)) return false;
     seen.add(href);
@@ -105,6 +124,31 @@ export function PlatformShell({
               </Link>
             );
           })}
+          {adminModules.length > 0 ? (
+            <>
+              <p className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--tx3)]">
+                Módulos
+              </p>
+              {adminModules.map((module_) => {
+                const active =
+                  pathname === module_.href || pathname.startsWith(`${module_.href}/`);
+                return (
+                  <Link
+                    key={module_.name}
+                    href={module_.href}
+                    onClick={() => setNavOpen(false)}
+                    className={`block rounded-[10px] px-3 py-2 text-sm font-medium transition ${
+                      active
+                        ? "bg-[var(--panel2)] text-[var(--tx)]"
+                        : "text-[var(--tx2)] hover:bg-[var(--panel2)] hover:text-[var(--tx)]"
+                    }`}
+                  >
+                    {module_.label}
+                  </Link>
+                );
+              })}
+            </>
+          ) : null}
         </nav>
         <div className="flex items-center justify-between gap-2 border-t border-[var(--border)] px-4 py-3">
           <div className="min-w-0 text-sm">

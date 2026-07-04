@@ -1,8 +1,21 @@
 // ViewModels del payload público del storefront.
 //
-// GAP documentado (plan §4): GET /api/v1/public/storefront/{page_key} devuelve
-// `dict` sin tipar en OpenAPI, así que este VM parsea defensivamente. Cuando el
-// backend exponga response_model tipado, este archivo se reduce a aliases.
+// CONTRATO CERRADO: GET /api/v1/public/storefront/{page_key} ya está tipado en
+// OpenAPI como `PublicStorefrontPage` (meta, layout, sections con media por
+// slot y theme_tokens). Aquí NO se vuelve a declarar la forma del payload a
+// mano: los tipos VM son aliases/derivaciones del tipo generado, y el único
+// adaptador (`toStorefrontPageVM`) se limita a normalizar opcionales
+// (defaults + orden de secciones). `theme_tokens` sigue siendo un dict de
+// tokens en el contrato, así que conserva su parseo allowlist
+// (`parseThemeTokens`: solo hex de 6 dígitos, jamás CSS arbitrario).
+
+import type { components } from "@/generated/openapi";
+
+export type PublicStorefrontPage = components["schemas"]["PublicStorefrontPage"];
+export type PublicStorefrontSection = components["schemas"]["PublicStorefrontSection"];
+export type PublicSectionMediaSlot = components["schemas"]["PublicSectionMediaSlot"];
+export type PublicStorefrontMeta = components["schemas"]["PublicStorefrontMeta"];
+export type PublicStorefrontLayout = components["schemas"]["PublicStorefrontLayout"];
 
 export type ThemeTokens = {
   colors: Record<string, string>;
@@ -11,40 +24,25 @@ export type ThemeTokens = {
   effects: { card_shadow?: string; button_style?: string };
 };
 
-export type SectionMediaSlotVM = {
-  desktop_file_id: string | null;
-  mobile_file_id: string | null;
-  alt_text: string | null;
-  focal_point_x: number | null;
-  focal_point_y: number | null;
-};
+// VM = contrato generado con los opcionales resueltos (la UI no repite `??`).
+export type SectionMediaSlotVM = Required<PublicSectionMediaSlot>;
 
-export type StorefrontSectionVM = {
-  template_key: string;
-  template_version: number;
-  sort_order: number;
-  content: Record<string, unknown>;
-  style: Record<string, unknown>;
-  behavior: Record<string, unknown>;
+export type StorefrontSectionVM = Omit<
+  Required<PublicStorefrontSection>,
+  "data" | "media"
+> & {
   data: Record<string, unknown> | null;
   media: Record<string, SectionMediaSlotVM>;
 };
 
-export type StorefrontLayoutVM = {
-  header: Record<string, unknown>;
-  footer: Record<string, unknown>;
-} | null;
+export type StorefrontLayoutVM = Required<PublicStorefrontLayout> | null;
 
-export type StorefrontPageVM = {
-  page_key: string;
-  slug: string;
+export type StorefrontPageVM = Omit<
+  Required<PublicStorefrontPage>,
+  "layout" | "meta" | "sections" | "theme_tokens"
+> & {
   layout: StorefrontLayoutVM;
-  meta: {
-    title: string | null;
-    description: string | null;
-    og_image_file_id: string | null;
-    favicon_file_id: string | null;
-  };
+  meta: Required<PublicStorefrontMeta>;
   sections: StorefrontSectionVM[];
   theme_tokens: ThemeTokens | null;
 };
@@ -55,10 +53,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
-}
-
-function asStringOrNull(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 export function parseThemeTokens(value: unknown): ThemeTokens | null {
@@ -76,57 +70,51 @@ export function parseThemeTokens(value: unknown): ThemeTokens | null {
   };
 }
 
-function parseSectionMedia(value: unknown): Record<string, SectionMediaSlotVM> {
-  if (!isRecord(value)) return {};
-  const media: Record<string, SectionMediaSlotVM> = {};
-  for (const [slot, raw] of Object.entries(value)) {
-    if (!isRecord(raw)) continue;
-    media[slot] = {
-      desktop_file_id: asStringOrNull(raw.desktop_file_id),
-      mobile_file_id: asStringOrNull(raw.mobile_file_id),
-      alt_text: asStringOrNull(raw.alt_text),
-      focal_point_x: typeof raw.focal_point_x === "number" ? raw.focal_point_x : null,
-      focal_point_y: typeof raw.focal_point_y === "number" ? raw.focal_point_y : null,
-    };
-  }
-  return media;
+function toMediaSlotVM(slot: PublicSectionMediaSlot): SectionMediaSlotVM {
+  return {
+    desktop_file_id: slot.desktop_file_id ?? null,
+    mobile_file_id: slot.mobile_file_id ?? null,
+    alt_text: slot.alt_text ?? null,
+    focal_point_x: slot.focal_point_x ?? null,
+    focal_point_y: slot.focal_point_y ?? null,
+  };
 }
 
-export function parseStorefrontPage(value: unknown): StorefrontPageVM | null {
-  if (!isRecord(value) || typeof value.page_key !== "string") return null;
-  const meta = asRecord(value.meta);
-  const sections: StorefrontSectionVM[] = [];
-  if (Array.isArray(value.sections)) {
-    for (const raw of value.sections) {
-      if (!isRecord(raw) || typeof raw.template_key !== "string") continue;
-      sections.push({
-        template_key: raw.template_key,
-        template_version: typeof raw.template_version === "number" ? raw.template_version : 1,
-        sort_order: typeof raw.sort_order === "number" ? raw.sort_order : 0,
-        content: asRecord(raw.content),
-        style: asRecord(raw.style),
-        behavior: asRecord(raw.behavior),
-        data: isRecord(raw.data) ? raw.data : null,
-        media: parseSectionMedia(raw.media),
-      });
-    }
+function toSectionVM(section: PublicStorefrontSection): StorefrontSectionVM {
+  const media: Record<string, SectionMediaSlotVM> = {};
+  for (const [slot, raw] of Object.entries(section.media ?? {})) {
+    media[slot] = toMediaSlotVM(raw);
   }
-  sections.sort((a, b) => a.sort_order - b.sort_order);
-  const layoutRaw = asRecord(value.layout);
   return {
-    page_key: value.page_key,
-    slug: typeof value.slug === "string" ? value.slug : "/",
-    layout: isRecord(value.layout)
-      ? { header: asRecord(layoutRaw.header), footer: asRecord(layoutRaw.footer) }
+    template_key: section.template_key,
+    template_version: section.template_version,
+    sort_order: section.sort_order,
+    content: section.content ?? {},
+    style: section.style ?? {},
+    behavior: section.behavior ?? {},
+    data: section.data ?? null,
+    media,
+  };
+}
+
+/** Adapter type-safe del contrato generado al VM que consume la UI. */
+export function toStorefrontPageVM(page: PublicStorefrontPage): StorefrontPageVM {
+  const sections = (page.sections ?? []).map(toSectionVM);
+  sections.sort((a, b) => a.sort_order - b.sort_order);
+  return {
+    page_key: page.page_key,
+    slug: page.slug,
+    layout: page.layout
+      ? { header: page.layout.header ?? {}, footer: page.layout.footer ?? {} }
       : null,
     meta: {
-      title: asStringOrNull(meta.title),
-      description: asStringOrNull(meta.description),
-      og_image_file_id: asStringOrNull(meta.og_image_file_id),
-      favicon_file_id: asStringOrNull(meta.favicon_file_id),
+      title: page.meta.title ?? null,
+      description: page.meta.description ?? null,
+      og_image_file_id: page.meta.og_image_file_id ?? null,
+      favicon_file_id: page.meta.favicon_file_id ?? null,
     },
     sections,
-    theme_tokens: parseThemeTokens(value.theme_tokens),
+    theme_tokens: parseThemeTokens(page.theme_tokens),
   };
 }
 

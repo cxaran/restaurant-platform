@@ -4,6 +4,7 @@
 // backend (nunca inventa contratos) sobre browserApi (cookie de sesión).
 
 import { browserApi } from "@/core/api/browser-client";
+import type { components } from "@/generated/openapi";
 import type { JsonSchema } from "./SchemaForm";
 
 export type PageSummary = {
@@ -13,7 +14,13 @@ export type PageSummary = {
   published_at: string | null;
   has_draft: boolean;
   draft_revision_number: number | null;
+  // Estado de programación real del backend (publicación diferida).
+  scheduled_publish_at?: string | null;
+  schedule_cancelled_reason?: string | null;
 };
+
+// Enlace de preview firmado y temporal (contrato generado, no espejo).
+export type PreviewLinkResult = components["schemas"]["PreviewLinkResult"];
 
 export type TemplateInfo = {
   key: string;
@@ -169,3 +176,13 @@ export const unschedulePublish = (pageKey: string) =>
   browserApi(`/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/schedule`, {
     method: "DELETE",
   });
+
+// Enlace de preview firmado (requiere storefront:preview). Solo lectura,
+// expira y se invalida al publicar.
+export const createPreviewLink = (pageKey: string, minutes?: number) =>
+  browserApi<PreviewLinkResult>(
+    `/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/preview-link${
+      minutes ? `?minutes=${minutes}` : ""
+    }`,
+    { method: "POST" },
+  );

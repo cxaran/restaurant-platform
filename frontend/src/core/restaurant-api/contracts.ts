@@ -28,6 +28,12 @@ export type DiscountRedemptionListItem = components["schemas"]["DiscountRedempti
 // Búsqueda de clientes por teléfono (ayuda para códigos personales; requiere profiles:read).
 export type CustomerProfileRead = components["schemas"]["CustomerProfileRead"];
 
+// Reportes operativos (ventas registradas, no utilidad): /reports/*.
+export type SalesByHourReport = components["schemas"]["SalesByHourReport"];
+export type SalesByHourItem = components["schemas"]["SalesByHourItem"];
+export type TopProductsReport = components["schemas"]["TopProductsReport"];
+export type TopProductItem = components["schemas"]["TopProductItem"];
+
 export type CreditTotalsRead = components["schemas"]["CreditTotalsRead"];
 export type CreditMovementRead = components["schemas"]["CreditMovementRead"];
 export type CustomerProfileSelfRead = components["schemas"]["CustomerProfileSelfRead"];

@@ -9,11 +9,11 @@ import { getResourceCatalog } from "@/core/resources/capabilities-client";
 // para el rol del usuario.
 export default async function ResourcesIndexPage() {
   await requireSession();
-  const resources = await getResourceCatalog();
+  const catalog = await getResourceCatalog();
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-slate-900">Recursos</h1>
-      <ResourceCatalog resources={resources} />
+      <ResourceCatalog resources={catalog.resources} />
     </div>
   );
 }

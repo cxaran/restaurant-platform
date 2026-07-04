@@ -740,7 +740,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Categories */
+        /**
+         * List Categories
+         * @description Listado genérico (motor de query): filtros/búsqueda/orden del contrato.
+         */
         get: operations["list_categories_api_v1_catalog_categories_get"];
         put?: never;
         /** Create Category */
@@ -758,7 +761,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Category */
+        get: operations["get_category_api_v1_catalog_categories__category_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -792,7 +796,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Products */
+        /**
+         * List Products
+         * @description Listado genérico (motor de query). ``category_id`` sigue acotando por
+         *     categoría; el estado se filtra con ``is_active`` (antes ``include_inactive``).
+         *     Las imágenes/inclusiones del producto viven en el detalle, no en la lista.
+         */
         get: operations["list_products_api_v1_catalog_products_get"];
         put?: never;
         /** Create Product */
@@ -810,7 +819,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Product */
+        get: operations["get_product_api_v1_catalog_products__product_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -912,7 +922,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Modifier Groups */
+        /**
+         * List Modifier Groups
+         * @description Listado genérico (motor de query); las opciones del grupo viven en el detalle.
+         */
         get: operations["list_modifier_groups_api_v1_catalog_modifier_groups_get"];
         put?: never;
         /** Create Modifier Group */
@@ -930,7 +943,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Modifier Group */
+        get: operations["get_modifier_group_api_v1_catalog_modifier_groups__group_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1432,11 +1446,31 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Categories */
+        /**
+         * List Categories
+         * @description Listado genérico (motor de query): filtro por dirección/estado y búsqueda.
+         */
         get: operations["list_categories_api_v1_finances_categories_get"];
         put?: never;
         /** Create Category */
         post: operations["create_category_api_v1_finances_categories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/finances/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Finance Category */
+        get: operations["get_finance_category_api_v1_finances_categories__category_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2051,6 +2085,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/sales-by-hour": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sales By Hour */
+        get: operations["sales_by_hour_api_v1_reports_sales_by_hour_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/top-products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Top Products */
+        get: operations["top_products_api_v1_reports_top_products_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/resources": {
         parameters: {
             query?: never;
@@ -2058,7 +2126,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Resources */
+        /**
+         * List Resources
+         * @description Catálogo de navegación completo, proyectado por permisos.
+         *
+         *     ``resources`` son los recursos tabulares/catálogo visibles (contrato CRUD
+         *     genérico); ``navigation_modules`` son los módulos ESPECIALIZADOS (pantallas
+         *     propias como el editor del sitio o el POS) donde el usuario tiene ALGUNO de
+         *     los permisos declarados (*anyOf*).
+         */
         get: operations["list_resources_api_v1_resources_get"];
         put?: never;
         post?: never;
@@ -2150,7 +2226,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Zones */
+        /**
+         * List Zones
+         * @description Listado genérico (motor de query) con campos simples; el polígono de
+         *     cobertura y las tarifas viven en el detalle de la zona.
+         */
         get: operations["list_zones_api_v1_shipping_zones_get"];
         put?: never;
         /** Create Zone */
@@ -2168,7 +2248,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Zone */
+        get: operations["get_zone_api_v1_shipping_zones__zone_id__get"];
         put?: never;
         post?: never;
         /** Deactivate Zone */
@@ -2445,6 +2526,51 @@ export interface paths {
         post: operations["schedule_page_api_v1_storefront_pages__page_key__schedule_post"];
         /** Unschedule Page */
         delete: operations["unschedule_page_api_v1_storefront_pages__page_key__schedule_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/storefront/pages/{page_key}/preview-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Preview Link
+         * @description Enlace de preview FIRMADO y temporal (§ Etapa 6.9): token opaco de solo
+         *     lectura, alcance mínimo (una revisión de una página), expiración ≤ 24 h.
+         *     Se invalida solo: al publicar/archivar la revisión deja de resolverse.
+         */
+        post: operations["create_preview_link_api_v1_storefront_pages__page_key__preview_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/storefront/preview/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Preview By Token
+         * @description Consumo del enlace firmado: SIN sesión, solo lectura, sin datos privados.
+         *
+         *     404 uniforme ante token inválido/expirado o revisión ya publicada/archivada
+         *     (no revela si el enlace existió).
+         */
+        get: operations["public_preview_by_token_api_v1_public_storefront_preview__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3634,10 +3760,34 @@ export interface components {
         };
         /** CategoryCreate */
         CategoryCreate: {
-            /** Name */
+            /** Nombre */
             name: string;
-            /** Description */
+            /** Descripción */
             description?: string | null;
+        };
+        /**
+         * CategoryListItem
+         * @description Fila del listado administrativo genérico de categorías (shell contract-driven).
+         */
+        CategoryListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nombre */
+            name: string;
+            /** Descripción */
+            description?: string | null;
+            /** Orden */
+            sort_order: number;
+            /** Activa */
+            is_active: boolean;
+            /**
+             * Creada
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** CategoryRead */
         CategoryRead: {
@@ -3657,11 +3807,11 @@ export interface components {
         };
         /** CategoryUpdate */
         CategoryUpdate: {
-            /** Name */
+            /** Nombre */
             name?: string | null;
-            /** Description */
+            /** Descripción */
             description?: string | null;
-            /** Is Active */
+            /** Activa */
             is_active?: boolean | null;
         };
         /**
@@ -3919,6 +4069,35 @@ export interface components {
              */
             priority: number;
         };
+        /**
+         * DeliveryZoneListItem
+         * @description Fila del listado administrativo genérico de zonas.
+         *
+         *     Sin ``coverage`` ni ``rates``: el polígono y las tarifas se administran en la
+         *     pantalla especializada de envíos.
+         */
+        DeliveryZoneListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Código */
+            code: string;
+            /** Nombre */
+            name: string;
+            /** Descripción */
+            description?: string | null;
+            /** Prioridad */
+            priority: number;
+            /** Activa */
+            is_active: boolean;
+            /**
+             * Creada
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** DeliveryZoneRead */
         DeliveryZoneRead: {
             /**
@@ -3945,19 +4124,19 @@ export interface components {
         };
         /** DeliveryZoneUpdate */
         DeliveryZoneUpdate: {
-            /** Code */
+            /** Código */
             code?: string | null;
-            /** Name */
+            /** Nombre */
             name?: string | null;
-            /** Description */
+            /** Descripción */
             description?: string | null;
             /** Coverage */
             coverage?: {
                 [key: string]: unknown;
             } | null;
-            /** Priority */
+            /** Prioridad */
             priority?: number | null;
-            /** Is Active */
+            /** Activa */
             is_active?: boolean | null;
         };
         /** DiscountCodeCreate */
@@ -4240,14 +4419,38 @@ export interface components {
         /** FinancialCategoryCreate */
         FinancialCategoryCreate: {
             /**
-             * Direction
+             * Dirección
              * @enum {string}
              */
             direction: "income" | "expense";
-            /** Name */
+            /** Nombre */
+            name: string;
+            /** Categoría padre (ID) */
+            parent_id?: string | null;
+        };
+        /**
+         * FinancialCategoryListItem
+         * @description Fila del listado administrativo genérico de categorías financieras.
+         */
+        FinancialCategoryListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Dirección */
+            direction: string;
+            /** Nombre */
             name: string;
             /** Parent Id */
             parent_id?: string | null;
+            /** Activa */
+            is_active: boolean;
+            /**
+             * Creada
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** FinancialCategoryRead */
         FinancialCategoryRead: {
@@ -4508,26 +4711,59 @@ export interface components {
         };
         /** ModifierGroupCreate */
         ModifierGroupCreate: {
-            /** Name */
+            /** Nombre */
             name: string;
             /**
-             * Selection Type
+             * Tipo de selección
              * @default single
              * @enum {string}
              */
             selection_type: "single" | "multiple";
             /**
-             * Min Selections
+             * Selecciones mínimas
              * @default 0
              */
             min_selections: number;
-            /** Max Selections */
+            /** Selecciones máximas */
             max_selections?: number | null;
             /**
-             * Is Required
+             * Obligatorio
              * @default false
              */
             is_required: boolean;
+        };
+        /**
+         * ModifierGroupListItem
+         * @description Fila del listado administrativo genérico de grupos de modificadores.
+         *
+         *     Sin las opciones anidadas: se administran en los endpoints especializados del
+         *     grupo (crear/editar/reordenar opciones).
+         */
+        ModifierGroupListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Nombre */
+            name: string;
+            /** Tipo de selección */
+            selection_type: string;
+            /** Mínimo */
+            min_selections: number;
+            /** Máximo */
+            max_selections?: number | null;
+            /** Obligatorio */
+            is_required: boolean;
+            /** Orden */
+            sort_order: number;
+            /** Activo */
+            is_active: boolean;
+            /**
+             * Creado
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ModifierGroupRead */
         ModifierGroupRead: {
@@ -4555,17 +4791,17 @@ export interface components {
         };
         /** ModifierGroupUpdate */
         ModifierGroupUpdate: {
-            /** Name */
+            /** Nombre */
             name?: string | null;
-            /** Selection Type */
+            /** Tipo de selección */
             selection_type?: ("single" | "multiple") | null;
-            /** Min Selections */
+            /** Selecciones mínimas */
             min_selections?: number | null;
-            /** Max Selections */
+            /** Selecciones máximas */
             max_selections?: number | null;
-            /** Is Required */
+            /** Obligatorio */
             is_required?: boolean | null;
-            /** Is Active */
+            /** Activo */
             is_active?: boolean | null;
         };
         /** ModifierOptionCreate */
@@ -4694,6 +4930,31 @@ export interface components {
             delivery?: components["schemas"]["OrderDeliveryRead"] | null;
             courier?: components["schemas"]["PublicCourierInfo"] | null;
         };
+        /**
+         * NavigationModule
+         * @description Módulo ESPECIALIZADO navegable (pantalla propia, no tabla genérica).
+         *
+         *     Contrato mínimo de navegación: el frontend solo enlaza (``href``) según la
+         *     sección (``admin`` o ``panel``); no describe columnas ni formularios — esos
+         *     viven en la pantalla especializada. ``required_permissions`` es un *anyOf*:
+         *     el módulo se proyecta si el usuario tiene ALGUNO de esos permisos (y el
+         *     backend de cada pantalla revalida siempre los suyos).
+         */
+        NavigationModule: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Href */
+            href: string;
+            /**
+             * Section
+             * @enum {string}
+             */
+            section: "admin" | "panel";
+            /** Required Permissions */
+            required_permissions: string[];
+        };
         /** OffsetPage[AuditEventListItem] */
         OffsetPage_AuditEventListItem_: {
             /** Items */
@@ -4710,6 +4971,36 @@ export interface components {
         OffsetPage_BackupSettingsListItem_: {
             /** Items */
             items: components["schemas"]["BackupSettingsListItem"][];
+            pagination: components["schemas"]["OffsetPagination"];
+        };
+        /** OffsetPage[CategoryListItem] */
+        OffsetPage_CategoryListItem_: {
+            /** Items */
+            items: components["schemas"]["CategoryListItem"][];
+            pagination: components["schemas"]["OffsetPagination"];
+        };
+        /** OffsetPage[DeliveryZoneListItem] */
+        OffsetPage_DeliveryZoneListItem_: {
+            /** Items */
+            items: components["schemas"]["DeliveryZoneListItem"][];
+            pagination: components["schemas"]["OffsetPagination"];
+        };
+        /** OffsetPage[FinancialCategoryListItem] */
+        OffsetPage_FinancialCategoryListItem_: {
+            /** Items */
+            items: components["schemas"]["FinancialCategoryListItem"][];
+            pagination: components["schemas"]["OffsetPagination"];
+        };
+        /** OffsetPage[ModifierGroupListItem] */
+        OffsetPage_ModifierGroupListItem_: {
+            /** Items */
+            items: components["schemas"]["ModifierGroupListItem"][];
+            pagination: components["schemas"]["OffsetPagination"];
+        };
+        /** OffsetPage[ProductListItem] */
+        OffsetPage_ProductListItem_: {
+            /** Items */
+            items: components["schemas"]["ProductListItem"][];
             pagination: components["schemas"]["OffsetPagination"];
         };
         /** OffsetPage[RoleListItem] */
@@ -5217,48 +5508,62 @@ export interface components {
             order: components["schemas"]["OrderRead"];
             payment: components["schemas"]["PaymentRead"];
         };
+        /**
+         * PreviewLinkResult
+         * @description Enlace de preview firmado y temporal (§ Etapa 6.9 del spec RC).
+         */
+        PreviewLinkResult: {
+            /** Token */
+            token: string;
+            /** Url */
+            url: string;
+            /** Expires At */
+            expires_at: string;
+            /** Revision Number */
+            revision_number: number;
+        };
         /** ProductCreate */
         ProductCreate: {
             /**
-             * Category Id
+             * Categoría (ID)
              * Format: uuid
              */
             category_id: string;
-            /** Sku */
+            /** SKU */
             sku?: string | null;
-            /** Name */
+            /** Nombre */
             name: string;
-            /** Description */
+            /** Descripción */
             description?: string | null;
-            /** Money Price Amount */
+            /** Precio */
             money_price_amount?: number | string | null;
             /**
-             * Is Money Purchase Available
+             * Venta por dinero
              * @default true
              */
             is_money_purchase_available: boolean;
             /**
-             * Credits Awarded Per Unit
+             * Créditos por unidad
              * @default 0
              */
             credits_awarded_per_unit: number;
-            /** Credit Redemption Price */
+            /** Precio en créditos */
             credit_redemption_price?: number | null;
             /**
-             * Is Available
+             * Disponible
              * @default true
              */
             is_available: boolean;
             /**
-             * Is Featured
+             * Destacado
              * @default false
              */
             is_featured: boolean;
-            /** Preparation Minutes */
+            /** Minutos de preparación */
             preparation_minutes?: number | null;
-            /** Max Units Per Order */
+            /** Máximo por pedido */
             max_units_per_order?: number | null;
-            /** Daily Unit Limit */
+            /** Límite diario */
             daily_unit_limit?: number | null;
         };
         /** ProductImageAttach */
@@ -5318,6 +5623,46 @@ export interface components {
         ProductInclusionsReplace: {
             /** Inclusions */
             inclusions: components["schemas"]["ProductInclusionItem"][];
+        };
+        /**
+         * ProductListItem
+         * @description Fila del listado administrativo genérico de productos.
+         *
+         *     Sin imágenes, inclusiones ni modificadores: esas colecciones se administran
+         *     en la pantalla especializada del catálogo, no en la tabla genérica.
+         */
+        ProductListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Categoría
+             * Format: uuid
+             */
+            category_id: string;
+            /** Nombre */
+            name: string;
+            /** SKU */
+            sku?: string | null;
+            /** Precio */
+            money_price_amount?: string | null;
+            /** Precio en créditos */
+            credit_redemption_price?: number | null;
+            /** Disponible */
+            is_available: boolean;
+            /** Destacado */
+            is_featured: boolean;
+            /** Orden */
+            sort_order: number;
+            /** Activo */
+            is_active: boolean;
+            /**
+             * Creado
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ProductModifierGroupItem */
         ProductModifierGroupItem: {
@@ -5402,33 +5747,33 @@ export interface components {
         };
         /** ProductUpdate */
         ProductUpdate: {
-            /** Category Id */
+            /** Categoría (ID) */
             category_id?: string | null;
-            /** Sku */
+            /** SKU */
             sku?: string | null;
-            /** Name */
+            /** Nombre */
             name?: string | null;
-            /** Description */
+            /** Descripción */
             description?: string | null;
-            /** Money Price Amount */
+            /** Precio */
             money_price_amount?: number | string | null;
-            /** Is Money Purchase Available */
+            /** Venta por dinero */
             is_money_purchase_available?: boolean | null;
-            /** Credits Awarded Per Unit */
+            /** Créditos por unidad */
             credits_awarded_per_unit?: number | null;
-            /** Credit Redemption Price */
+            /** Precio en créditos */
             credit_redemption_price?: number | null;
-            /** Is Available */
+            /** Disponible */
             is_available?: boolean | null;
-            /** Is Featured */
+            /** Destacado */
             is_featured?: boolean | null;
-            /** Preparation Minutes */
+            /** Minutos de preparación */
             preparation_minutes?: number | null;
-            /** Max Units Per Order */
+            /** Máximo por pedido */
             max_units_per_order?: number | null;
-            /** Daily Unit Limit */
+            /** Límite diario */
             daily_unit_limit?: number | null;
-            /** Is Active */
+            /** Activo */
             is_active?: boolean | null;
         };
         /** PublicBusinessPhone */
@@ -5589,6 +5934,19 @@ export interface components {
             /** Modifier Groups */
             modifier_groups: components["schemas"]["PublicModifierGroup"][];
         };
+        /** PublicSectionMediaSlot */
+        PublicSectionMediaSlot: {
+            /** Desktop File Id */
+            desktop_file_id?: string | null;
+            /** Mobile File Id */
+            mobile_file_id?: string | null;
+            /** Alt Text */
+            alt_text?: string | null;
+            /** Focal Point X */
+            focal_point_x?: number | null;
+            /** Focal Point Y */
+            focal_point_y?: number | null;
+        };
         /** PublicShippingQuoteRequest */
         PublicShippingQuoteRequest: {
             /** Subtotal */
@@ -5610,6 +5968,72 @@ export interface components {
             is_free_shipping: boolean;
             /** Estimated Minutes */
             estimated_minutes?: number | null;
+        };
+        /** PublicStorefrontLayout */
+        PublicStorefrontLayout: {
+            /** Header */
+            header?: {
+                [key: string]: unknown;
+            };
+            /** Footer */
+            footer?: {
+                [key: string]: unknown;
+            };
+        };
+        /** PublicStorefrontMeta */
+        PublicStorefrontMeta: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Og Image File Id */
+            og_image_file_id?: string | null;
+            /** Favicon File Id */
+            favicon_file_id?: string | null;
+        };
+        /** PublicStorefrontPage */
+        PublicStorefrontPage: {
+            /** Page Key */
+            page_key: string;
+            /** Slug */
+            slug: string;
+            meta: components["schemas"]["PublicStorefrontMeta"];
+            layout?: components["schemas"]["PublicStorefrontLayout"] | null;
+            /** Sections */
+            sections?: components["schemas"]["PublicStorefrontSection"][];
+            /** Theme Tokens */
+            theme_tokens?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** PublicStorefrontSection */
+        PublicStorefrontSection: {
+            /** Template Key */
+            template_key: string;
+            /** Template Version */
+            template_version: number;
+            /** Sort Order */
+            sort_order: number;
+            /** Content */
+            content?: {
+                [key: string]: unknown;
+            };
+            /** Style */
+            style?: {
+                [key: string]: unknown;
+            };
+            /** Behavior */
+            behavior?: {
+                [key: string]: unknown;
+            };
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+            /** Media */
+            media?: {
+                [key: string]: components["schemas"]["PublicSectionMediaSlot"];
+            };
         };
         /** ReadinessRead */
         ReadinessRead: {
@@ -5785,6 +6209,25 @@ export interface components {
              * @default []
              */
             related_lists: components["schemas"]["ResourceRelatedListCapability"][];
+        };
+        /**
+         * ResourceCatalogResponse
+         * @description Respuesta de ``GET /api/v1/resources``: catálogo completo de navegación.
+         *
+         *     - ``resources``: capabilities de los recursos tabulares/catálogo visibles para
+         *       el usuario (mismo contenido que antes del envelope).
+         *     - ``navigation_modules``: módulos ESPECIALIZADOS (pantallas propias como el
+         *       editor del sitio o el POS) proyectados por permisos — solo aparecen los
+         *       módulos donde el usuario tiene ALGUNO de sus ``required_permissions``.
+         */
+        ResourceCatalogResponse: {
+            /** Resources */
+            resources: components["schemas"]["ResourceCapability"][];
+            /**
+             * Navigation Modules
+             * @default []
+             */
+            navigation_modules: components["schemas"]["NavigationModule"][];
         };
         /**
          * ResourceDetailCapability
@@ -6088,6 +6531,32 @@ export interface components {
             description?: string | null;
             /** Activo */
             is_active?: boolean | null;
+        };
+        /** SalesByHourItem */
+        SalesByHourItem: {
+            /** Hour */
+            hour: number;
+            /** Orders Count */
+            orders_count: number;
+            /** Money Total */
+            money_total: string;
+        };
+        /** SalesByHourReport */
+        SalesByHourReport: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Timezone */
+            timezone: string;
+            /** Items */
+            items: components["schemas"]["SalesByHourItem"][];
         };
         /** ScheduleRequest */
         ScheduleRequest: {
@@ -6852,6 +7321,32 @@ export interface components {
             credits_earned: number;
             /** Credits Redeemed */
             credits_redeemed: number;
+        };
+        /** TopProductItem */
+        TopProductItem: {
+            /** Product Name */
+            product_name: string;
+            /** Units */
+            units: number;
+            /** Money Total */
+            money_total: string;
+            /** Credits Redeemed */
+            credits_redeemed: number;
+        };
+        /** TopProductsReport */
+        TopProductsReport: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Items */
+            items: components["schemas"]["TopProductItem"][];
         };
         /** TrackingToggleRequest */
         TrackingToggleRequest: {
@@ -8804,7 +9299,25 @@ export interface operations {
     };
     list_categories_api_v1_catalog_categories_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Campos de orden separados por coma. Use '-' para orden descendente. */
+                sort?: string;
+                is_active?: boolean | null;
+                name?: string | null;
+                id_in?: string[] | null;
+                name_ne?: string | null;
+                name_contains?: string | null;
+                name_startswith?: string | null;
+                name_endswith?: string | null;
+                created_at_on?: string | null;
+                created_at_before?: string | null;
+                created_at_after?: string | null;
+                created_at_from?: string | null;
+                created_at_to?: string | null;
+                q?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: {
@@ -8819,7 +9332,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CategoryRead"][];
+                    "application/json": components["schemas"]["OffsetPage_CategoryListItem_"];
                 };
             };
             /** @description Validation Error */
@@ -8850,6 +9363,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_category_api_v1_catalog_categories__category_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8943,8 +9489,26 @@ export interface operations {
     list_products_api_v1_catalog_products_get: {
         parameters: {
             query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Campos de orden separados por coma. Use '-' para orden descendente. */
+                sort?: string;
+                is_active?: boolean | null;
+                is_available?: boolean | null;
+                is_featured?: boolean | null;
                 category_id?: string | null;
-                include_inactive?: boolean;
+                name?: string | null;
+                id_in?: string[] | null;
+                name_ne?: string | null;
+                name_contains?: string | null;
+                name_startswith?: string | null;
+                name_endswith?: string | null;
+                created_at_on?: string | null;
+                created_at_before?: string | null;
+                created_at_after?: string | null;
+                created_at_from?: string | null;
+                created_at_to?: string | null;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -8960,7 +9524,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProductRead"][];
+                    "application/json": components["schemas"]["OffsetPage_ProductListItem_"];
                 };
             };
             /** @description Validation Error */
@@ -8991,6 +9555,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_product_api_v1_catalog_products__product_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -9228,7 +9825,26 @@ export interface operations {
     };
     list_modifier_groups_api_v1_catalog_modifier_groups_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Campos de orden separados por coma. Use '-' para orden descendente. */
+                sort?: string;
+                is_active?: boolean | null;
+                is_required?: boolean | null;
+                name?: string | null;
+                id_in?: string[] | null;
+                name_ne?: string | null;
+                name_contains?: string | null;
+                name_startswith?: string | null;
+                name_endswith?: string | null;
+                created_at_on?: string | null;
+                created_at_before?: string | null;
+                created_at_after?: string | null;
+                created_at_from?: string | null;
+                created_at_to?: string | null;
+                q?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: {
@@ -9243,7 +9859,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ModifierGroupRead"][];
+                    "application/json": components["schemas"]["OffsetPage_ModifierGroupListItem_"];
                 };
             };
             /** @description Validation Error */
@@ -9274,6 +9890,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModifierGroupRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_modifier_group_api_v1_catalog_modifier_groups__group_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10357,7 +11006,21 @@ export interface operations {
     };
     list_categories_api_v1_finances_categories_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Campos de orden separados por coma. Use '-' para orden descendente. */
+                sort?: string;
+                direction?: string | null;
+                is_active?: boolean | null;
+                name?: string | null;
+                id_in?: string[] | null;
+                name_ne?: string | null;
+                name_contains?: string | null;
+                name_startswith?: string | null;
+                name_endswith?: string | null;
+                q?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: {
@@ -10372,7 +11035,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FinancialCategoryRead"][];
+                    "application/json": components["schemas"]["OffsetPage_FinancialCategoryListItem_"];
                 };
             };
             /** @description Validation Error */
@@ -10403,6 +11066,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancialCategoryRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_finance_category_api_v1_finances_categories__category_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -11705,6 +12401,75 @@ export interface operations {
             };
         };
     };
+    sales_by_hour_api_v1_reports_sales_by_hour_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesByHourReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    top_products_api_v1_reports_top_products_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopProductsReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_resources_api_v1_resources_get: {
         parameters: {
             query?: never;
@@ -11722,7 +12487,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ResourceCapability"][];
+                    "application/json": components["schemas"]["ResourceCatalogResponse"];
                 };
             };
             /** @description Validation Error */
@@ -12028,7 +12793,21 @@ export interface operations {
     };
     list_zones_api_v1_shipping_zones_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+                /** @description Campos de orden separados por coma. Use '-' para orden descendente. */
+                sort?: string;
+                is_active?: boolean | null;
+                code?: string | null;
+                name?: string | null;
+                id_in?: string[] | null;
+                name_ne?: string | null;
+                name_contains?: string | null;
+                name_startswith?: string | null;
+                name_endswith?: string | null;
+                q?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: {
@@ -12043,7 +12822,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeliveryZoneRead"][];
+                    "application/json": components["schemas"]["OffsetPage_DeliveryZoneListItem_"];
                 };
             };
             /** @description Validation Error */
@@ -12074,6 +12853,39 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryZoneRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_zone_api_v1_shipping_zones__zone_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12903,6 +13715,72 @@ export interface operations {
             };
         };
     };
+    create_preview_link_api_v1_storefront_pages__page_key__preview_link_post: {
+        parameters: {
+            query?: {
+                minutes?: number;
+            };
+            header?: never;
+            path: {
+                page_key: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewLinkResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_preview_by_token_api_v1_public_storefront_preview__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicStorefrontPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     preview_draft_api_v1_storefront_pages__page_key__preview_get: {
         parameters: {
             query?: never;
@@ -12955,9 +13833,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PublicStorefrontPage"];
                 };
             };
             /** @description Validation Error */

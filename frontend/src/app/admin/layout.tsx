@@ -14,11 +14,11 @@ export default async function PlatformLayout({
     const status = await getBootstrapStatus();
     redirect(status.setup_required ? "/setup" : "/login");
   }
-  const resources = await getResourceCatalog();
+  const catalog = await getResourceCatalog();
 
   return (
     <SessionProvider initialSession={session}>
-      <PlatformShell session={session} resources={resources}>
+      <PlatformShell session={session} catalog={catalog}>
         {children}
       </PlatformShell>
     </SessionProvider>

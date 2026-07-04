@@ -9,6 +9,7 @@ import "@/app/(storefront)/storefront.css";
 
 import { useCallback, useEffect, useState } from "react";
 
+import { CapabilityGate } from "@/components/storefront/CapabilityGate";
 import { SectionRenderer } from "@/components/storefront/SectionRenderer";
 import { StorefrontThemeProvider } from "@/components/storefront/StorefrontThemeProvider";
 import { ApiRequestError } from "@/core/api/api-error";
@@ -17,6 +18,7 @@ import { FALLBACK_TOKENS, type StorefrontSectionVM } from "@/core/restaurant-api
 import {
   addSection,
   applyTheme,
+  createPreviewLink,
   getDraft,
   getLayout,
   getPages,
@@ -33,6 +35,7 @@ import {
   type LayoutConfig,
   type MediaSlots,
   type PageSummary,
+  type PreviewLinkResult,
   type TemplateInfo,
   type ThemePreset,
 } from "./editor-api";
@@ -44,10 +47,11 @@ const btn: React.CSSProperties = {
   border: "1px solid rgba(0,0,0,0.3)", background: "transparent", cursor: "pointer",
 };
 
-// Solo queda fuera lo que el backend aún no ofrece:
-const STILL_PENDING = [
-  "Enlace de preview firmado para compartir: el preview requiere permiso administrativo.",
-];
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("es-MX");
+}
 
 type PreviewSection = DraftSection & { media?: MediaSlots };
 
@@ -71,6 +75,7 @@ export function StorefrontAdminView({
   const canEdit = perms.has("storefront:edit");
   const canPublish = perms.has("storefront:publish");
   const canPreview = perms.has("storefront:preview") || perms.has("storefront:read_draft");
+  const canPreviewLink = perms.has("storefront:preview");
 
   const [pages, setPages] = useState<PageSummary[]>([]);
   const [templates, setTemplates] = useState<TemplateInfo[]>([]);
@@ -89,6 +94,8 @@ export function StorefrontAdminView({
   const [busy, setBusy] = useState(false);
   const [tick, setTick] = useState(0);
   const [scheduleAt, setScheduleAt] = useState("");
+  const [previewLink, setPreviewLink] = useState<PreviewLinkResult | null>(null);
+  const [previewMinutes, setPreviewMinutes] = useState("");
   const refresh = useCallback(() => setTick((value) => value + 1), []);
 
   useEffect(() => {
@@ -126,14 +133,17 @@ export function StorefrontAdminView({
     let active = true;
     (async () => {
       try {
-        const [draftData, previewData] = await Promise.all([
+        const [draftData, previewData, pagesData] = await Promise.all([
           getDraft(pageKey),
           browserApi<{ sections: PreviewSection[] }>(
             `/api/v1/storefront/pages/${encodeURIComponent(pageKey)}/preview`,
           ),
+          // Refresca el estado real de programación tras cada acción.
+          getPages(),
         ]);
         if (!active) return;
         setDraft(draftData);
+        setPages(pagesData);
         const media: Record<string, MediaSlots> = {};
         for (const section of previewData.sections) {
           if (section.id && section.media) media[section.id] = section.media;
@@ -179,6 +189,7 @@ export function StorefrontAdminView({
   }
 
   const sections = draft ? [...draft.sections].sort((a, b) => a.sort_order - b.sort_order) : [];
+  const currentPage = pages.find((page) => page.page_key === pageKey) ?? null;
   const selected = sections.find((section) => section.id === selectedId) ?? null;
   const selectedTemplate = selected
     ? templates.find((template) => template.key === selected.template_key) ?? null
@@ -193,6 +204,7 @@ export function StorefrontAdminView({
           value={pageKey}
           onChange={(event) => {
             setSelectedId(null);
+            setPreviewLink(null);
             setPageKey(event.target.value);
           }}
           style={{ padding: "8px 12px", borderRadius: 8 }}
@@ -249,13 +261,87 @@ export function StorefrontAdminView({
               type="button"
               style={btn}
               disabled={busy}
-              onClick={() => void run(() => publishPage(pageKey), "Revisión publicada: el sitio ya la muestra.")}
+              onClick={() => {
+                // Publicar invalida cualquier enlace de preview vigente.
+                setPreviewLink(null);
+                void run(() => publishPage(pageKey), "Revisión publicada: el sitio ya la muestra.");
+              }}
             >
               Publicar ahora
             </button>
           </span>
         ) : null}
       </div>
+
+      {/* Estado REAL de programación reportado por el backend. */}
+      {currentPage?.scheduled_publish_at ? (
+        <p role="status" style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>
+          Programada para {formatDateTime(currentPage.scheduled_publish_at)} (la ejecuta el servidor).
+        </p>
+      ) : null}
+      {currentPage?.schedule_cancelled_reason ? (
+        <p
+          role="status"
+          style={{
+            margin: 0, fontSize: 13, fontWeight: 800, color: "#8a4b00",
+            background: "rgba(246, 185, 59, 0.18)", border: "1px solid rgba(138, 75, 0, 0.4)",
+            borderRadius: 8, padding: "6px 10px",
+          }}
+        >
+          Programación cancelada: {currentPage.schedule_cancelled_reason}
+        </p>
+      ) : null}
+
+      {canPreviewLink ? (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            style={btn}
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const minutes = Number.parseInt(previewMinutes, 10);
+                setPreviewLink(
+                  await createPreviewLink(pageKey, Number.isFinite(minutes) && minutes > 0 ? minutes : undefined),
+                );
+              })
+            }
+          >
+            Enlace de preview
+          </button>
+          <label style={{ fontSize: 12, fontWeight: 700, display: "flex", gap: 6, alignItems: "center" }}>
+            Minutos
+            <input
+              type="number"
+              min={1}
+              placeholder="auto"
+              value={previewMinutes}
+              onChange={(event) => setPreviewMinutes(event.target.value)}
+              style={{ width: 72, padding: "6px 8px", borderRadius: 8 }}
+            />
+          </label>
+          {previewLink ? (
+            <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", fontSize: 12 }}>
+              <code style={{ padding: "4px 8px", background: "rgba(0,0,0,0.06)", borderRadius: 6, wordBreak: "break-all" }}>
+                {`${window.location.origin}${previewLink.url}`}
+              </code>
+              <button
+                type="button"
+                style={{ ...btn, padding: "4px 10px", fontSize: 11 }}
+                onClick={() =>
+                  void navigator.clipboard.writeText(`${window.location.origin}${previewLink.url}`)
+                }
+              >
+                Copiar
+              </button>
+              <span style={{ opacity: 0.7 }}>
+                Expira {formatDateTime(previewLink.expires_at)} · rev #{previewLink.revision_number} · solo
+                lectura; se invalida al publicar.
+              </span>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       {message ? <p role="status" style={{ margin: 0, fontWeight: 700 }}>{message}</p> : null}
       {error ? <p role="alert" style={{ margin: 0, color: "#b3261e", fontWeight: 700 }}>{error}</p> : null}
@@ -408,15 +494,6 @@ export function StorefrontAdminView({
         )
       ) : null}
 
-      <details>
-        <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: 14 }}>
-          Pendientes de backend ({STILL_PENDING.length})
-        </summary>
-        <ul style={{ fontSize: 13, lineHeight: 1.7 }}>
-          {STILL_PENDING.map((item) => <li key={item}>{item}</li>)}
-        </ul>
-      </details>
-
       {canPreview && draft ? (
         <div style={{ border: "1px solid rgba(0,0,0,0.2)", borderRadius: 12, overflow: "hidden" }}>
           <div style={{ padding: "8px 14px", fontSize: 13, background: "rgba(0,0,0,0.06)" }}>
@@ -438,46 +515,9 @@ export function StorefrontAdminView({
   );
 }
 
-// Layout: el backend YA expone los JSON Schema de HeaderConfig/FooterConfig en
-// GET /storefront/layout; el espejo local queda solo como fallback defensivo.
-const HEADER_SCHEMA = {
-  type: "object",
-  properties: {
-    nav_links: {
-      type: "array",
-      maxItems: 6,
-      title: "Enlaces de navegación",
-      items: { $ref: "#/$defs/Cta" },
-    },
-    show_status_indicator: { type: "boolean", title: "Mostrar abierto/cerrado", default: true },
-    show_cart: { type: "boolean", title: "Mostrar carrito", default: true },
-  },
-  $defs: {
-    Cta: {
-      type: "object",
-      properties: {
-        label: { type: "string", maxLength: 60, title: "Texto" },
-        link_type: {
-          type: "string",
-          title: "Tipo de enlace",
-          enum: ["menu_page", "credits_page", "internal_route", "anchor", "whatsapp", "phone", "external_https"],
-        },
-        target: { anyOf: [{ type: "string", maxLength: 300 }, { type: "null" }], title: "Destino" },
-      },
-    },
-  },
-} as const;
-
-const FOOTER_SCHEMA = {
-  type: "object",
-  properties: {
-    show_phones: { type: "boolean", title: "Mostrar teléfonos", default: true },
-    note: { anyOf: [{ type: "string", maxLength: 200 }, { type: "null" }], title: "Nota" },
-    social_links: { type: "array", maxItems: 6, title: "Redes", items: { $ref: "#/$defs/Cta" } },
-  },
-  $defs: HEADER_SCHEMA.$defs,
-} as const;
-
+// Layout: el backend SIEMPRE expone los JSON Schema de HeaderConfig/FooterConfig
+// en GET /storefront/layout. Sin espejos locales: si faltara el contrato se
+// informa (CapabilityGate), jamás se renderiza un esquema inventado en cliente.
 function LayoutPanel({
   layout, busy, onSave,
 }: Readonly<{
@@ -488,15 +528,29 @@ function LayoutPanel({
 }>) {
   const [header, setHeader] = useState(layout.header_config);
   const [footer, setFooter] = useState(layout.footer_config);
+  if (!layout.header_schema || !layout.footer_schema) {
+    return (
+      <CapabilityGate
+        title="Layout del sitio"
+        state={{
+          kind: "missing_endpoint",
+          detail:
+            "Contrato no disponible: GET /storefront/layout no devolvió header_schema/footer_schema.",
+        }}
+      >
+        {null}
+      </CapabilityGate>
+    );
+  }
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
       <fieldset style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: 12 }}>
         <legend style={{ fontWeight: 800, fontSize: 13 }}>Header · navegación</legend>
-        <SchemaForm schema={(layout.header_schema ?? HEADER_SCHEMA) as never} value={header} onChange={setHeader} />
+        <SchemaForm schema={layout.header_schema} value={header} onChange={setHeader} />
       </fieldset>
       <fieldset style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: 12 }}>
         <legend style={{ fontWeight: 800, fontSize: 13 }}>Footer</legend>
-        <SchemaForm schema={(layout.footer_schema ?? FOOTER_SCHEMA) as never} value={footer} onChange={setFooter} />
+        <SchemaForm schema={layout.footer_schema} value={footer} onChange={setFooter} />
       </fieldset>
       <div>
         <button type="button" style={btn} disabled={busy} onClick={() => onSave(header, footer)}>

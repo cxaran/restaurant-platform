@@ -5,9 +5,9 @@ import type { StorefrontSectionVM } from "@/core/restaurant-api/view-models";
 import { HeroCarousel, type HeroSlideVM } from "./HeroCarousel";
 import { AddToCartButton } from "./MenuView";
 
-// Registry: SOLO plantillas que el backend expone hoy. Las keys planeadas pero
-// aún sin contrato (catalog.categories, banner.credits, banner.delivery) NO se
-// registran: caen en UnknownTemplateFallback (plan §4).
+// Registry: SOLO plantillas que el backend expone hoy. Una key sin renderer
+// registrado cae en UnknownTemplateFallback: invisible en público, señalada
+// en preview (plan §4).
 
 type SectionProps = Readonly<{ section: StorefrontSectionVM; preview?: boolean }>;
 
@@ -405,6 +405,176 @@ function DeliveryBannerSection({ section }: SectionProps) {
   );
 }
 
+function ImageTextSection({ section }: SectionProps) {
+  // storefront.content.image_text: bloque editorial imagen + texto. La imagen
+  // sale del slot de media `main` (patrón del hero); sin imagen el layout es
+  // solo-texto centrado en una columna elegante.
+  const content = section.content as { title?: string; body?: string; cta?: unknown };
+  if (!content.title && !content.body) return null;
+  const style = section.style as { color_scheme?: string; image_position?: string };
+  const scheme = sectionScheme(style.color_scheme);
+  const mainMedia = section.media.main ?? null;
+  const mediaUrl = publicFileUrl(mainMedia?.desktop_file_id ?? mainMedia?.mobile_file_id);
+  const imageLeft = style.image_position === "left";
+  const text = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 240, flex: 1 }}>
+      {content.title ? (
+        <h2 className="sf-display" style={{ fontSize: 28, margin: 0 }}>{content.title}</h2>
+      ) : null}
+      {content.body ? (
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.65, opacity: 0.9, whiteSpace: "pre-line" }}>
+          {content.body}
+        </p>
+      ) : null}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <CtaLink cta={content.cta} variant="solid" />
+      </div>
+    </div>
+  );
+  return (
+    <section style={{ background: scheme.background, color: scheme.color }}>
+      <div
+        className="sf-container"
+        style={
+          mediaUrl
+            ? {
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
+                gap: 32,
+                alignItems: "center",
+                paddingBlock: 40,
+              }
+            : { maxWidth: 720, paddingBlock: 40 }
+        }
+      >
+        {mediaUrl && imageLeft ? (
+          <div className="sf-imgbox" style={{ minHeight: 220 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- media publicada del backend */}
+            <img
+              src={mediaUrl}
+              alt={mainMedia?.alt_text ?? ""}
+              style={{ maxWidth: "100%", maxHeight: 340, objectFit: "cover", width: "100%" }}
+            />
+          </div>
+        ) : null}
+        {text}
+        {mediaUrl && !imageLeft ? (
+          <div className="sf-imgbox" style={{ minHeight: 220 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- media publicada del backend */}
+            <img
+              src={mediaUrl}
+              alt={mainMedia?.alt_text ?? ""}
+              style={{ maxWidth: "100%", maxHeight: 340, objectFit: "cover", width: "100%" }}
+            />
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+type InfoCardVM = { title?: string; description?: string | null; cta?: unknown };
+
+function InfoCardsSection({ section, preview }: SectionProps) {
+  // storefront.content.info_cards: grilla responsive de tarjetas informativas.
+  const content = section.content as { title?: string; cards?: unknown };
+  const cards = Array.isArray(content.cards)
+    ? (content.cards as InfoCardVM[]).filter((card) => typeof card?.title === "string" && card.title)
+    : [];
+  if (cards.length === 0 && !preview) return null;
+  const scheme = sectionScheme((section.style as { color_scheme?: string }).color_scheme);
+  return (
+    <section style={{ background: scheme.background, color: scheme.color }}>
+      <div className="sf-container" style={{ paddingBlock: 30 }}>
+        {content.title ? (
+          <h2 className="sf-display" style={{ fontSize: 26, margin: "0 0 16px" }}>
+            {content.title}
+          </h2>
+        ) : null}
+        {cards.length === 0 ? (
+          <div className="sf-error" role="note" style={{ fontSize: 13 }}>
+            Esta sección no tiene tarjetas: agrégalas en el contenido.
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gap: 16,
+              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+            }}
+          >
+            {cards.map((card, index) => (
+              <article
+                key={`${card.title}-${index}`}
+                className="sf-card"
+                style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 8 }}
+              >
+                <h3 className="sf-display" style={{ fontSize: 18, margin: 0 }}>{card.title}</h3>
+                {card.description ? (
+                  <p className="sf-muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.55, flex: 1 }}>
+                    {card.description}
+                  </p>
+                ) : null}
+                <div>
+                  <CtaLink cta={card.cta} variant="outline" />
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+type FaqItemVM = { question?: string; answer?: string };
+
+function FaqSection({ section, preview }: SectionProps) {
+  // storefront.content.faq: <details>/<summary> nativos y accesibles — sin JS
+  // extra y sin animaciones (respeta prefers-reduced-motion por construcción).
+  const content = section.content as { title?: string; items?: unknown };
+  const items = Array.isArray(content.items)
+    ? (content.items as FaqItemVM[]).filter(
+        (item) => typeof item?.question === "string" && item.question &&
+          typeof item?.answer === "string" && item.answer,
+      )
+    : [];
+  if (items.length === 0 && !preview) return null;
+  return (
+    <section className="sf-container" style={{ paddingBlock: 26, maxWidth: 780 }}>
+      <h2 className="sf-display" style={{ fontSize: 26, margin: "0 0 14px" }}>
+        {content.title ?? "Preguntas frecuentes"}
+      </h2>
+      {items.length === 0 ? (
+        <div className="sf-error" role="note" style={{ fontSize: 13 }}>
+          Esta sección no tiene preguntas: agrégalas en el contenido.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {items.map((item, index) => (
+            <details key={`${item.question}-${index}`} className="sf-card" style={{ padding: 0 }}>
+              <summary
+                style={{
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  padding: "14px 18px",
+                  listStylePosition: "inside",
+                }}
+              >
+                {item.question}
+              </summary>
+              <p className="sf-muted" style={{ margin: 0, padding: "0 18px 16px", fontSize: 14, lineHeight: 1.6 }}>
+                {item.answer}
+              </p>
+            </details>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function UnknownTemplateFallback({ section, preview }: SectionProps) {
   // En el sitio público una plantilla desconocida no rompe nada: se omite.
   // En preview se señala para que el editor sepa qué falta.
@@ -429,6 +599,9 @@ const REGISTRY: Record<string, (props: SectionProps) => React.ReactNode> = {
   "storefront.catalog.categories": CategoriesSection,
   "storefront.banner.credits": CreditsBannerSection,
   "storefront.banner.delivery": DeliveryBannerSection,
+  "storefront.content.image_text": ImageTextSection,
+  "storefront.content.info_cards": InfoCardsSection,
+  "storefront.content.faq": FaqSection,
 };
 
 export const SUPPORTED_TEMPLATE_KEYS = Object.keys(REGISTRY);

@@ -13,7 +13,9 @@ async function currentCookie(): Promise<string> {
 }
 
 /**
- * Catálogo de recursos visibles para el usuario actual, resuelto en servidor.
+ * Catálogo de navegación visible para el usuario actual, resuelto en servidor.
+ * Envelope ResourceCatalogResponse: `resources` (capabilities tabulares) +
+ * `navigation_modules` (pantallas especializadas con href del backend).
  *
  * Deduplicado con ``cache()`` solo dentro del mismo render/request (layout y
  * dashboard comparten una única petición). No hay cache entre usuarios ni entre

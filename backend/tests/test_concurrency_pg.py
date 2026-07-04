@@ -102,17 +102,44 @@ class ConcurrencyPgTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        # El esquema se crea con las MIGRACIONES reales (alembic upgrade head)
+        # sobre la base limpia: mismo camino que producción — create_all no
+        # reproduce índices parciales/secuencias y GeoAlchemy2 no lo soporta
+        # con los TypeDecorator del proyecto.
+        import subprocess
+        import sys
+
+        parsed = urlparse(_URL)
+        env = dict(os.environ)
+        env.update(
+            {
+                "POSTGRES_USER": parsed.username or "platform",
+                "POSTGRES_PASSWORD": parsed.password or "platform",
+                "POSTGRES_SERVER": parsed.hostname or "127.0.0.1",
+                "POSTGRES_PORT": str(parsed.port or 5432),
+                "POSTGRES_DB": parsed.path.lstrip("/"),
+            }
+        )
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", "-c", "backend/alembic.ini", "upgrade", "head"],
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"alembic upgrade head falló:\n{result.stderr[-2000:]}")
         cls.engine = create_engine(_URL)
-        with cls.engine.begin() as conn:
-            conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
-        Base.metadata.drop_all(cls.engine)
-        Base.metadata.create_all(cls.engine)
-        with cls.engine.begin() as conn:
-            conn.execute(text("CREATE SEQUENCE IF NOT EXISTS orders_order_number_seq"))
 
     @classmethod
     def tearDownClass(cls) -> None:
         if cls.engine is not None:
+            # La BD *_test puede compartirse con otros módulos PG de la suite:
+            # no dejamos filas residuales que rompan sus teardowns (FKs).
+            with cls.engine.begin() as conn:
+                tables = ", ".join(
+                    f'"{t.name}"' for t in reversed(Base.metadata.sorted_tables)
+                )
+                conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
             cls.engine.dispose()
 
     def setUp(self) -> None:
@@ -318,7 +345,64 @@ class ConcurrencyPgTest(unittest.TestCase):
         self.assertIsInstance(errors[0], (DeliveryRuleError, IntegrityError))
 
     # ------------------------------------------------------------------
-    # 4. Reembolso de la misma línea: el acumulado por línea aguanta la carrera.
+    # 4. Redención del mismo código: una vez por usuario, aún en carrera.
+    # ------------------------------------------------------------------
+    def test_concurrent_discount_redemptions_single_winner(self) -> None:
+        from backend.app.models.discounts import DiscountCode
+        from backend.app.services.discount_service import (
+            DiscountRuleError,
+            reserve_redemption,
+        )
+
+        with Session(self.engine) as session:
+            product = Product(
+                category_id=self.category_id,
+                name="Boneless",
+                money_price_amount=Decimal("500"),
+            )
+            code = DiscountCode(
+                name="Verano",
+                code="VERANO100",
+                code_normalized="verano100",
+                discount_amount=Decimal("100"),
+                minimum_order_amount=Decimal("400"),
+                created_by=self.staff_id,
+            )
+            session.add_all([product, code])
+            session.flush()
+            product_id, code_id = product.id, code.id
+            session.commit()
+
+        def worker(_: int):
+            with Session(self.engine) as session:
+                code_row = session.get(DiscountCode, code_id)
+                assert code_row is not None
+                priced = price_cart(
+                    session,
+                    [CartLineInput(product_id=product_id, quantity=1, purchase_mode="money")],
+                )
+                order = create_order(
+                    session,
+                    priced,
+                    OrderIdentity(
+                        source="online",
+                        fulfillment_type="pickup",
+                        customer_user_id=self.customer_id,
+                        customer_name="Cliente",
+                        customer_phone="8330000000",
+                    ),
+                )
+                redemption = reserve_redemption(session, code_row=code_row, order=order)
+                session.commit()
+                return redemption.id
+
+        oks, errors = self._split(self._run_pair(worker))
+        self.assertEqual(len(oks), 1, f"el código se reservó dos veces: {errors}")
+        self.assertEqual(len(errors), 1)
+        self.assertIsInstance(errors[0], (DiscountRuleError, IntegrityError))
+
+    # ------------------------------------------------------------------
+    # 5. Reembolso de la misma línea: el acumulado por línea aguanta la carrera.
     # ------------------------------------------------------------------
     def test_concurrent_refunds_same_line_capped(self) -> None:
         with Session(self.engine) as session:

@@ -9,6 +9,7 @@ bootstrap -> catalogo con modificadores -> storefront (media+layout+publish)
 -> cliente -> creditos -> checkout web (dinero+canje) -> transiciones -> ticket -> POS.
 """
 import base64
+import os
 import sys
 import time
 
@@ -16,7 +17,9 @@ RUN = str(int(time.time()))[-6:]
 
 import httpx
 
-BASE = "http://127.0.0.1:31800/api/v1"
+# Por defecto apunta al uvicorn suelto (31800); contra el stack Docker E2E:
+#   E2E_BASE=http://127.0.0.1:31080 E2E_ORIGIN=http://127.0.0.1:31080 python ...
+BASE = os.environ.get("E2E_BASE", "http://127.0.0.1:31800") + "/api/v1"
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 )
@@ -37,7 +40,7 @@ def expect(resp, code, name):
     step(name, extra=f"({resp.status_code})")
     return resp.json() if resp.content and "json" in resp.headers.get("content-type", "") else None
 
-HEADERS = {"Origin": "http://localhost:3000"}
+HEADERS = {"Origin": os.environ.get("E2E_ORIGIN", "http://localhost:3000")}
 admin = httpx.Client(base_url=BASE, timeout=30, headers=HEADERS)
 cust = httpx.Client(base_url=BASE, timeout=30, headers=HEADERS)
 

@@ -16,13 +16,20 @@ class PointGeometry(TypeDecorator):
 
     impl = LargeBinary
     cache_ok = True
+    # Atributos que los hooks DDL de GeoAlchemy2 sondean sobre el tipo: la
+    # columna se declara inline (sin AddGeometryColumn) y sin índice implícito
+    # (las migraciones deciden los índices espaciales explícitamente).
+    spatial_index = False
+    use_typmod = None
 
     def load_dialect_impl(self, dialect):  # type: ignore[override]
-        if dialect.name == "postgresql":
+        # GeoAlchemy2 introspecciona con dialect=None en sus hooks de DDL
+        # (create_all/drop_all): sin dialecto se responde el impl neutro.
+        if dialect is not None and dialect.name == "postgresql":
             return dialect.type_descriptor(
                 Geometry(geometry_type="POINT", srid=4326, spatial_index=False)
             )
-        return dialect.type_descriptor(LargeBinary())
+        return LargeBinary() if dialect is None else dialect.type_descriptor(LargeBinary())
 
 
 class MultiPolygonGeometry(TypeDecorator):
@@ -30,10 +37,12 @@ class MultiPolygonGeometry(TypeDecorator):
 
     impl = LargeBinary
     cache_ok = True
+    spatial_index = False
+    use_typmod = None
 
     def load_dialect_impl(self, dialect):  # type: ignore[override]
-        if dialect.name == "postgresql":
+        if dialect is not None and dialect.name == "postgresql":
             return dialect.type_descriptor(
                 Geometry(geometry_type="MULTIPOLYGON", srid=4326, spatial_index=False)
             )
-        return dialect.type_descriptor(LargeBinary())
+        return LargeBinary() if dialect is None else dialect.type_descriptor(LargeBinary())

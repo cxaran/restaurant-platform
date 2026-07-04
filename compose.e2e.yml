@@ -116,6 +116,38 @@ services:
       - frontend
       - backend
 
+  # Jobs en segundo plano (publicación programada del storefront, expiración de
+  # pedidos, purgas): mismos binarios que el backend, perfil opt-in "taskiq".
+  taskiq-worker:
+    build:
+      context: ./backend
+      target: prod
+    image: restaurant-platform-backend:e2e
+    profiles: [ "taskiq" ]
+    environment:
+      <<: *backend-environment
+    command: [ "taskiq", "worker", "backend.app.taskiq_app:broker", "--workers", "1", "--max-async-tasks", "1" ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  taskiq-scheduler:
+    build:
+      context: ./backend
+      target: prod
+    image: restaurant-platform-backend:e2e
+    profiles: [ "taskiq" ]
+    environment:
+      <<: *backend-environment
+    command: [ "taskiq", "scheduler", "backend.app.taskiq_app:scheduler", "--skip-first-run" ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   mailpit:
     image: axllent/mailpit:latest
     expose:

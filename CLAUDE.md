@@ -103,6 +103,54 @@ The `app/query/` engine turns a public read schema + ORM model + `QueryOptions` 
 ### Routing status
 All feature routers are mounted (`api/v1/router.py`): `auth`, `permissions` (catalog read), `roles` (CRUD + permissions), `users` (self-service `/me`) and `users_admin` (admin CRUD + roles + revoke-sessions). `users` + `users_admin` share the `/users` prefix (self-service `/me` included first). Routers build list endpoints with `ResourceQuery` and the **general route helpers** in `api/resource_actions.py` (CRUD/relation/serialize/error helpers — keep one-off logic out of routers). `test_auth_routes.py` asserts `/auth/refresh` and `/auth/logout` are absent from the OpenAPI schema — keep it green when adding/removing routes.
 
+### Restaurant domain (built on top of platform-core)
+
+Three separated frontend experiences (Next.js App Router):
+
+```text
+/        → public storefront + customer flows: /menu, /carrito, /checkout,
+           /pedidos, /pedidos/[id], /cuenta, /creditos  (group (storefront))
+/panel   → daily operation: pedidos, pos, entregas, reparto, tickets —
+           modules gated by real permissions, never role === "x"
+/admin   → contract-driven admin shell: /admin/resources/[name] (generic CRUD
+           from GET /api/v1/resources), /admin/storefront, /admin/backups, …
+```
+
+`/sitio` and legacy admin paths only exist as redirects in `frontend/next.config.ts`.
+
+Key backend modules (`app/models` + `app/services` + `api/v1`): catalog (products,
+modifier groups/options, `credit_redemption_price`), shipping (PostGIS zones + rates),
+orders (state machine in `ORDER_TRANSITIONS`, immutable snapshots, frozen totals on
+approval), payments (methods with `requires_manual_verification`/`allows_cash_change`,
+verification ≠ fulfillment), deliveries (courier self-assign, `GET /courier/deliveries/mine`),
+finances (per-line refunds with accumulated caps), credits (immutable ledger, balance =
+SUM(delta), reserve→consume/release), storefront (versioned revisions draft→published→archived,
+template registry with JSON Schemas, scheduled publish via Taskiq), profiles
+(customer/staff, `can_deliver`), discount codes (fixed-amount, web-only).
+
+Non-negotiable domain invariants (enforced backend + DB, never frontend-only):
+
+- An order is **100% money or 100% credits** — no mixed lines, no monetary top-up,
+  no shipping and no discount codes on credits orders.
+- **Payment confirmed ≠ order completed**: `completed` means real fulfillment.
+  Verifying a transfer never auto-completes (except explicit counter/counter sale rule).
+  Cash-on-delivery is collected atomically with completion.
+- Discount codes: fixed amount X with minimum Y, `source=online` + authenticated
+  customer only, one use per user, reserve→consume on completed / release on
+  cancel/expire, immutable snapshots on redemptions. **No promotions engine.**
+- Quantities are strict positive integers at every layer (schema strict=True, service,
+  DB CHECK) — never truncate.
+- Public SVG is blocked (H8): branding uses ico/png/webp/jpeg only.
+- Frontend types come ONLY from `src/generated/openapi.ts` (`npm run generate:api`,
+  drift guard `npm run check:api`). Admin navigation derives from `GET /api/v1/resources`.
+- `utc_now()` returns naive-UTC by core convention; the PG connection pins
+  `TimeZone=UTC` (H7 policy). Don't compare naive against aware without care.
+
+Relevant docs: `GOALS.md` (roadmap), `docs/release-candidate-spec.md` (spec, prevails),
+`AUDITORIA_BACKEND.md` (H1–H10), `docs/deployment-runbook.md`,
+`docs/contract-architecture-audit.md`, `docs/frontend-reuse-and-storefront-plan.md`.
+Design handoff (visual reference only, git-ignored): `.design-handoff/tony-tony/`.
+
 ### Background jobs & backups
 - **Taskiq over PostgreSQL** (`app/taskiq_app.py`; see `docs/background-tasks-taskiq.md`). Worker and scheduler are opt-in Docker services (`--profile taskiq`); FastAPI only starts the broker in its lifespan to PUBLISH tasks, never to run them. Channel/table: `restaurant_platform_taskiq*`.
 - **Encrypted backups to Google Drive** (`app/services/backup_service.py`; see `docs/backups-google-drive.md`): `backups.tick` runs every minute and consults due work in PostgreSQL (`backup_settings.next_run_at`) — the real schedule/retention is DB-edited, not a cron. Pipeline: `pg_dump --snapshot` → `pg_restore --list` verify → tar → OPTIONAL `age` encryption → resumable idempotent Drive upload → local GFS retention. An EXPLORER artifact (readable SQLite from the same snapshot, sensitive columns excluded) can accompany each backup. Frontend: `/backups` (Drive files + settings panel) and `/backups/explore` (sql.js WASM + local age decryption in the browser). The Docker image installs `postgresql-client` and `age`.

@@ -106,17 +106,19 @@ class ValidateFileTest(unittest.TestCase):
                     validate_file(content, kind=kind)
                 self.assertEqual(ctx.exception.code, "formato_no_permitido")
 
-    def test_favicon_accepts_ico_png_and_clean_svg(self) -> None:
-        for content in (ICO_BYTES, PNG_BYTES, SVG_BYTES):
+    def test_favicon_accepts_only_ico_and_png(self) -> None:
+        for content in (ICO_BYTES, PNG_BYTES):
             with self.subTest(head=content[:4]):
                 validate_file(content, kind="favicon")
 
-    def test_rejects_svg_with_active_content(self) -> None:
-        for content in (SVG_SCRIPT_BYTES, SVG_HANDLER_BYTES):
+    def test_favicon_rejects_svg_entirely(self) -> None:
+        """H8: el favicon se sirve público sin sesión y la sanitización por
+        regex es evadible — SVG queda fuera del perfil, limpio o no."""
+        for content in (SVG_BYTES, SVG_SCRIPT_BYTES, SVG_HANDLER_BYTES):
             with self.subTest(head=content[:24]):
                 with self.assertRaises(FileValidationError) as ctx:
                     validate_file(content, kind="favicon")
-                self.assertEqual(ctx.exception.code, "svg_con_contenido_activo")
+                self.assertEqual(ctx.exception.code, "formato_no_permitido")
 
     def test_document_accepts_pdf_and_xml(self) -> None:
         for content in (PDF_BYTES, XML_BYTES):

@@ -10,6 +10,7 @@ from backend.app.security.groups.orders import OrderPermissions
 from backend.app.security.groups.payments import PaymentPermissions, TicketPermissions
 from backend.app.security.groups.permissions import PermissionPermissions
 from backend.app.security.groups.roles import RolePermissions
+from backend.app.security.groups.profiles import ProfilePermissions
 from backend.app.security.groups.shipping import ShippingPermissions
 from backend.app.security.groups.storefront import StorefrontPermissions
 from backend.app.security.groups.system_settings import SystemSettingsPermissions
@@ -35,6 +36,7 @@ SECURITY_GROUPS: list[type[SecurityGroup]] = [
     FinancePermissions,
     CreditPermissions,
     StorefrontPermissions,
+    ProfilePermissions,
 ]
 
 

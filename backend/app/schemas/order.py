@@ -84,6 +84,8 @@ class CaptureRequest(ApiWriteSchema):
 
 class OrderTransitionRequest(ApiWriteSchema):
     new_status: str
+    # H5: cancelar con pago cobrado exige reconocimiento explícito (no reembolsa).
+    acknowledge_paid_payments: bool = False
     reason_code: Optional[str] = Field(default=None, max_length=80)
     internal_note: Optional[str] = None
     customer_visible_note: Optional[str] = None

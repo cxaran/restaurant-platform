@@ -61,7 +61,9 @@ FILE_PROFILES: dict[str, FileProfile] = {
     ),
     "favicon": FileProfile(
         kind="favicon",
-        allowed_formats=frozenset({"ico", "png", "svg"}),
+        # H8: sin SVG — la sanitización por regex es evadible y el favicon se
+        # sirve público sin sesión; ico/png cubren el caso real.
+        allowed_formats=frozenset({"ico", "png"}),
         max_bytes=512 * 1024,
     ),
     "document": FileProfile(

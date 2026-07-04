@@ -122,7 +122,9 @@ def _load_products_locked(
         Product.id.in_(product_ids)  # pyright: ignore[reportAttributeAccessIssue]
     )
     # FOR UPDATE sólo tiene efecto real en PostgreSQL; SQLite (tests) lo ignora.
-    statement = statement.with_for_update()
+    # H6: orden DETERMINISTA de locks (por id): dos carritos con los mismos
+    # productos en distinto orden ya no pueden abrazarse en un deadlock.
+    statement = statement.order_by(Product.id).with_for_update()  # pyright: ignore[reportArgumentType]
     rows = {product.id: product for product in session.exec(statement).all()}
     missing = set(product_ids) - set(rows)
     if missing:

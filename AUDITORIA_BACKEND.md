@@ -15,16 +15,16 @@ La base es sólida: invariantes críticas están en la base de datos (no solo en
 
 | # | Severidad | Hallazgo | Estado |
 | --- | --- | --- | --- |
-| H1 | Alta | Cantidades fraccionarias en líneas de canje producen producto gratis | **Corregido por revisión estática; pendiente de ejecución real** (ver §8) |
-| H2 | Alta | Reembolso de línea canjeada NO consumida puede devolver créditos dos veces | **Corregido por revisión estática; pendiente de ejecución real** (ver §8) |
-| H3 | Alta | Reembolsos repetidos sobre la misma línea no acumulan tope por cantidad | **Corregido por revisión estática; pendiente de ejecución real** (ver §8) |
-| H4 | Media | `payment_status` puede quedar «paid» prematuro en deliveries pagados antes de aprobar |
-| H5 | Media | Cancelar un pedido con pago cobrado no exige ni sugiere reembolso |
-| H6 | Media | Posible deadlock en PG por orden de locks no determinista en `price_cart` |
-| H7 | Media | Mezcla naive/aware en `utc_now()` vs columnas `timestamptz` (depende del TZ de la conexión) |
-| H8 | Media | Sanitización de SVG por regex es evadible → vector XSS almacenado vía `/public/files` |
-| H9 | Baja | `collection_instruction` etiqueta «efectivo» a cualquier pago pendiente |
-| H10 | Baja | Venta POS con transferencia queda `approved` para siempre si nadie la completa tras verificar |
+| H1 | Alta | Cantidades fraccionarias en líneas de canje producen producto gratis | **CORREGIDO Y VALIDADO** (migración aplicada + suite verde; §10) |
+| H2 | Alta | Reembolso de línea canjeada NO consumida puede devolver créditos dos veces | **CORREGIDO Y VALIDADO** (§10) |
+| H3 | Alta | Reembolsos repetidos sobre la misma línea no acumulan tope por cantidad | **CORREGIDO Y VALIDADO** (§10) |
+| H4 | Media | `payment_status` puede quedar «paid» prematuro en deliveries pagados antes de aprobar | **Corregido**: recompute al aprobar; cobro parcial → «pending» (§10) |
+| H5 | Media | Cancelar un pedido con pago cobrado no exige ni sugiere reembolso | **Corregido**: exige `acknowledge_paid_payments` + bitácora (§10) |
+| H6 | Media | Posible deadlock en PG por orden de locks no determinista en `price_cart` | **Corregido**: locks por id en productos y líneas (§10) |
+| H7 | Media | Mezcla naive/aware en `utc_now()` vs columnas `timestamptz` (depende del TZ de la conexión) | **Corregido**: sesión PG fijada a UTC en `connect_args` (§10) |
+| H8 | Media | Sanitización de SVG por regex es evadible → vector XSS almacenado vía `/public/files` | **Mitigado**: favicon sin SVG (backend) + verificación MIME (frontend) (§10) |
+| H9 | Baja | `collection_instruction` etiqueta «efectivo» a cualquier pago pendiente | **Corregido**: «cobrar efectivo» solo con método de cobro real (§10) |
+| H10 | Baja | Venta POS con transferencia queda `approved` para siempre si nadie la completa tras verificar | Abierto — decisión de producto pendiente |
 
 ---
 
@@ -309,3 +309,11 @@ H4 (paid prematuro en deliveries), H5 (cancelar con cobro sin reembolso), H6 (or
 
 
 Riesgos aún pendientes: H4–H10 y los [FALTA] de la auditoría (incluida la API de perfiles, bloqueante operativo).
+
+## 10. Ejecución real (2026-07-03, cierre de pendientes)
+
+- Migración `e8b2c47f91a3` aplicada contra PostGIS: upgrade → downgrade → re-upgrade OK; `order_lines.quantity` = INTEGER y los 4 índices únicos parciales del ledger verificados en el catálogo.
+- Suite canónica: **529 tests, 476 passed, 0 failed** (incluye tests dirigidos nuevos: enteros estrictos vía HTTP, topes acumulados por línea, H4/H5/H9 y perfiles).
+- **API de perfiles implementada** (bloqueante operativo resuelto): `/profiles/me`, búsqueda de clientes por teléfono (`?phone=`), upsert de personal con `can_deliver` y disponibilidad del propio repartidor; permisos `profiles:*` en el catálogo y en las 3 guardas.
+- H4–H9 corregidos en código (tabla del resumen §1). H10 sigue abierto como decisión de producto.
+- Aún pendiente de ejecución: pruebas de concurrencia con dos sesiones PG y E2E de navegador del flujo completo.

@@ -109,6 +109,7 @@ def transition_order(
     reason_code: Optional[str] = None,
     internal_note: Optional[str] = None,
     customer_visible_note: Optional[str] = None,
+    acknowledge_paid_payments: bool = False,
 ) -> Order:
     """Aplica una transición válida, sus efectos y la bitácora. NO hace commit."""
     allowed = ORDER_TRANSITIONS.get(order.status, ())
@@ -129,6 +130,11 @@ def transition_order(
         _freeze_totals_on_approval(order)
         order.approved_by = actor_id
         order.approved_at = now
+        # H4: el total recién congelado (con envío) puede dejar corto un pago
+        # previo — recalcular AQUÍ evita el «paid» prematuro de deliveries.
+        from backend.app.services.payment_service import recompute_order_payment_status
+
+        recompute_order_payment_status(session, order)
     elif new_status == "completed":
         order.completed_at = now
         # §22: consumir canjes y acreditar créditos ganados (import tardío: sin ciclo).
@@ -136,6 +142,28 @@ def transition_order(
 
         on_order_completed(session, order, actor_id=actor_id)
     elif new_status == "cancelled":
+        # H5: cancelar NO reembolsa. Si hay dinero cobrado, quien cancela debe
+        # reconocerlo explícitamente y el hecho queda en la bitácora; el
+        # reembolso es un flujo aparte y posterior.
+        from backend.app.models.payments import Payment as _Payment
+
+        paid = session.exec(
+            select(_Payment).where(
+                _Payment.order_id == order.id,
+                _Payment.status.in_(("paid", "partially_refunded")),  # pyright: ignore[reportAttributeAccessIssue]
+            )
+        ).first()
+        if paid is not None:
+            if not acknowledge_paid_payments:
+                raise OrderRuleError(
+                    "pago_registrado",
+                    "Este pedido tiene pagos cobrados: cancelar no reembolsa. "
+                    "Confirma la cancelación y resuelve el reembolso por separado.",
+                )
+            internal_note = (
+                (internal_note + " · " if internal_note else "")
+                + "Cancelado con pago cobrado: requiere resolución de reembolso."
+            )
         order.cancelled_at = now
         order.cancelled_by = actor_id
         # §22.3: liberar las reservas de canje.

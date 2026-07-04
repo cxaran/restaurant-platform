@@ -56,7 +56,12 @@ from backend.app.services.finance_service import (  # noqa: E402
     record_payment_income,
     void_entry,
 )
-from backend.app.services.payment_service import create_payment, mark_paid  # noqa: E402
+from backend.app.services.order_service import OrderRuleError, transition_order  # noqa: E402
+from backend.app.services.payment_service import (  # noqa: E402
+    collection_instruction,
+    create_payment,
+    mark_paid,
+)
 from backend.app.utils.utc_now import utc_now  # noqa: E402
 
 
@@ -202,6 +207,150 @@ class FinanceServiceTest(unittest.TestCase):
                     processed_by=self.user_id, allocations=[],
                 )
             self.assertEqual(ctx.exception.code, "reembolso_excede_pago")
+
+    def test_refund_caps_accumulate_per_line(self) -> None:
+        """H3: 1+1 unidades ok; la tercera falla; el dinero acumula por línea."""
+        with Session(self.engine) as session:
+            order, payment = self._paid_payment(session)
+
+            for _ in range(2):
+                create_refund(
+                    session, order, payment,
+                    amount=Decimal("50"), reason="Parcial",
+                    processed_by=self.user_id,
+                    allocations=[
+                        RefundAllocationInput(
+                            order_line_id=self.line_id,
+                            refunded_quantity=1,
+                            money_refunded_amount=Decimal("50"),
+                        )
+                    ],
+                )
+                session.commit()
+
+            with self.assertRaises(FinanceRuleError) as ctx:
+                create_refund(
+                    session, order, payment,
+                    amount=Decimal("10"), reason="Tercero",
+                    processed_by=self.user_id,
+                    allocations=[
+                        RefundAllocationInput(
+                            order_line_id=self.line_id,
+                            refunded_quantity=1,
+                            money_refunded_amount=Decimal("10"),
+                        )
+                    ],
+                )
+            self.assertEqual(ctx.exception.code, "reembolso_excede_linea")
+            session.rollback()
+
+            # Dinero por encima del remanente histórico (200 − 100 = 100)
+            # también se rechaza aunque queden unidades... pero aquí ya no
+            # quedan: verificamos el código de dinero con una línea fresca.
+
+    def test_refund_money_cap_per_line(self) -> None:
+        with Session(self.engine) as session:
+            order, payment = self._paid_payment(session)
+            with self.assertRaises(FinanceRuleError) as ctx:
+                create_refund(
+                    session, order, payment,
+                    amount=Decimal("200"), reason="Excede línea",
+                    processed_by=self.user_id,
+                    allocations=[
+                        RefundAllocationInput(
+                            order_line_id=self.line_id,
+                            refunded_quantity=1,
+                            money_refunded_amount=Decimal("201"),
+                        )
+                    ],
+                )
+            self.assertEqual(ctx.exception.code, "reembolso_excede_dinero_linea")
+
+    def test_cancel_with_paid_payment_requires_acknowledgement(self) -> None:
+        """H5: cancelar no reembolsa; el cobro existente exige reconocimiento."""
+        with Session(self.engine) as session:
+            order, _payment = self._paid_payment(session)
+
+            with self.assertRaises(OrderRuleError) as ctx:
+                transition_order(
+                    session, order, "cancelled", actor_id=self.user_id,
+                    reason_code="store_cancelled",
+                )
+            self.assertEqual(ctx.exception.code, "pago_registrado")
+            session.rollback()
+
+            order = session.get(Order, self.order_id)
+            assert order is not None
+            transition_order(
+                session, order, "cancelled", actor_id=self.user_id,
+                reason_code="store_cancelled", acknowledge_paid_payments=True,
+            )
+            session.commit()
+            self.assertEqual(order.status, "cancelled")
+            # El hecho queda en la bitácora para conciliación posterior.
+            from backend.app.models.orders import OrderStatusHistory
+
+            note = session.exec(
+                select(OrderStatusHistory).where(
+                    OrderStatusHistory.new_status == "cancelled"
+                )
+            ).one().internal_note
+            self.assertIn("requiere resolución de reembolso", note or "")
+
+    def test_approval_recomputes_payment_status(self) -> None:
+        """H4: si el total congelado supera lo cobrado, deja de ser «paid»."""
+        with Session(self.engine) as session:
+            user = session.get(User, self.user_id)
+            method = session.get(PaymentMethodConfig, self.method_id)
+            assert user is not None and method is not None
+            order = Order(
+                order_number=77, public_code="ORD-000077",
+                source="counter", fulfillment_type="counter",
+                status="pending_approval", payment_status="unpaid",
+                created_by=user.id,
+                items_subtotal_amount=Decimal("200"),
+            )
+            session.add(order)
+            session.flush()
+            payment = create_payment(session, order, method, expected_amount=Decimal("200"))
+            mark_paid(session, order, payment, actor_id=user.id)
+            self.assertEqual(order.payment_status, "paid")
+
+            # Un cargo autorizado sube el total al congelar en la aprobación.
+            from backend.app.models.orders import OrderAdjustment
+
+            session.add(
+                OrderAdjustment(
+                    order_id=order.id, adjustment_type="manual_fee", direction="charge",
+                    amount=Decimal("50"), reason="Empaque especial",
+                    authorized_by=user.id,
+                )
+            )
+            session.flush()
+            session.refresh(order)
+            transition_order(session, order, "approved", actor_id=user.id)
+            session.commit()
+            self.assertEqual(order.total_money_amount, Decimal("250"))
+            self.assertEqual(order.payment_status, "pending")  # ya NO «paid»
+
+    def test_collection_instruction_never_says_cash_for_transfer(self) -> None:
+        """H9: transferencia pendiente → «no cobrar», jamás «cobrar efectivo»."""
+        with Session(self.engine) as session:
+            order = session.get(Order, self.order_id)
+            assert order is not None
+            transfer = PaymentMethodConfig(
+                code="bank_transfer", display_name="Transferencia bancaria",
+                requires_manual_verification=True,
+            )
+            session.add(transfer)
+            session.flush()
+            create_payment(session, order, transfer, expected_amount=Decimal("200"))
+            session.flush()
+
+            instruction = collection_instruction(session, order)
+            self.assertFalse(instruction.must_collect)
+            self.assertFalse(instruction.label.startswith("Cobrar"))
+            self.assertIn("no cobrar", instruction.label.lower())
 
     def test_business_summary_formula(self) -> None:
         with Session(self.engine) as session:

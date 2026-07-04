@@ -166,6 +166,10 @@ def recompute_order_payment_status(session: Session, order: Order) -> str:
         derived = "partially_refunded"
     elif paid_total >= target and target >= 0 and any(s == "paid" for s in statuses):
         derived = "paid"
+    elif paid_total > 0 and any(s == "paid" for s in statuses):
+        # H4: hay dinero cobrado pero el total congelado quedó por encima
+        # (p. ej. envío fijado al aprobar) — el pedido sigue DEBIENDO.
+        derived = "pending"
     elif "pending_verification" in statuses:
         derived = "pending_verification"
     elif "pending" in statuses:
@@ -194,11 +198,24 @@ class CollectionInstruction:
 
 def collection_instruction(session: Session, order: Order) -> CollectionInstruction:
     payments = session.exec(select(Payment).where(Payment.order_id == order.id)).all()
-    pending_cash = [
-        payment
-        for payment in payments
-        if payment.status == "pending" and payment.change_requested_for_amount is not None
-    ] or [payment for payment in payments if payment.status == "pending"]
+
+    # H9: «cobrar en efectivo» SOLO si el método del pago pendiente realmente
+    # es de cobro contra entrega (allows_cash_change) — jamás derivarlo del
+    # simple status=pending (una transferencia sin verificar NO se cobra).
+    def _is_cash(payment: Payment) -> bool:
+        if payment.change_requested_for_amount is not None:
+            return True
+        method = session.get(PaymentMethodConfig, payment.payment_method_config_id)
+        return bool(method and method.allows_cash_change)
+
+    pending = [payment for payment in payments if payment.status == "pending"]
+    pending_cash = [payment for payment in pending if _is_cash(payment)]
+
+    if pending and not pending_cash:
+        return CollectionInstruction(
+            must_collect=False, amount=None, change_for=None, change_amount=None,
+            label="Pago pendiente de verificación · no cobrar en efectivo",
+        )
 
     if order.payment_status == "paid" or not pending_cash:
         method = next((p.payment_method_name_snapshot for p in payments if p.status == "paid"), None)

@@ -154,6 +154,16 @@ class OrderRoutesTest(unittest.TestCase):
         self.assertEqual(other, [])
         self.assertEqual(detail.status_code, 404)
 
+    def test_quantities_must_be_strict_positive_integers(self) -> None:
+        """H1 vía HTTP: 0.5, "1", true, 0 y negativos → 422 de validación."""
+        for bad in (0.5, "1", True, 0, -1, "1.0", 1.5):
+            payload = self._checkout_payload(
+                lines=[{"product_id": str(self.product_id), "quantity": bad}]
+            )
+            with _As(CUSTOMER_ID):
+                response = self.client.post("/api/v1/orders", json=payload)
+            self.assertEqual(response.status_code, 422, f"quantity={bad!r}")
+
     def test_checkout_credits_on_non_redeemable_product_rejected(self) -> None:
         payload = self._checkout_payload(
             lines=[{

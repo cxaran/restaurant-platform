@@ -12,6 +12,7 @@ from backend.app.api.v1.credits import router as credits_router
 from backend.app.api.v1.files import router as files_router
 from backend.app.api.v1.finances import router as finances_router
 from backend.app.api.v1.orders import router as orders_router
+from backend.app.api.v1.profiles import router as profiles_router
 from backend.app.api.v1.payments import router as payments_router
 from backend.app.api.v1.permissions import router as permissions_router
 from backend.app.api.v1.public_site import router as public_site_router
@@ -37,6 +38,7 @@ router.include_router(credits_router)
 router.include_router(files_router)
 router.include_router(finances_router)
 router.include_router(orders_router)
+router.include_router(profiles_router)
 router.include_router(payments_router)
 router.include_router(permissions_router)
 router.include_router(public_site_router)

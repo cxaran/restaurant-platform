@@ -517,6 +517,7 @@ def transition(
             reason_code=payload.reason_code,
             internal_note=payload.internal_note,
             customer_visible_note=payload.customer_visible_note,
+            acknowledge_paid_payments=payload.acknowledge_paid_payments,
         )
     except OrderRuleError as exc:
         api_error(status.HTTP_409_CONFLICT, exc.code, exc.message)

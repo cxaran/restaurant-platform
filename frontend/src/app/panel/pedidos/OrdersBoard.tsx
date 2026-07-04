@@ -3,6 +3,7 @@
 // Cola operativa de pedidos: estados reales del backend, transiciones por
 // permiso. Ocultar botones NO es seguridad — el backend valida cada acción.
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiRequestError } from "@/core/api/api-error";
@@ -178,7 +179,15 @@ export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>
               <span style={{ fontWeight: 900, minWidth: 80, textAlign: "right" }}>
                 {formatMoney(order.total_money_amount ?? order.items_subtotal_amount)}
               </span>
-              <span style={{ display: "flex", gap: 6 }}>
+              <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {perms.has("tickets:print") ? (
+                  <Link
+                    href={`/panel/tickets?order=${order.id}`}
+                    style={{ fontSize: 12, fontWeight: 800, color: "inherit" }}
+                  >
+                    Ticket
+                  </Link>
+                ) : null}
                 {(NEXT_ACTIONS[order.status] ?? [])
                   .filter((action) => perms.has(action.permission))
                   .map((action) => (

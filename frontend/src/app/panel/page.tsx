@@ -31,13 +31,15 @@ const MODULES: {
   },
   {
     label: "Reparto (mis entregas)",
-    detail: "Pantalla mobile-first en el siguiente incremento del frontend.",
+    detail: "Cola de envíos, entrega en curso y resumen del día.",
     anyOf: ["deliveries:self_assign", "deliveries:read"],
+    href: "/panel/reparto",
   },
   {
     label: "Tickets",
-    detail: "Pantalla operativa en el siguiente incremento del frontend.",
+    detail: "Reimpresión de tickets con bitácora.",
     anyOf: ["tickets:print"],
+    href: "/panel/tickets",
   },
 ];
 

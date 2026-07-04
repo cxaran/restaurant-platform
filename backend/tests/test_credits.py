@@ -95,7 +95,7 @@ class CreditServiceTest(unittest.TestCase):
             session.add(
                 OrderLine(
                     order_id=order.id, product_name_snapshot="Orden de boneless",
-                    quantity=Decimal("1"), purchase_mode="money",
+                    quantity=1, purchase_mode="money",
                     money_unit_price_snapshot=Decimal("230"),
                     money_line_total_amount=Decimal("230"),
                     credits_awarded_per_unit_snapshot=20,
@@ -106,7 +106,7 @@ class CreditServiceTest(unittest.TestCase):
             session.add(
                 OrderLine(
                     order_id=order.id, product_name_snapshot="Dip ranch",
-                    quantity=Decimal("1"), purchase_mode="credits",
+                    quantity=1, purchase_mode="credits",
                     credit_redemption_price_per_unit_snapshot=50,
                     credits_redeemed_total=50,
                 )
@@ -176,22 +176,113 @@ class CreditServiceTest(unittest.TestCase):
             redemption = session.exec(select(CreditRedemption)).one()
             self.assertEqual(redemption.status, "released")
 
-    def test_refund_reverses_earned_credits(self) -> None:
+    def _allocation_for(self, session: Session, line, quantity: int = 1):
+        from backend.app.models.finances import OrderLineRefundAllocation
+
+        allocation = OrderLineRefundAllocation(
+            payment_refund_id=uuid.uuid4(),  # FK no forzada en SQLite
+            order_line_id=line.id,
+            refunded_quantity=quantity,
+        )
+        session.add(allocation)
+        session.flush()
+        return allocation
+
+    def test_refund_reverses_earned_credits_only_when_completed(self) -> None:
         with Session(self.engine) as session:
             order = self._order_with_lines(session, credits_line=False)
+            line = session.exec(select(OrderLine)).one()
+
+            # H2: pedido NO completado → el earn no existe → sin reverso.
+            allocation = self._allocation_for(session, line)
+            applied = on_refund_allocation(
+                session, order, allocation,
+                requested_earned_reversal=20, requested_credits_refund=0, actor_id=None,
+            )
+            self.assertEqual(applied, (0, 0))
+            self.assertEqual(balance(session, self.user_id), 0)
+
             on_order_completed(session, order, actor_id=None)  # earn +20
+            order.status = "completed"
             session.commit()
             self.assertEqual(balance(session, self.user_id), 20)
 
-            line = session.exec(select(OrderLine)).one()
-            on_refund_allocation(
-                session, order, order_line_id=line.id,
-                credits_earned_reversed=20, credits_refunded=0, actor_id=None,
+            allocation2 = self._allocation_for(session, line)
+            applied = on_refund_allocation(
+                session, order, allocation2,
+                requested_earned_reversal=20, requested_credits_refund=0, actor_id=None,
             )
             session.commit()
+            self.assertEqual(applied, (20, 0))
             self.assertEqual(balance(session, self.user_id), 0)
-            types = {e.entry_type for e in session.exec(select(CreditLedgerEntry)).all()}
-            self.assertIn("earn_reversal", types)
+
+            # H2: un tercer intento no puede revertir más de lo acreditado.
+            allocation3 = self._allocation_for(session, line)
+            applied = on_refund_allocation(
+                session, order, allocation3,
+                requested_earned_reversal=20, requested_credits_refund=0, actor_id=None,
+            )
+            self.assertEqual(applied, (0, 0))
+            self.assertEqual(balance(session, self.user_id), 0)
+
+    def test_reserved_redemption_never_refunds_credits(self) -> None:
+        """H2: canje reserved → reembolso NO devuelve; la cancelación libera UNA vez."""
+        with Session(self.engine) as session:
+            manual_adjustment(
+                session, user_id=self.user_id, delta=50,
+                description="Saldo", created_by=self.user_id,
+            )
+            order = self._order_with_lines(session, money_line=False)
+            reserve_order_redemptions(session, order)
+            session.commit()
+            self.assertEqual(balance(session, self.user_id), 0)
+
+            credit_line = session.exec(select(OrderLine)).one()
+            allocation = self._allocation_for(session, credit_line)
+            applied = on_refund_allocation(
+                session, order, allocation,
+                requested_earned_reversal=0, requested_credits_refund=50, actor_id=None,
+            )
+            # reserved: sin redemption_refund; los créditos siguen reservados.
+            self.assertEqual(applied, (0, 0))
+            self.assertEqual(balance(session, self.user_id), 0)
+
+            on_order_cancelled(session, order, actor_id=None)
+            session.commit()
+            self.assertEqual(balance(session, self.user_id), 50)  # UNA liberación
+
+    def test_consumed_redemption_refunds_capped(self) -> None:
+        """H2/H3: canje consumed devuelve hasta lo gastado, acumulado."""
+        with Session(self.engine) as session:
+            manual_adjustment(
+                session, user_id=self.user_id, delta=50,
+                description="Saldo", created_by=self.user_id,
+            )
+            order = self._order_with_lines(session, money_line=False)
+            reserve_order_redemptions(session, order)
+            on_order_completed(session, order, actor_id=None)  # consume
+            order.status = "completed"
+            session.commit()
+            self.assertEqual(balance(session, self.user_id), 0)
+
+            credit_line = session.exec(select(OrderLine)).one()
+            allocation = self._allocation_for(session, credit_line)
+            applied = on_refund_allocation(
+                session, order, allocation,
+                requested_earned_reversal=0, requested_credits_refund=50, actor_id=None,
+            )
+            session.commit()
+            self.assertEqual(applied, (0, 50))
+            self.assertEqual(balance(session, self.user_id), 50)
+
+            # Segundo intento: ya no queda remanente del canje.
+            allocation2 = self._allocation_for(session, credit_line)
+            applied = on_refund_allocation(
+                session, order, allocation2,
+                requested_earned_reversal=0, requested_credits_refund=50, actor_id=None,
+            )
+            self.assertEqual(applied, (0, 0))
+            self.assertEqual(balance(session, self.user_id), 50)
 
     def test_manual_adjustment_cannot_go_negative(self) -> None:
         with Session(self.engine) as session:

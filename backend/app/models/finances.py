@@ -218,11 +218,21 @@ class OrderLineRefundAllocation(Base):
     __tablename__ = "order_line_refund_allocations"
     __table_args__ = (
         CheckConstraint(
-            "refunded_quantity > 0", name="order_line_refund_allocations_qty_positive"
+            "refunded_quantity >= 1", name="order_line_refund_allocations_qty_positive"
         ),
         CheckConstraint(
             "money_refunded_amount >= 0",
             name="order_line_refund_allocations_money_non_negative",
+        ),
+        # Devolución SOLO-CRÉDITOS: sin pago no puede moverse dinero y el actor
+        # es obligatorio (no existen reembolsos monetarios ficticios de $0).
+        CheckConstraint(
+            "payment_refund_id IS NOT NULL OR money_refunded_amount = 0",
+            name="order_line_refund_allocations_credit_only_no_money",
+        ),
+        CheckConstraint(
+            "payment_refund_id IS NOT NULL OR processed_by IS NOT NULL",
+            name="order_line_refund_allocations_actor_required",
         ),
         Index("ix_order_line_refund_allocations_refund", "payment_refund_id"),
         Index("ix_order_line_refund_allocations_line", "order_line_id"),
@@ -231,14 +241,28 @@ class OrderLineRefundAllocation(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    payment_refund_id: Mapped[uuid.UUID] = mapped_column(
+    payment_refund_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("payment_refunds.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        comment=(
+            "NULL sólo en devoluciones de líneas pagadas 100% con créditos (sin pago "
+            "monetario): entonces money debe ser 0 y processed_by obligatorio."
+        ),
+    )
+    processed_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="RESTRICT"),
+        nullable=True,
+        comment="Actor de la devolución (siempre registrado; obligatorio sin pago).",
     )
     order_line_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("order_lines.id", ondelete="RESTRICT"), nullable=False
     )
-    refunded_quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    refunded_quantity: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Unidades ENTERAS (H1); el tope ACUMULA reembolsos previos de la línea (H3).",
+    )
     money_refunded_amount: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False, default=Decimal("0")
     )

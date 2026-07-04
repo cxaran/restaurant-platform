@@ -106,13 +106,13 @@ class TicketDelivery(ApiReadSchema):
 class TicketLineModifier(ApiReadSchema):
     group: str
     option: str
-    quantity: Decimal
+    quantity: int
     total: Decimal
 
 
 class TicketLine(ApiReadSchema):
     name: str
-    quantity: Decimal
+    quantity: int
     purchase_mode: str
     unit_price: Decimal
     line_total: Decimal

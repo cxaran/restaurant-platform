@@ -159,9 +159,134 @@ def void_entry(
 @dataclass(frozen=True)
 class RefundAllocationInput:
     order_line_id: uuid.UUID
-    refunded_quantity: Decimal
+    refunded_quantity: int  # H1: unidades enteras
     money_refunded_amount: Decimal
     reason: Optional[str] = None
+
+
+def _lock_line_and_check_remaining(
+    session: Session,
+    order: Order,
+    *,
+    order_line_id: uuid.UUID,
+    refunded_quantity: int,
+    money_refunded_amount: Decimal,
+) -> OrderLine:
+    """H3: bloquea la línea y valida contra el remanente HISTÓRICO acumulado.
+
+    Política de montos (controlada por backend): el cliente sólo declara
+    cantidad y, en reembolsos monetarios, el dinero a devolver — acotado por el
+    remanente de ``money_line_total_amount`` (que ya incluye modificadores) menos
+    lo ya devuelto. Los créditos a devolver/revertir NUNCA vienen del payload:
+    los calcula el ledger según snapshots y estado del canje. Los ajustes
+    monetarios excepcionales (descuentos post-venta, compensaciones) van por
+    ``order_adjustments`` o asientos manuales, no disfrazados de devolución.
+    """
+    if isinstance(refunded_quantity, bool) or not isinstance(refunded_quantity, int) \
+            or refunded_quantity < 1:
+        raise FinanceRuleError(
+            "cantidad_invalida",
+            "La cantidad reembolsada debe ser un entero mayor o igual a 1.",
+        )
+    # El LOCK serializa reembolsos concurrentes de la misma línea; los
+    # remanentes se calculan DENTRO de esta transacción.
+    line = session.exec(
+        select(OrderLine).where(OrderLine.id == order_line_id).with_for_update()
+    ).first()
+    if line is None or line.order_id != order.id:
+        raise FinanceRuleError(
+            "linea_invalida", "Alguna línea del reembolso no pertenece al pedido."
+        )
+
+    previous = session.exec(
+        select(OrderLineRefundAllocation).where(
+            OrderLineRefundAllocation.order_line_id == line.id
+        )
+    ).all()
+    already_quantity = sum(prev.refunded_quantity for prev in previous)
+    already_money = sum((prev.money_refunded_amount for prev in previous), Decimal("0"))
+    if refunded_quantity > line.quantity - already_quantity:
+        raise FinanceRuleError(
+            "reembolso_excede_linea",
+            f"La línea vendió {line.quantity} y ya tiene {already_quantity} "
+            "unidades reembolsadas.",
+        )
+    if money_refunded_amount > line.money_line_total_amount - already_money:
+        raise FinanceRuleError(
+            "reembolso_excede_dinero_linea",
+            "El dinero reembolsado excede el remanente histórico de la línea.",
+        )
+    return line
+
+
+def refund_credits_only_line(
+    session: Session,
+    order: Order,
+    *,
+    order_line_id: uuid.UUID,
+    refunded_quantity: int,
+    reason: str,
+    processed_by: uuid.UUID,
+) -> OrderLineRefundAllocation:
+    """Devolución de una línea pagada 100% con créditos, SIN pago monetario.
+
+    Un pedido canjeado por completo no tiene ``payments``: la asignación se crea
+    sin ``payment_refund_id`` (dinero forzado a 0 por CHECK), con actor y motivo
+    obligatorios, y el ledger aplica la devolución según el estado real del
+    canje (sólo ``consumed``, con tope acumulado — H2/H3). Idempotencia por los
+    índices únicos parciales sobre ``refund_allocation_id``.
+    """
+    if not (reason or "").strip():
+        raise FinanceRuleError("motivo_requerido", "La devolución requiere motivo.")
+    line = _lock_line_and_check_remaining(
+        session,
+        order,
+        order_line_id=order_line_id,
+        refunded_quantity=refunded_quantity,
+        money_refunded_amount=Decimal("0"),
+    )
+    if line.purchase_mode != "credits":
+        raise FinanceRuleError(
+            "linea_no_canjeada",
+            "Esta vía sólo devuelve líneas canjeadas con créditos; el dinero se "
+            "reembolsa sobre su pago.",
+        )
+
+    allocation = OrderLineRefundAllocation(
+        payment_refund_id=None,
+        order_line_id=line.id,
+        refunded_quantity=refunded_quantity,
+        money_refunded_amount=Decimal("0"),
+        processed_by=processed_by,
+        reason=reason,
+    )
+    session.add(allocation)
+    session.flush()
+
+    from backend.app.services.credit_service import on_refund_allocation
+
+    applied_reversal, applied_refund = on_refund_allocation(
+        session,
+        order,
+        allocation,
+        requested_earned_reversal=(
+            line.credits_awarded_per_unit_snapshot * refunded_quantity
+        ),
+        requested_credits_refund=(
+            (line.credit_redemption_price_per_unit_snapshot or 0) * refunded_quantity
+        ),
+        actor_id=processed_by,
+    )
+    if applied_refund == 0 and applied_reversal == 0:
+        raise FinanceRuleError(
+            "canje_no_devolvible",
+            "El canje de esta línea no está consumido o ya devolvió todo su remanente.",
+        )
+    allocation.credits_earned_reversed_total = applied_reversal
+    allocation.credits_refunded_total = applied_refund
+    session.add(allocation)
+    session.flush()
+    return allocation
 
 
 def create_refund(
@@ -208,45 +333,49 @@ def create_refund(
     session.add(refund)
     session.flush()
 
-    for item in allocations:
-        line = session.get(OrderLine, item.order_line_id)
-        if line is None or line.order_id != order.id:
-            raise FinanceRuleError(
-                "linea_invalida", "Alguna línea del reembolso no pertenece al pedido."
-            )
-        if item.refunded_quantity <= 0 or item.refunded_quantity > line.quantity:
-            raise FinanceRuleError(
-                "cantidad_invalida", "Cantidad reembolsada fuera de rango para la línea."
-            )
-        credits_earned_reversed = int(
-            line.credits_awarded_per_unit_snapshot * int(item.refunded_quantity)
-        )
-        credits_refunded = int(
-            (line.credit_redemption_price_per_unit_snapshot or 0)
-            * int(item.refunded_quantity)
-        )
-        session.add(
-            OrderLineRefundAllocation(
-                payment_refund_id=refund.id,
-                order_line_id=line.id,
-                refunded_quantity=item.refunded_quantity,
-                money_refunded_amount=item.money_refunded_amount,
-                credits_refunded_total=credits_refunded,
-                credits_earned_reversed_total=credits_earned_reversed,
-                reason=item.reason,
-            )
-        )
-        # §22.5: asientos del ledger (import tardío: evita ciclo).
-        from backend.app.services.credit_service import on_refund_allocation
-
-        on_refund_allocation(
+    # Orden DETERMINISTA de locks: siempre por id ascendente de línea, para que
+    # dos reembolsos concurrentes del mismo pedido no puedan abrazarse (H6-local).
+    for item in sorted(allocations, key=lambda a: str(a.order_line_id)):
+        line = _lock_line_and_check_remaining(
             session,
             order,
+            order_line_id=item.order_line_id,
+            refunded_quantity=item.refunded_quantity,
+            money_refunded_amount=item.money_refunded_amount,
+        )
+
+        allocation = OrderLineRefundAllocation(
+            payment_refund_id=refund.id,
             order_line_id=line.id,
-            credits_earned_reversed=credits_earned_reversed,
-            credits_refunded=credits_refunded,
+            refunded_quantity=item.refunded_quantity,
+            money_refunded_amount=item.money_refunded_amount,
+            processed_by=processed_by,
+            reason=item.reason,
+        )
+        session.add(allocation)
+        session.flush()
+
+        # §22.5 + H2: el ledger decide lo APLICABLE según el estado real del
+        # canje y del pedido; la asignación registra lo aplicado, no lo teórico.
+        from backend.app.services.credit_service import on_refund_allocation
+
+        applied_reversal, applied_refund = on_refund_allocation(
+            session,
+            order,
+            allocation,
+            requested_earned_reversal=(
+                line.credits_awarded_per_unit_snapshot * item.refunded_quantity
+            ),
+            requested_credits_refund=(
+                (line.credit_redemption_price_per_unit_snapshot or 0)
+                * item.refunded_quantity
+            ),
             actor_id=processed_by,
         )
+        allocation.credits_earned_reversed_total = applied_reversal
+        allocation.credits_refunded_total = applied_refund
+        session.add(allocation)
+        session.flush()
 
     original_income = session.exec(
         select(FinancialEntry).where(

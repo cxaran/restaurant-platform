@@ -44,16 +44,26 @@ class PricingError(ValueError):
 @dataclass(frozen=True)
 class CartModifierInput:
     modifier_option_id: uuid.UUID
-    quantity: Decimal = Decimal("1")
+    quantity: int = 1
 
 
 @dataclass(frozen=True)
 class CartLineInput:
     product_id: uuid.UUID
-    quantity: Decimal
+    quantity: int  # H1: SOLO enteros positivos; el servicio lo re-valida.
     purchase_mode: str  # money | credits
     modifiers: tuple[CartModifierInput, ...] = ()
     customer_note: Optional[str] = None
+
+
+def _require_positive_int(value, *, what: str) -> int:
+    """H1: rechaza fracciones, cero, negativos y booleanos — sin truncar jamás."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise PricingError(
+            "cantidad_invalida",
+            f"{what} debe ser un número entero mayor o igual a 1.",
+        )
+    return value
 
 
 @dataclass
@@ -72,12 +82,11 @@ def price_cart(session: Session, cart: list[CartLineInput]) -> PricedOrder:
         raise PricingError("carrito_vacio", "El pedido no tiene productos.")
 
     result = PricedOrder()
-    requested_by_product: dict[uuid.UUID, Decimal] = {}
+    requested_by_product: dict[uuid.UUID, int] = {}
     for line in cart:
-        if line.quantity <= 0:
-            raise PricingError("cantidad_invalida", "Las cantidades deben ser mayores a cero.")
+        _require_positive_int(line.quantity, what="La cantidad del producto")
         requested_by_product[line.product_id] = (
-            requested_by_product.get(line.product_id, Decimal("0")) + line.quantity
+            requested_by_product.get(line.product_id, 0) + line.quantity
         )
 
     # Lock de productos con límite diario: serializa el conteo contra pedidos
@@ -122,7 +131,7 @@ def _load_products_locked(
 
 
 def _validate_product_limits(
-    session: Session, product: Product, requested_units: Decimal
+    session: Session, product: Product, requested_units: int
 ) -> None:
     if not product.is_active or not product.is_available:
         raise PricingError(
@@ -157,7 +166,7 @@ def business_day_bounds(session: Session, day: Optional[date] = None) -> tuple[d
     return (start.astimezone(timezone.utc), (start + timedelta(days=1)).astimezone(timezone.utc))
 
 
-def consumed_daily_units(session: Session, product_id: uuid.UUID) -> Decimal:
+def consumed_daily_units(session: Session, product_id: uuid.UUID) -> int:
     """Unidades del producto en pedidos NO cancelados creados hoy (§11.2).
 
     Derivado siempre de order_lines: no existe contador editable.
@@ -172,7 +181,7 @@ def consumed_daily_units(session: Session, product_id: uuid.UUID) -> Decimal:
         .where(Order.created_at < end)
     )
     value = session.exec(statement).one()
-    return Decimal(str(value))
+    return int(value)
 
 
 def _price_line(
@@ -198,7 +207,8 @@ def _price_line(
         unit_price = Decimal("0")
         credits_awarded = 0
         redemption_price = product.credit_redemption_price
-        credits_redeemed = int(product.credit_redemption_price * int(line.quantity))
+        # H1: multiplicación EXACTA entero×entero — jamás truncar cantidades.
+        credits_redeemed = product.credit_redemption_price * line.quantity
     else:
         raise PricingError("modo_compra_invalido", "Modo de compra no reconocido.")
 
@@ -216,7 +226,7 @@ def _price_line(
         modifier_money_total_per_unit=modifier_total_per_unit,
         money_line_total_amount=line_total,
         credits_awarded_per_unit_snapshot=credits_awarded,
-        credits_earned_total_snapshot=int(credits_awarded * int(quantity)),
+        credits_earned_total_snapshot=credits_awarded * quantity,
         credit_redemption_price_per_unit_snapshot=redemption_price,
         credits_redeemed_total=credits_redeemed,
         customer_note=line.customer_note,
@@ -267,10 +277,9 @@ def _price_modifiers(
                 "opcion_no_aplicable",
                 f"La opción «{option.name}» no aplica para «{product.name}».",
             )
-        if item.quantity <= 0:
-            raise PricingError("cantidad_invalida", "Las cantidades deben ser mayores a cero.")
+        _require_positive_int(item.quantity, what="La cantidad de la opción")
 
-        counts[option.modifier_group_id] += int(item.quantity)
+        counts[option.modifier_group_id] += item.quantity
         row_total = option.price_adjustment * item.quantity
         total_per_unit += row_total
         modifier_rows.append(

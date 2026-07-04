@@ -233,13 +233,30 @@ def create_order(
             "Un pedido capturado por personal debe registrar al empleado.",
         )
 
-    if identity.fulfillment_type in ("delivery", "pickup") and (
+    # Contacto por canal: pickup exige contacto a nivel pedido (hay que avisar);
+    # en DELIVERY el contacto obligatorio vive en el snapshot de order_deliveries
+    # (recipient_name/phone), así una captura manual sin cliente sigue siendo
+    # entregable. La composición de la entrega valida esa parte.
+    if identity.fulfillment_type == "pickup" and (
         not identity.customer_name or not identity.customer_phone
     ):
         raise OrderRuleError(
             "datos_contacto_requeridos",
-            "Nombre y teléfono de contacto son obligatorios para entregar o avisar.",
+            "Nombre y teléfono de contacto son obligatorios para avisar al cliente.",
         )
+
+    # Créditos SOLO con cliente (CHECK orders_credits_require_customer):
+    # sin customer_user_id no se canjea (error) ni se gana (snapshots en cero).
+    if identity.customer_user_id is None:
+        if priced.credits_redeemed_total > 0:
+            raise OrderRuleError(
+                "canje_sin_cliente",
+                "El canje con créditos requiere un usuario cliente (§22.1).",
+            )
+        priced.credits_earned_total = 0
+        for line in priced.lines:
+            line.credits_earned_total_snapshot = 0
+            line.credits_awarded_per_unit_snapshot = 0
 
     profile = get_business_profile(session)
     number = _next_order_number(session)

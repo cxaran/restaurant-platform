@@ -70,7 +70,7 @@ def _engine():
 def _priced(subtotal: str = "230") -> PricedOrder:
     line = OrderLine(
         product_name_snapshot="Orden de boneless",
-        quantity=Decimal("1"),
+        quantity=1,
         purchase_mode="money",
         money_unit_price_snapshot=Decimal(subtotal),
         money_line_total_amount=Decimal(subtotal),
@@ -123,17 +123,33 @@ class OrderServiceTest(unittest.TestCase):
                 )
         self.assertEqual(ctx.exception.code, "empleado_requerido")
 
-    def test_delivery_requires_contact_snapshot(self) -> None:
+    def test_pickup_requires_contact_snapshot(self) -> None:
+        # Regla por canal: PICKUP exige contacto a nivel pedido; en DELIVERY el
+        # contacto obligatorio vive en order_deliveries (lo valida la composición).
         with self._session() as session:
             with self.assertRaises(OrderRuleError) as ctx:
                 create_order(
                     session, _priced(),
                     OrderIdentity(
-                        source="online", fulfillment_type="delivery",
+                        source="online", fulfillment_type="pickup",
                         customer_user_id=self.user_id,
                     ),
                 )
         self.assertEqual(ctx.exception.code, "datos_contacto_requeridos")
+
+    def test_counter_without_customer_earns_zero_credits(self) -> None:
+        # Regla dura: sin customer_user_id no se ganan créditos (snapshots en 0).
+        with self._session() as session:
+            order = create_order(
+                session, _priced(),
+                OrderIdentity(
+                    source="counter", fulfillment_type="counter",
+                    created_by=self.user_id,
+                ),
+            )
+            session.commit()
+            self.assertEqual(order.credits_earned_total_snapshot, 0)
+            self.assertEqual(order.lines[0].credits_earned_total_snapshot, 0)
 
     def test_counter_sale_without_customer_is_valid(self) -> None:
         with self._session() as session:

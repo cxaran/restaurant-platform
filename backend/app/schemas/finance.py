@@ -94,7 +94,8 @@ class BusinessSummaryRead(ApiReadSchema):
 
 class RefundAllocationItem(ApiWriteSchema):
     order_line_id: UUID
-    refunded_quantity: Decimal = Field(gt=0)
+    # H1: entero ESTRICTO (sin coerción de "1"/1.0/bool); H3: acumulado por línea.
+    refunded_quantity: int = Field(ge=1, strict=True)
     money_refunded_amount: Decimal = Field(ge=0)
     reason: Optional[str] = None
 
@@ -105,6 +106,25 @@ class RefundCreate(ApiWriteSchema):
     allocations: list[RefundAllocationItem] = Field(default_factory=list)
     transaction_reference: Optional[str] = Field(default=None, max_length=180)
     bank_name: Optional[str] = Field(default=None, max_length=120)
+
+
+class CreditRefundCreate(ApiWriteSchema):
+    """Devolución de línea 100% canjeada (pedido sin pago monetario)."""
+
+    order_line_id: UUID
+    refunded_quantity: int = Field(ge=1, strict=True)
+    reason: str = Field(min_length=1)
+
+
+class CreditRefundAllocationRead(ApiReadSchema):
+    id: UUID
+    order_line_id: UUID
+    refunded_quantity: int
+    credits_refunded_total: int
+    credits_earned_reversed_total: int
+    reason: Optional[str] = None
+    processed_by: Optional[UUID] = None
+    created_at: datetime
 
 
 class RefundRead(ApiReadSchema):

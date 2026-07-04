@@ -108,7 +108,7 @@ class OrderRoutesTest(unittest.TestCase):
     def _checkout_payload(self, **overrides) -> dict:
         payload = {
             "fulfillment_type": "pickup",
-            "lines": [{"product_id": str(self.product_id), "quantity": "1"}],
+            "lines": [{"product_id": str(self.product_id), "quantity": 1}],
             "customer_name": "María López",
             "customer_phone": "8332147789",
         }
@@ -158,7 +158,7 @@ class OrderRoutesTest(unittest.TestCase):
         payload = self._checkout_payload(
             lines=[{
                 "product_id": str(self.product_id),
-                "quantity": "1",
+                "quantity": 1,
                 "purchase_mode": "credits",
             }]
         )
@@ -171,7 +171,7 @@ class OrderRoutesTest(unittest.TestCase):
         payload = {
             "source": "counter",
             "fulfillment_type": "counter",
-            "lines": [{"product_id": str(self.product_id), "quantity": "1"}],
+            "lines": [{"product_id": str(self.product_id), "quantity": 1}],
         }
         with _As(STAFF_ID):
             self.assertEqual(
@@ -188,7 +188,7 @@ class OrderRoutesTest(unittest.TestCase):
         payload = {
             "source": "counter",
             "fulfillment_type": "counter",
-            "lines": [{"product_id": str(self.product_id), "quantity": "1"}],
+            "lines": [{"product_id": str(self.product_id), "quantity": 1}],
         }
         with _As(STAFF_ID, "orders:capture"):
             order = self.client.post("/api/v1/orders/capture", json=payload).json()

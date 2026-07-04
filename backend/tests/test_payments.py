@@ -119,7 +119,7 @@ class PaymentsRoutesTest(unittest.TestCase):
         payment = {"method_code": "cash_counter"}
         payment.update(payment_overrides)
         return {
-            "lines": [{"product_id": str(self.product_id), "quantity": "2"}],
+            "lines": [{"product_id": str(self.product_id), "quantity": 2}],
             "payment": payment,
         }
 

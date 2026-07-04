@@ -19,6 +19,8 @@ from backend.app.models.orders import Order
 from backend.app.models.payments import Payment
 from backend.app.schemas.finance import (
     BusinessSummaryRead,
+    CreditRefundAllocationRead,
+    CreditRefundCreate,
     FinancialCategoryCreate,
     FinancialCategoryRead,
     FinancialEntryAttachmentCreate,
@@ -38,6 +40,7 @@ from backend.app.services.finance_service import (
     business_summary,
     create_refund,
     record_manual_entry,
+    refund_credits_only_line,
     void_entry,
 )
 
@@ -210,6 +213,41 @@ def read_summary(
 # ---------------------------------------------------------------------------
 # Reembolsos (§18.4): nunca borran el pago original
 # ---------------------------------------------------------------------------
+
+@router.post(
+    "/orders/{order_id}/credit-refunds",
+    response_model=CreditRefundAllocationRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def refund_credit_line(
+    order_id: uuid.UUID,
+    payload: CreditRefundCreate,
+    session: SessionDep,
+    current_user: CurrentUser,
+    _: PaymentPermissions.REFUND.requiere,
+) -> CreditRefundAllocationRead:
+    """Devolución de una línea 100% canjeada: pedidos SIN pago monetario.
+
+    No crea pagos ni reembolsos monetarios ficticios: la asignación vive sin
+    ``payment_refund_id`` (dinero 0 por CHECK), con actor y motivo, y el ledger
+    aplica sólo lo devolvible según el estado del canje (H2/H3).
+    """
+    order = get_or_404(session, Order, order_id, "Pedido no encontrado")
+    try:
+        allocation = refund_credits_only_line(
+            session,
+            order,
+            order_line_id=payload.order_line_id,
+            refunded_quantity=payload.refunded_quantity,
+            reason=payload.reason,
+            processed_by=current_user.id,
+        )
+    except FinanceRuleError as exc:
+        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
+    commit_or_conflict(session, "No fue posible registrar la devolución.")
+    session.refresh(allocation)
+    return CreditRefundAllocationRead.model_validate(allocation, from_attributes=True)
+
 
 @router.post(
     "/payments/{payment_id}/refunds",

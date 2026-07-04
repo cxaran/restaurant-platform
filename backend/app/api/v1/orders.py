@@ -153,11 +153,22 @@ def _compose_delivery_and_shipping(
             "La entrega a domicilio requiere al menos calle y número.",
         )
 
+    # Regla de canal: aunque el pedido no tenga cliente (captura manual), la
+    # ENTREGA exige contacto real en el snapshot (recipient_name/phone).
+    recipient_name = data.recipient_name or order.customer_name_snapshot
+    recipient_phone = data.recipient_phone or order.customer_phone_snapshot
+    if not recipient_name or not recipient_phone:
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "datos_contacto_requeridos",
+            "La entrega a domicilio requiere nombre y teléfono de quien recibe.",
+        )
+
     delivery = OrderDelivery(
         order_id=order.id,
         user_address_id=data.user_address_id,
-        recipient_name=data.recipient_name or order.customer_name_snapshot or "",
-        recipient_phone=data.recipient_phone or order.customer_phone_snapshot or "",
+        recipient_name=recipient_name,
+        recipient_phone=recipient_phone,
         location_source=location_source,
         delivery_note=data.delivery_note,
         **fields,

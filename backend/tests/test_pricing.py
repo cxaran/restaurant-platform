@@ -149,7 +149,7 @@ class PricingTest(unittest.TestCase):
                 [
                     CartLineInput(
                         product_id=self.boneless_id,
-                        quantity=Decimal("2"),
+                        quantity=2,
                         purchase_mode="money",
                         modifiers=(
                             CartModifierInput(self.buffalo_id),
@@ -178,7 +178,7 @@ class PricingTest(unittest.TestCase):
                 session,
                 [
                     CartLineInput(
-                        product_id=self.dip_id, quantity=Decimal("2"), purchase_mode="credits"
+                        product_id=self.dip_id, quantity=2, purchase_mode="credits"
                     )
                 ],
             )
@@ -197,7 +197,7 @@ class PricingTest(unittest.TestCase):
                     [
                         CartLineInput(
                             product_id=self.boneless_id,
-                            quantity=Decimal("1"),
+                            quantity=1,
                             purchase_mode="money",
                         )
                     ],
@@ -212,7 +212,7 @@ class PricingTest(unittest.TestCase):
                     [
                         CartLineInput(
                             product_id=self.boneless_id,
-                            quantity=Decimal("1"),
+                            quantity=1,
                             purchase_mode="money",
                             modifiers=(
                                 CartModifierInput(self.bbq_id),
@@ -231,7 +231,7 @@ class PricingTest(unittest.TestCase):
                     [
                         CartLineInput(
                             product_id=self.dip_id,
-                            quantity=Decimal("1"),
+                            quantity=1,
                             purchase_mode="money",
                             modifiers=(CartModifierInput(self.bbq_id),),
                         )
@@ -246,12 +246,12 @@ class PricingTest(unittest.TestCase):
                     session,
                     [
                         CartLineInput(
-                            product_id=self.boneless_id, quantity=Decimal("3"),
+                            product_id=self.boneless_id, quantity=3,
                             purchase_mode="money",
                             modifiers=(CartModifierInput(self.bbq_id),),
                         ),
                         CartLineInput(
-                            product_id=self.boneless_id, quantity=Decimal("3"),
+                            product_id=self.boneless_id, quantity=3,
                             purchase_mode="money",
                             modifiers=(CartModifierInput(self.buffalo_id),),
                         ),
@@ -280,7 +280,7 @@ class PricingTest(unittest.TestCase):
                 OrderLine(
                     order_id=order.id, product_id=self.boneless_id,
                     product_name_snapshot="Orden de boneless",
-                    quantity=Decimal("8"), purchase_mode="money",
+                    quantity=8, purchase_mode="money",
                     money_unit_price_snapshot=Decimal("230"),
                     money_line_total_amount=Decimal("1840"),
                 )
@@ -293,7 +293,7 @@ class PricingTest(unittest.TestCase):
                     session,
                     [
                         CartLineInput(
-                            product_id=self.boneless_id, quantity=Decimal("3"),
+                            product_id=self.boneless_id, quantity=3,
                             purchase_mode="money",
                             modifiers=(CartModifierInput(self.bbq_id),),
                         )
@@ -306,7 +306,7 @@ class PricingTest(unittest.TestCase):
                 session,
                 [
                     CartLineInput(
-                        product_id=self.boneless_id, quantity=Decimal("2"),
+                        product_id=self.boneless_id, quantity=2,
                         purchase_mode="money",
                         modifiers=(CartModifierInput(self.bbq_id),),
                     )
@@ -325,7 +325,7 @@ class PricingTest(unittest.TestCase):
                     session,
                     [
                         CartLineInput(
-                            product_id=self.boneless_id, quantity=Decimal("1"),
+                            product_id=self.boneless_id, quantity=1,
                             purchase_mode="money",
                             modifiers=(CartModifierInput(self.bbq_id),),
                         )

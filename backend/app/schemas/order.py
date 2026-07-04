@@ -23,12 +23,13 @@ from backend.app.schemas.delivery import PublicCourierInfo
 
 class OrderModifierInput(ApiWriteSchema):
     modifier_option_id: UUID
-    quantity: Decimal = Field(default=Decimal("1"), gt=0)
+    # H1: entero ESTRICTO — rechaza también "1", "1.0", 1.0 y true/false.
+    quantity: int = Field(default=1, ge=1, strict=True)
 
 
 class OrderLineInput(ApiWriteSchema):
     product_id: UUID
-    quantity: Decimal = Field(gt=0)
+    quantity: int = Field(ge=1, strict=True)
     purchase_mode: Literal["money", "credits"] = "money"
     modifiers: list[OrderModifierInput] = Field(default_factory=list)
     customer_note: Optional[str] = None
@@ -110,7 +111,7 @@ class OrderAdjustmentCreate(ApiWriteSchema):
 class OrderLineModifierRead(ApiReadSchema):
     group_name_snapshot: str
     option_name_snapshot: str
-    quantity: Decimal
+    quantity: int
     unit_price_adjustment: Decimal
     total_amount: Decimal
 
@@ -119,7 +120,7 @@ class OrderLineRead(ApiReadSchema):
     id: UUID
     product_id: Optional[UUID] = None
     product_name_snapshot: str
-    quantity: Decimal
+    quantity: int
     purchase_mode: str
     money_unit_price_snapshot: Decimal
     modifier_money_total_per_unit: Decimal

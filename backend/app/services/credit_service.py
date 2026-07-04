@@ -187,46 +187,108 @@ def on_order_cancelled(session: Session, order: Order, *, actor_id: Optional[uui
     session.flush()
 
 
+def _ledger_sum(
+    session: Session, *, order_line_id: uuid.UUID, entry_type: str
+) -> int:
+    value = session.exec(
+        select(sa_func.coalesce(sa_func.sum(CreditLedgerEntry.credit_delta), 0)).where(
+            CreditLedgerEntry.order_line_id == order_line_id,
+            CreditLedgerEntry.entry_type == entry_type,
+        )
+    ).one()
+    return int(value)
+
+
 def on_refund_allocation(
     session: Session,
     order: Order,
+    allocation,
     *,
-    order_line_id: uuid.UUID,
-    credits_earned_reversed: int,
-    credits_refunded: int,
+    requested_earned_reversal: int,
+    requested_credits_refund: int,
     actor_id: Optional[uuid.UUID],
-) -> None:
-    """Reembolso por línea (§22.5): revierte ganados y devuelve canjes."""
+) -> tuple[int, int]:
+    """Reembolso por línea (§22.5) con el lifecycle DEFINITIVO (H2).
+
+    Reglas de estado del canje:
+        reserved  → sólo puede liberarse (cancelación); NUNCA redemption_refund.
+        consumed  → puede devolver créditos, hasta lo realmente gastado.
+        released  → no vuelve a liberarse, consumirse ni devolverse.
+
+    earn_reversal SOLO si el pedido está ``completed`` (el earn existió) y hasta
+    el remanente aún no revertido de la línea. Devuelve la tupla APLICADA
+    ``(earned_reversed, credits_refunded)`` — puede ser menor a lo solicitado y
+    la asignación debe registrar estos valores, no los teóricos.
+
+    Idempotencia: cada asiento referencia ``refund_allocation_id`` y los índices
+    únicos parciales del ledger impiden un segundo movimiento del mismo tipo
+    para la misma asignación, aun con reintentos o concurrencia.
+    """
     if order.customer_user_id is None:
-        return
+        # Regla dura: sin cliente no existen créditos (CHECK en orders + aquí).
+        return (0, 0)
     now = utc_now()
-    if credits_earned_reversed > 0:
-        session.add(
-            CreditLedgerEntry(
-                user_id=order.customer_user_id,
-                order_id=order.id,
-                order_line_id=order_line_id,
-                entry_type="earn_reversal",
-                credit_delta=-credits_earned_reversed,
-                description=f"Reverso por reembolso del pedido {order.public_code}.",
-                occurred_at=now,
-                created_by=actor_id,
-            )
+    applied_reversal = 0
+    applied_refund = 0
+
+    if requested_earned_reversal > 0 and order.status == "completed":
+        earned = _ledger_sum(
+            session, order_line_id=allocation.order_line_id, entry_type="earn"
         )
-    if credits_refunded > 0:
-        session.add(
-            CreditLedgerEntry(
-                user_id=order.customer_user_id,
-                order_id=order.id,
-                order_line_id=order_line_id,
+        already_reversed = -_ledger_sum(
+            session, order_line_id=allocation.order_line_id, entry_type="earn_reversal"
+        )
+        applied_reversal = max(0, min(requested_earned_reversal, earned - already_reversed))
+        if applied_reversal > 0:
+            session.add(
+                CreditLedgerEntry(
+                    user_id=order.customer_user_id,
+                    order_id=order.id,
+                    order_line_id=allocation.order_line_id,
+                    refund_allocation_id=allocation.id,
+                    entry_type="earn_reversal",
+                    credit_delta=-applied_reversal,
+                    description=f"Reverso por reembolso del pedido {order.public_code}.",
+                    occurred_at=now,
+                    created_by=actor_id,
+                )
+            )
+
+    if requested_credits_refund > 0:
+        redemption = session.exec(
+            select(CreditRedemption).where(
+                CreditRedemption.order_line_id == allocation.order_line_id
+            )
+        ).first()
+        # SOLO canjes CONSUMIDOS devuelven créditos; los reserved se liberan por
+        # cancelación y los released ya devolvieron lo suyo.
+        if redemption is not None and redemption.status == "consumed":
+            already_refunded = _ledger_sum(
+                session,
+                order_line_id=allocation.order_line_id,
                 entry_type="redemption_refund",
-                credit_delta=credits_refunded,
-                description=f"Devolución de canje del pedido {order.public_code}.",
-                occurred_at=now,
-                created_by=actor_id,
             )
-        )
+            applied_refund = max(
+                0, min(requested_credits_refund, redemption.credits_spent - already_refunded)
+            )
+            if applied_refund > 0:
+                session.add(
+                    CreditLedgerEntry(
+                        user_id=order.customer_user_id,
+                        order_id=order.id,
+                        order_line_id=allocation.order_line_id,
+                        credit_redemption_id=redemption.id,
+                        refund_allocation_id=allocation.id,
+                        entry_type="redemption_refund",
+                        credit_delta=applied_refund,
+                        description=f"Devolución de canje del pedido {order.public_code}.",
+                        occurred_at=now,
+                        created_by=actor_id,
+                    )
+                )
+
     session.flush()
+    return (applied_reversal, applied_refund)
 
 
 def manual_adjustment(

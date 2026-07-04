@@ -118,6 +118,19 @@ class Order(Base):
             "source != 'online' OR customer_user_id IS NOT NULL",
             name="orders_online_requires_customer",
         ),
+        # Todo pedido de canal interno registra al empleado capturista.
+        CheckConstraint(
+            "source = 'online' OR created_by IS NOT NULL",
+            name="orders_staff_requires_employee",
+        ),
+        # Créditos SOLO con cliente (regla H1/H2): sin customer_user_id el pedido
+        # no gana ni canjea créditos. La parte cross-tabla (que no existan
+        # credit_redemptions) la protege el servicio dentro de la transacción.
+        CheckConstraint(
+            "customer_user_id IS NOT NULL "
+            "OR (credits_earned_total_snapshot = 0 AND credits_redeemed_total = 0)",
+            name="orders_credits_require_customer",
+        ),
         Index("uq_orders_order_number", "order_number", unique=True),
         Index("uq_orders_public_code", "public_code", unique=True),
         Index("ix_orders_customer_created", "customer_user_id", "created_at"),
@@ -231,7 +244,8 @@ class OrderLine(Base):
     __tablename__ = "order_lines"
     __table_args__ = (
         CheckConstraint(_in_clause("purchase_mode", PURCHASE_MODES), name="order_lines_mode"),
-        CheckConstraint("quantity > 0", name="order_lines_quantity_positive"),
+        # H1: SOLO enteros positivos — no existen medias órdenes en restaurante.
+        CheckConstraint("quantity >= 1", name="order_lines_quantity_positive"),
         Index("ix_order_lines_order", "order_id"),
         Index("ix_order_lines_product", "product_id"),
     )
@@ -250,7 +264,11 @@ class OrderLine(Base):
     )
     product_name_snapshot: Mapped[str] = mapped_column(String(180), nullable=False)
     product_description_snapshot: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    quantity: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        comment="Unidades ENTERAS (H1): sin fracciones; los créditos multiplican exacto.",
+    )
     purchase_mode: Mapped[str] = mapped_column(String(20), nullable=False)
     money_unit_price_snapshot: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False, default=Decimal("0")
@@ -290,7 +308,10 @@ class OrderLineModifier(Base):
     """Salsa/extra elegido, congelado (§15.2)."""
 
     __tablename__ = "order_line_modifiers"
-    __table_args__ = (Index("ix_order_line_modifiers_line", "order_line_id"),)
+    __table_args__ = (
+        CheckConstraint("quantity >= 1", name="order_line_modifiers_quantity_positive"),
+        Index("ix_order_line_modifiers_line", "order_line_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -307,9 +328,7 @@ class OrderLineModifier(Base):
     )
     group_name_snapshot: Mapped[str] = mapped_column(String(120), nullable=False)
     option_name_snapshot: Mapped[str] = mapped_column(String(180), nullable=False)
-    quantity: Mapped[Decimal] = mapped_column(
-        Numeric(10, 2), nullable=False, default=Decimal("1")
-    )
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     unit_price_adjustment: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False, default=Decimal("0")
     )

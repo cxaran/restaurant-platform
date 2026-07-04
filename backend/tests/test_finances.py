@@ -101,7 +101,7 @@ class FinanceServiceTest(unittest.TestCase):
             self.order_id = order.id
             line = OrderLine(
                 order_id=order.id, product_name_snapshot="Orden de boneless",
-                quantity=Decimal("2"), purchase_mode="money",
+                quantity=2, purchase_mode="money",
                 money_unit_price_snapshot=Decimal("100"),
                 money_line_total_amount=Decimal("200"),
                 credits_awarded_per_unit_snapshot=10,
@@ -175,7 +175,7 @@ class FinanceServiceTest(unittest.TestCase):
                 allocations=[
                     RefundAllocationInput(
                         order_line_id=self.line_id,
-                        refunded_quantity=Decimal("1"),
+                        refunded_quantity=1,
                         money_refunded_amount=Decimal("100"),
                     )
                 ],

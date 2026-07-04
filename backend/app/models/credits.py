@@ -19,6 +19,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -95,6 +96,37 @@ class CreditLedgerEntry(Base):
         CheckConstraint("credit_delta != 0", name="credit_ledger_entries_delta_nonzero"),
         Index("ix_credit_ledger_user_occurred", "user_id", "occurred_at"),
         Index("ix_credit_ledger_order", "order_id"),
+        # H2: idempotencia a nivel BASE — un canje solo puede reservarse y
+        # liberarse UNA vez; una asignación de reembolso solo puede producir UN
+        # movimiento de cada tipo, aun con reintentos o concurrencia.
+        Index(
+            "uq_credit_ledger_reservation_per_redemption",
+            "credit_redemption_id",
+            unique=True,
+            postgresql_where=text("entry_type = 'redeem_reservation'"),
+            sqlite_where=text("entry_type = 'redeem_reservation'"),
+        ),
+        Index(
+            "uq_credit_ledger_release_per_redemption",
+            "credit_redemption_id",
+            unique=True,
+            postgresql_where=text("entry_type = 'redemption_release'"),
+            sqlite_where=text("entry_type = 'redemption_release'"),
+        ),
+        Index(
+            "uq_credit_ledger_refund_per_allocation",
+            "refund_allocation_id",
+            unique=True,
+            postgresql_where=text("entry_type = 'redemption_refund'"),
+            sqlite_where=text("entry_type = 'redemption_refund'"),
+        ),
+        Index(
+            "uq_credit_ledger_reversal_per_allocation",
+            "refund_allocation_id",
+            unique=True,
+            postgresql_where=text("entry_type = 'earn_reversal'"),
+            sqlite_where=text("entry_type = 'earn_reversal'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -128,6 +160,12 @@ class CreditLedgerEntry(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("credit_ledger_entries.id", ondelete="RESTRICT"),
         nullable=True,
+    )
+    refund_allocation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("order_line_refund_allocations.id", ondelete="RESTRICT"),
+        nullable=True,
+        comment="Causa exacta del movimiento cuando proviene de un reembolso (H2).",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

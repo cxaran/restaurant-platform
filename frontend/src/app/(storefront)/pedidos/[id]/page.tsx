@@ -91,6 +91,13 @@ export default async function MyOrderDetailPage({
           <span>Subtotal</span>
           <span style={{ fontWeight: 700 }}>{formatMoney(order.items_subtotal_amount)}</span>
         </div>
+        {/* Descuento aplicado (snapshot del backend): solo si hubo código. */}
+        {Number.parseFloat(order.discount_total_amount) > 0 ? (
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
+            <span>{order.discount_code_label ?? "Descuento"}</span>
+            <span style={{ fontWeight: 700 }}>−{formatMoney(order.discount_total_amount)}</span>
+          </div>
+        ) : null}
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
           <span>Envío</span>
           <span style={{ fontWeight: 700 }}>

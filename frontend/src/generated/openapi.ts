@@ -1288,6 +1288,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/discount-codes/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quote Discount Code
+         * @description Cotiza un código contra el carrito ACTUAL del cliente autenticado.
+         *
+         *     El backend valúa las líneas con ``price_cart``: el subtotal elegible es la
+         *     suma monetaria de productos y modificadores — el envío NUNCA cuenta.
+         */
+        post: operations["quote_discount_code_api_v1_discount_codes_quote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discount-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Discount Codes */
+        get: operations["list_discount_codes_api_v1_discount_codes_get"];
+        put?: never;
+        /**
+         * Create Discount Code
+         * @description Crea un código. El texto es del administrador: NO hay generador automático.
+         */
+        post: operations["create_discount_code_api_v1_discount_codes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/discount-codes/{code_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Discount Code */
+        get: operations["get_discount_code_api_v1_discount_codes__code_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Discount Code
+         * @description Edita la definición VIGENTE del código. Todos los campos son editables.
+         *
+         *     Los cambios sólo afectan usos FUTUROS: las redenciones existentes conservan
+         *     sus snapshots inmutables (código, nombre y montos del momento de reservar) y
+         *     jamás se tocan al editar.
+         */
+        patch: operations["update_discount_code_api_v1_discount_codes__code_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/discount-codes/{code_id}/redemptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Discount Code Redemptions */
+        get: operations["list_discount_code_redemptions_api_v1_discount_codes__code_id__redemptions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/files": {
         parameters: {
             query?: never;
@@ -1530,6 +1616,29 @@ export interface paths {
         put?: never;
         /** Capture Order */
         post: operations["capture_order_api_v1_orders_capture_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/cancellations/pending-refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Cancelled Pending Refunds
+         * @description Cola de conciliación H5: cancelados con cobro cuya devolución sigue abierta.
+         *
+         *     Incluye resoluciones refund_now/refund_pending mientras el dinero devuelto
+         *     no cubra lo cobrado; «retain» queda fuera (decisión auditada aparte).
+         */
+        get: operations["list_cancelled_pending_refunds_api_v1_orders_cancellations_pending_refunds_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3462,6 +3571,31 @@ export interface components {
             entry_count: number;
         };
         /**
+         * CancelledWithPaymentItem
+         * @description Cola de conciliación H5: cancelados con cobro y devolución abierta.
+         */
+        CancelledWithPaymentItem: {
+            /**
+             * Order Id
+             * Format: uuid
+             */
+            order_id: string;
+            /** Public Code */
+            public_code: string;
+            /** Cancelled At */
+            cancelled_at?: string | null;
+            /** Cancellation Money Resolution */
+            cancellation_money_resolution?: string | null;
+            /** Cancellation Resolution Note */
+            cancellation_resolution_note?: string | null;
+            /** Paid Total */
+            paid_total: string;
+            /** Refunded Total */
+            refunded_total: string;
+            /** Outstanding Amount */
+            outstanding_amount: string;
+        };
+        /**
          * CaptureRequest
          * @description Captura por personal (§1.2): cliente OPCIONAL; el empleado queda registrado.
          */
@@ -3555,6 +3689,8 @@ export interface components {
             /** Customer Note */
             customer_note?: string | null;
             delivery?: components["schemas"]["DeliveryInput"] | null;
+            /** Discount Code */
+            discount_code?: string | null;
         };
         /** CompleteDeliveryRequest */
         CompleteDeliveryRequest: {
@@ -3823,6 +3959,177 @@ export interface components {
             priority?: number | null;
             /** Is Active */
             is_active?: boolean | null;
+        };
+        /** DiscountCodeCreate */
+        DiscountCodeCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Code */
+            code: string;
+            /** Discount Amount */
+            discount_amount: number | string;
+            /** Minimum Order Amount */
+            minimum_order_amount: number | string;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid Until */
+            valid_until?: string | null;
+            /** Target Customer User Id */
+            target_customer_user_id?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** DiscountCodeListItem */
+        DiscountCodeListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Code */
+            code: string;
+            /** Discount Amount */
+            discount_amount: string;
+            /** Minimum Order Amount */
+            minimum_order_amount: string;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid Until */
+            valid_until?: string | null;
+            /** Target Customer User Id */
+            target_customer_user_id?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** DiscountCodeRead */
+        DiscountCodeRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Code */
+            code: string;
+            /** Discount Amount */
+            discount_amount: string;
+            /** Minimum Order Amount */
+            minimum_order_amount: string;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid Until */
+            valid_until?: string | null;
+            /** Target Customer User Id */
+            target_customer_user_id?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** DiscountCodeUpdate */
+        DiscountCodeUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Code */
+            code?: string | null;
+            /** Discount Amount */
+            discount_amount?: number | string | null;
+            /** Minimum Order Amount */
+            minimum_order_amount?: number | string | null;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid Until */
+            valid_until?: string | null;
+            /** Target Customer User Id */
+            target_customer_user_id?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+        };
+        /**
+         * DiscountQuoteRequest
+         * @description Cotización del carrito web: sólo el código y las líneas (IDs+cantidades).
+         */
+        DiscountQuoteRequest: {
+            /** Discount Code */
+            discount_code: string;
+            /** Lines */
+            lines: components["schemas"]["OrderLineInput"][];
+        };
+        /** DiscountQuoteResult */
+        DiscountQuoteResult: {
+            /** Valid */
+            valid: boolean;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Discount Amount */
+            discount_amount: string;
+            /** Minimum Order Amount */
+            minimum_order_amount: string;
+            /** Eligible Subtotal */
+            eligible_subtotal: string;
+        };
+        /** DiscountRedemptionListItem */
+        DiscountRedemptionListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Order Id
+             * Format: uuid
+             */
+            order_id: string;
+            /** Order Public Code */
+            order_public_code: string;
+            /**
+             * Customer User Id
+             * Format: uuid
+             */
+            customer_user_id: string;
+            /** Code Snapshot */
+            code_snapshot: string;
+            /** Name Snapshot */
+            name_snapshot: string;
+            /** Discount Amount Snapshot */
+            discount_amount_snapshot: string;
+            /** Minimum Order Amount Snapshot */
+            minimum_order_amount_snapshot: string;
+            /** Status */
+            status: string;
+            /**
+             * Reserved At
+             * Format: date-time
+             */
+            reserved_at: string;
+            /** Consumed At */
+            consumed_at?: string | null;
+            /** Released At */
+            released_at?: string | null;
+            /** Release Reason */
+            release_reason?: string | null;
         };
         /**
          * DriveBackupFileRead
@@ -4358,6 +4665,13 @@ export interface components {
             purchase_mode: string;
             /** Items Subtotal Amount */
             items_subtotal_amount: string;
+            /**
+             * Discount Total Amount
+             * @default 0
+             */
+            discount_total_amount: string;
+            /** Discount Code Label */
+            discount_code_label?: string | null;
             /** Shipping Amount */
             shipping_amount?: string | null;
             /** Shipping Pending Review */
@@ -4658,6 +4972,10 @@ export interface components {
             customer_note?: string | null;
             /** Internal Note */
             internal_note?: string | null;
+            /** Cancellation Money Resolution */
+            cancellation_money_resolution?: string | null;
+            /** Cancellation Resolution Note */
+            cancellation_resolution_note?: string | null;
             /** Created By */
             created_by?: string | null;
             /**
@@ -4705,11 +5023,10 @@ export interface components {
         OrderTransitionRequest: {
             /** New Status */
             new_status: string;
-            /**
-             * Acknowledge Paid Payments
-             * @default false
-             */
-            acknowledge_paid_payments: boolean;
+            /** Payment Resolution */
+            payment_resolution?: ("refund_now" | "refund_pending" | "retain") | null;
+            /** Resolution Reason */
+            resolution_reason?: string | null;
             /** Reason Code */
             reason_code?: string | null;
             /** Internal Note */
@@ -9725,6 +10042,218 @@ export interface operations {
             };
         };
     };
+    quote_discount_code_api_v1_discount_codes_quote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscountQuoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountQuoteResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_discount_codes_api_v1_discount_codes_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                is_active?: boolean | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountCodeListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_discount_code_api_v1_discount_codes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscountCodeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountCodeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_discount_code_api_v1_discount_codes__code_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountCodeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_discount_code_api_v1_discount_codes__code_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiscountCodeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountCodeRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_discount_code_redemptions_api_v1_discount_codes__code_id__redemptions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                code_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscountRedemptionListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_file_api_v1_files_post: {
         parameters: {
             query?: never;
@@ -10306,6 +10835,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cancelled_pending_refunds_api_v1_orders_cancellations_pending_refunds_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelledWithPaymentItem"][];
                 };
             };
             /** @description Validation Error */

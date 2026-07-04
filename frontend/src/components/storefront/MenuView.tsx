@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import type { PublicMenuCategory, PublicProduct } from "@/core/restaurant-api/contracts";
 import { formatMoney, publicFileUrl } from "@/core/restaurant-api/theme";
 import { useCart } from "@/core/storefront/cart";
+import { isCustomizable, requiresConfiguration } from "@/core/storefront/configurator";
+import { ProductConfigurator } from "./ProductConfigurator";
 
 export function AddToCartButton({
   productId,
@@ -27,9 +29,15 @@ export function AddToCartButton({
   );
 }
 
-function ProductCard({ product }: Readonly<{ product: PublicProduct }>) {
+function ProductCard({
+  product,
+  onConfigure,
+}: Readonly<{ product: PublicProduct; onConfigure: (product: PublicProduct) => void }>) {
   const imageUrl = publicFileUrl(product.image_file_ids[0] ?? null);
-  const money = product.is_money_purchase_available && product.money_price_amount !== null;
+  const money = product.is_money_purchase_available && product.money_price_amount != null;
+  // Con grupos requeridos (o mínimos > 0) NUNCA se agrega directo al carrito.
+  const mustConfigure = requiresConfiguration(product);
+  const customizable = isCustomizable(product);
   return (
     <article className="sf-card" style={{ display: "flex", flexDirection: "column" }}>
       <div className="sf-imgbox" style={{ height: 170, borderRadius: 0 }}>
@@ -65,17 +73,40 @@ function ProductCard({ product }: Readonly<{ product: PublicProduct }>) {
             Personalizable: {product.modifier_groups.map((group) => group.name).join(", ")}
           </div>
         ) : null}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
           <div style={{ fontWeight: 900, fontSize: 18 }}>
             {money ? formatMoney(product.money_price_amount) : "Solo con créditos"}
           </div>
           {money ? (
-            <AddToCartButton
-              productId={product.id}
-              name={product.name}
-              priceHint={product.money_price_amount ?? null}
-              compact
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {customizable && !mustConfigure ? (
+                <button
+                  type="button"
+                  className="sf-chip"
+                  onClick={() => onConfigure(product)}
+                  aria-label={`Personalizar ${product.name}`}
+                >
+                  Personalizar
+                </button>
+              ) : null}
+              {mustConfigure ? (
+                <button
+                  type="button"
+                  className="sf-btn"
+                  style={{ padding: "8px 18px", fontSize: 13 }}
+                  onClick={() => onConfigure(product)}
+                >
+                  Agregar
+                </button>
+              ) : (
+                <AddToCartButton
+                  productId={product.id}
+                  name={product.name}
+                  priceHint={product.money_price_amount ?? null}
+                  compact
+                />
+              )}
+            </div>
           ) : null}
         </div>
       </div>
@@ -85,6 +116,7 @@ function ProductCard({ product }: Readonly<{ product: PublicProduct }>) {
 
 export function MenuView({ categories }: Readonly<{ categories: PublicMenuCategory[] }>) {
   const [active, setActive] = useState<string | "all">("all");
+  const [configuring, setConfiguring] = useState<PublicProduct | null>(null);
   const visible = useMemo(
     () => (active === "all" ? categories : categories.filter((c) => c.id === active)),
     [categories, active],
@@ -149,11 +181,14 @@ export function MenuView({ categories }: Readonly<{ categories: PublicMenuCatego
             }}
           >
             {category.products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} onConfigure={setConfiguring} />
             ))}
           </div>
         </section>
       ))}
+      {configuring ? (
+        <ProductConfigurator product={configuring} onClose={() => setConfiguring(null)} />
+      ) : null}
     </div>
   );
 }

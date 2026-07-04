@@ -42,6 +42,7 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
     setSubmitting(true);
     const payload: CheckoutRequest = {
       fulfillment_type: fulfillment,
+      purchase_mode: "money",
       customer_name: name,
       customer_phone: phone,
       customer_note: note || null,
@@ -78,12 +79,15 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
         setError(
           "No se pudo confirmar por una actualización simultánea. Revisa el pedido y vuelve a intentarlo.",
         );
+      } else if (err instanceof ApiRequestError) {
+        // Error de dominio (p. ej. seleccion_incompleta): mensaje del backend
+        // más el detalle por campo si viene; el carrito NO se toca.
+        const details = (err.body.errors ?? [])
+          .map((item) => item.message)
+          .filter((message) => message && message !== err.body.message);
+        setError(details.length > 0 ? `${err.body.message} ${details.join(" ")}` : err.body.message);
       } else {
-        setError(
-          err instanceof ApiRequestError
-            ? err.body.message
-            : "No fue posible enviar el pedido. Intenta de nuevo.",
-        );
+        setError("No fue posible enviar el pedido. Intenta de nuevo.");
       }
       setSubmitting(false);
     }

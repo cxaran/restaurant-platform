@@ -1,13 +1,43 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
+import { ProductConfigurator } from "@/components/storefront/ProductConfigurator";
 import { QuantityStepper } from "@/components/storefront/QuantityStepper";
+import type { PublicProduct } from "@/core/restaurant-api/contracts";
+import { fetchPublicMenu } from "@/core/restaurant-api/menu";
 import { formatMoney } from "@/core/restaurant-api/theme";
-import { useCart } from "@/core/storefront/cart";
+import { useCart, type CartLine } from "@/core/storefront/cart";
+import { isCustomizable } from "@/core/storefront/configurator";
 
 export default function CartPage() {
   const { lines, count, subtotalHint, setQuantity, removeLine } = useCart();
+  const [catalog, setCatalog] = useState<Map<string, PublicProduct> | null>(null);
+  const [editing, setEditing] = useState<CartLine | null>(null);
+
+  // Catálogo público para reconstituir el PublicProduct de cada línea al
+  // editar. Si el fetch falla solo se ocultan las acciones de edición.
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicMenu()
+      .then((categories) => {
+        if (cancelled) return;
+        const map = new Map<string, PublicProduct>();
+        for (const category of categories) {
+          for (const product of category.products) map.set(product.id, product);
+        }
+        setCatalog(map);
+      })
+      .catch(() => {
+        // Silencioso: el carrito sigue funcionando sin edición de modificadores.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const editingProduct = editing ? (catalog?.get(editing.product_id) ?? null) : null;
 
   return (
     <div className="sf-container" style={{ paddingBlock: 28, maxWidth: 760 }}>
@@ -20,33 +50,58 @@ export default function CartPage() {
       ) : (
         <>
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 12 }} aria-live="polite">
-            {lines.map((line) => (
-              <li key={line.key} className="sf-card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <div style={{ fontWeight: 800 }}>{line.name}</div>
-                  <div className="sf-muted" style={{ fontSize: 13 }}>
-                    {line.unit_price_hint ? `${formatMoney(line.unit_price_hint)} c/u` : "Precio al confirmar"}
+            {lines.map((line) => {
+              const product = catalog?.get(line.product_id) ?? null;
+              const editable =
+                product !== null && (line.modifiers.length > 0 || isCustomizable(product));
+              return (
+                <li key={line.key} className="sf-card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ fontWeight: 800 }}>{line.name}</div>
+                    {line.modifiers.length > 0 ? (
+                      <ul className="sf-muted" style={{ listStyle: "none", margin: "2px 0 0", padding: 0, fontSize: 13 }}>
+                        {line.modifiers.map((modifier) => (
+                          <li key={modifier.modifier_option_id}>
+                            {modifier.name}
+                            {modifier.quantity > 1 ? ` ×${modifier.quantity}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <div className="sf-muted" style={{ fontSize: 13 }}>
+                      {line.unit_price_hint ? `${formatMoney(line.unit_price_hint)} c/u` : "Precio al confirmar"}
+                    </div>
                   </div>
-                </div>
-                <QuantityStepper
-                  value={line.quantity}
-                  onChange={(next) => setQuantity(line.key, next)}
-                />
-                <div style={{ fontWeight: 900, minWidth: 76, textAlign: "right" }}>
-                  {line.unit_price_hint
-                    ? formatMoney(Number.parseFloat(line.unit_price_hint) * line.quantity)
-                    : "—"}
-                </div>
-                <button
-                  type="button"
-                  className="sf-chip"
-                  onClick={() => removeLine(line.key)}
-                  aria-label={`Quitar ${line.name}`}
-                >
-                  Quitar
-                </button>
-              </li>
-            ))}
+                  <QuantityStepper
+                    value={line.quantity}
+                    onChange={(next) => setQuantity(line.key, next)}
+                  />
+                  <div style={{ fontWeight: 900, minWidth: 76, textAlign: "right" }}>
+                    {line.unit_price_hint
+                      ? formatMoney(Number.parseFloat(line.unit_price_hint) * line.quantity)
+                      : "—"}
+                  </div>
+                  {editable ? (
+                    <button
+                      type="button"
+                      className="sf-chip"
+                      onClick={() => setEditing(line)}
+                      aria-label={`Editar ${line.name}`}
+                    >
+                      Editar
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="sf-chip"
+                    onClick={() => removeLine(line.key)}
+                    aria-label={`Quitar ${line.name}`}
+                  >
+                    Quitar
+                  </button>
+                </li>
+              );
+            })}
           </ul>
           <div className="sf-card" style={{ marginTop: 18, padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
             <div>
@@ -62,6 +117,13 @@ export default function CartPage() {
           </div>
         </>
       )}
+      {editing && editingProduct ? (
+        <ProductConfigurator
+          product={editingProduct}
+          editLine={editing}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
     </div>
   );
 }

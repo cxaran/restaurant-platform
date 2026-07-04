@@ -16,24 +16,18 @@ import {
   type ReactNode,
 } from "react";
 
-export type CartModifier = { modifier_option_id: string; name: string; quantity: number };
+import {
+  isValidQuantity,
+  lineSignature,
+  replaceLineIn,
+  type CartLine,
+  type CartModifier,
+} from "./cart-lines";
 
-export type CartLine = {
-  key: string;
-  product_id: string;
-  name: string;
-  unit_price_hint: string | null;
-  quantity: number;
-  modifiers: CartModifier[];
-  customer_note?: string;
-};
+export type { CartLine, CartModifier };
 
 const STORAGE_KEY = "rp-storefront-cart-v1";
 const EMPTY: CartLine[] = [];
-
-function isValidQuantity(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 1;
-}
 
 function loadStoredLines(): CartLine[] {
   try {
@@ -86,6 +80,7 @@ type CartContextValue = {
   count: number;
   subtotalHint: number;
   addLine: (line: Omit<CartLine, "key" | "quantity">, quantity?: number) => void;
+  replaceLine: (key: string, line: Omit<CartLine, "key" | "quantity">, quantity: number) => void;
   setQuantity: (key: string, quantity: number) => void;
   removeLine: (key: string) => void;
   clear: () => void;
@@ -100,10 +95,7 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
     (line: Omit<CartLine, "key" | "quantity">, quantity = 1) => {
       if (!isValidQuantity(quantity)) return;
       const current = getSnapshot();
-      const signature = `${line.product_id}:${line.modifiers
-        .map((m) => `${m.modifier_option_id}x${m.quantity}`)
-        .sort()
-        .join(",")}`;
+      const signature = lineSignature(line.product_id, line.modifiers);
       const existing = current.find((item) => item.key === signature);
       setCart(
         existing
@@ -112,6 +104,16 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
             )
           : [...current, { ...line, key: signature, quantity }],
       );
+    },
+    [],
+  );
+
+  const replaceLine = useCallback(
+    (key: string, line: Omit<CartLine, "key" | "quantity">, quantity: number) => {
+      // Edición de una línea: reemplaza (o fusiona por firma), nunca duplica.
+      const current = getSnapshot();
+      const next = replaceLineIn(current, key, line, quantity);
+      if (next !== current) setCart(next);
     },
     [],
   );
@@ -134,8 +136,8 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
       const price = Number.parseFloat(line.unit_price_hint ?? "");
       return Number.isFinite(price) ? sum + price * line.quantity : sum;
     }, 0);
-    return { lines, count, subtotalHint, addLine, setQuantity, removeLine, clear };
-  }, [lines, addLine, setQuantity, removeLine, clear]);
+    return { lines, count, subtotalHint, addLine, replaceLine, setQuantity, removeLine, clear };
+  }, [lines, addLine, replaceLine, setQuantity, removeLine, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

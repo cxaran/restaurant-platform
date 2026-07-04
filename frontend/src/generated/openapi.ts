@@ -3476,6 +3476,12 @@ export interface components {
              * @enum {string}
              */
             fulfillment_type: "delivery" | "pickup" | "counter";
+            /**
+             * Purchase Mode
+             * @default money
+             * @enum {string}
+             */
+            purchase_mode: "money" | "credits";
             /** Lines */
             lines: components["schemas"]["OrderLineInput"][];
             /** Customer User Id */
@@ -3534,6 +3540,12 @@ export interface components {
              * @enum {string}
              */
             fulfillment_type: "delivery" | "pickup";
+            /**
+             * Purchase Mode
+             * @default money
+             * @enum {string}
+             */
+            purchase_mode: "money" | "credits";
             /** Lines */
             lines: components["schemas"]["OrderLineInput"][];
             /** Customer Name */
@@ -4342,6 +4354,8 @@ export interface components {
             status_label: string;
             /** Fulfillment Type */
             fulfillment_type: string;
+            /** Purchase Mode */
+            purchase_mode: string;
             /** Items Subtotal Amount */
             items_subtotal_amount: string;
             /** Shipping Amount */
@@ -4567,6 +4581,8 @@ export interface components {
             source: string;
             /** Fulfillment Type */
             fulfillment_type: string;
+            /** Purchase Mode */
+            purchase_mode: string;
             /** Status */
             status: string;
             /** Payment Status */
@@ -4616,6 +4632,8 @@ export interface components {
             source: string;
             /** Fulfillment Type */
             fulfillment_type: string;
+            /** Purchase Mode */
+            purchase_mode: string;
             /** Status */
             status: string;
             /** Payment Status */

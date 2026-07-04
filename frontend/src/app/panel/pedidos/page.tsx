@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { requireSession } from "@/core/auth/session";
 import { OrdersBoard } from "./OrdersBoard";
+import { PendingRefunds } from "./PendingRefunds";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function PanelOrdersPage() {
         <Link href="/panel" style={{ fontSize: 13, fontWeight: 700 }}>Panel</Link>
         <Link href="/panel/pos" style={{ fontSize: 13, fontWeight: 700 }}>POS</Link>
       </header>
+      {permissions.includes("payments:read") ? <PendingRefunds /> : null}
       <OrdersBoard permissions={permissions} />
     </main>
   );

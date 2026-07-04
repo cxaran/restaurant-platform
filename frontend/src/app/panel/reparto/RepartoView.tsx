@@ -9,33 +9,25 @@ import { useEffect, useState } from "react";
 
 import { ApiRequestError } from "@/core/api/api-error";
 import { browserApi } from "@/core/api/browser-client";
+import type {
+  AssignmentRead,
+  AvailableDeliveryItem,
+  CourierSummaryRead,
+  MyActiveDelivery,
+} from "@/core/restaurant-api/panel-contracts";
 import { formatMoney } from "@/core/restaurant-api/theme";
-
-type QueueItem = {
-  order_id: string;
-  order_delivery_id: string;
-  public_code: string;
-  customer_name?: string | null;
-  address_summary: string;
-  zone_name?: string | null;
-  collection_label: string;
-  ready_since?: string | null;
-};
-
-type Assignment = { order_delivery_id: string; status: string };
-
-type Summary = {
-  deliveries_completed: number;
-  cash_collected: string;
-  shipping_charged: string;
-};
+import {
+  ActiveDeliveryCard,
+  completeDelivery,
+  fetchMyDeliveries,
+  startDelivery,
+} from "./courier-shared";
 
 export function RepartoView() {
   const [available, setAvailable] = useState(false);
-  const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [current, setCurrent] = useState<(QueueItem & { status: string }) | null>(null);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [deliveredTo, setDeliveredTo] = useState("");
+  const [queue, setQueue] = useState<AvailableDeliveryItem[]>([]);
+  const [current, setCurrent] = useState<MyActiveDelivery | null>(null);
+  const [summary, setSummary] = useState<CourierSummaryRead | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tick, setTick] = useState(0);
@@ -45,21 +37,14 @@ export function RepartoView() {
     (async () => {
       try {
         const [queueData, summaryData, mine] = await Promise.all([
-          browserApi<QueueItem[]>("/api/v1/courier/available-orders"),
-          browserApi<Summary>("/api/v1/courier/summary"),
-          browserApi<(QueueItem & { assignment_status: string })[]>(
-            "/api/v1/courier/deliveries/mine",
-          ),
+          browserApi<AvailableDeliveryItem[]>("/api/v1/courier/available-orders"),
+          browserApi<CourierSummaryRead>("/api/v1/courier/summary"),
+          fetchMyDeliveries(),
         ]);
         if (!active) return;
         setQueue(queueData);
         setSummary(summaryData);
-        const active_ = mine[0];
-        setCurrent(
-          active_
-            ? { ...active_, status: active_.assignment_status === "in_progress" ? "in_progress" : "assigned" }
-            : null,
-        );
+        setCurrent(mine[0] ?? null);
         setError(null);
       } catch (err) {
         if (!active) return;
@@ -100,39 +85,31 @@ export function RepartoView() {
     }
   }
 
-  async function take(item: QueueItem) {
+  async function take(item: AvailableDeliveryItem) {
     const result = await call(() =>
-      browserApi<Assignment>(`/api/v1/courier/deliveries/${item.order_delivery_id}/take`, {
+      browserApi<AssignmentRead>(`/api/v1/courier/deliveries/${item.order_delivery_id}/take`, {
         method: "POST",
       }),
     );
     if (result) {
-      setCurrent({ ...item, status: "assigned" });
+      setCurrent({ ...item, assignment_status: "assigned" });
       setTick((value) => value + 1);
     }
   }
 
   async function start() {
     if (!current) return;
-    const result = await call(() =>
-      browserApi<Assignment>(`/api/v1/courier/deliveries/${current.order_delivery_id}/start`, {
-        method: "POST",
-      }),
-    );
-    if (result) setCurrent({ ...current, status: "in_progress" });
+    const result = await call(() => startDelivery(current.order_delivery_id));
+    if (result) setCurrent({ ...current, assignment_status: "in_progress" });
   }
 
-  async function complete() {
+  async function complete(deliveredToName: string) {
     if (!current) return;
     const result = await call(() =>
-      browserApi<Assignment>(
-        `/api/v1/courier/deliveries/${current.order_delivery_id}/complete`,
-        { method: "POST", body: { delivered_to_name: deliveredTo || null } },
-      ),
+      completeDelivery(current.order_delivery_id, deliveredToName),
     );
     if (result) {
       setCurrent(null);
-      setDeliveredTo("");
       setTick((value) => value + 1);
     }
   }
@@ -170,45 +147,13 @@ export function RepartoView() {
       {error ? <p role="alert" style={{ margin: 0, color: "#b3261e", fontWeight: 700 }}>{error}</p> : null}
 
       {current ? (
-        <div style={{ ...card, borderWidth: 2 }}>
-          <div style={{ fontWeight: 900, fontSize: 16 }}>
-            {current.public_code} · {current.status === "in_progress" ? "En camino" : "Asignada"}
-          </div>
-          <div style={{ fontSize: 14, margin: "6px 0" }}>
-            {current.customer_name ?? "Cliente"} · {current.address_summary}
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>
-            {current.collection_label}
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-            <a
-              className="sf-chip"
-              style={{ textDecoration: "none", border: "1px solid rgba(0,0,0,0.3)", borderRadius: 999, padding: "8px 14px", fontWeight: 700, fontSize: 13 }}
-              href={`https://www.google.com/maps/search/${encodeURIComponent(current.address_summary)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Abrir en Maps
-            </a>
-          </div>
-          {current.status !== "in_progress" ? (
-            <button type="button" disabled={busy} onClick={() => void start()} style={{ width: "100%", padding: "12px", borderRadius: 10, fontWeight: 900 }}>
-              Salir a entregar
-            </button>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <input
-                placeholder="¿Quién recibió? (opcional)"
-                value={deliveredTo}
-                onChange={(event) => setDeliveredTo(event.target.value)}
-                style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.25)" }}
-              />
-              <button type="button" disabled={busy} onClick={() => void complete()} style={{ width: "100%", padding: "12px", borderRadius: 10, fontWeight: 900 }}>
-                Marcar como entregado
-              </button>
-            </div>
-          )}
-        </div>
+        <ActiveDeliveryCard
+          delivery={current}
+          busy={busy}
+          detailHref={`/panel/reparto/${current.order_delivery_id}`}
+          onStart={() => void start()}
+          onComplete={(deliveredToName) => void complete(deliveredToName)}
+        />
       ) : null}
 
       <section>

@@ -30,6 +30,12 @@ const MODULES: {
     href: "/panel/pos",
   },
   {
+    label: "Entregas",
+    detail: "Despacho: cola de envíos listos y asignación manual de repartidor.",
+    anyOf: ["deliveries:read", "deliveries:assign"],
+    href: "/panel/entregas",
+  },
+  {
     label: "Reparto (mis entregas)",
     detail: "Cola de envíos, entrega en curso y resumen del día.",
     anyOf: ["deliveries:self_assign", "deliveries:read"],

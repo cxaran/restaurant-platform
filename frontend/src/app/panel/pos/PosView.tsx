@@ -9,21 +9,19 @@ import { QuantityStepper } from "@/components/storefront/QuantityStepper";
 import { ApiRequestError } from "@/core/api/api-error";
 import { browserApi } from "@/core/api/browser-client";
 import type { PublicMenuCategory } from "@/core/restaurant-api/contracts";
+import type { PosSaleRequest, PosSaleResult } from "@/core/restaurant-api/panel-contracts";
 import { formatMoney } from "@/core/restaurant-api/theme";
 
+// Línea LOCAL del carrito de mostrador (nombre/precio solo para pintar);
+// el contrato real de envío es PosSaleRequest.
 type PosLine = { product_id: string; name: string; price: string | null; quantity: number };
-
-type PosResult = {
-  order: { id: string; public_code: string; status: string; total_money_amount?: string | null };
-  payment: { status: string; change_amount?: string | null };
-};
 
 export function PosView() {
   const [menu, setMenu] = useState<PublicMenuCategory[]>([]);
   const [lines, setLines] = useState<PosLine[]>([]);
   const [billAmount, setBillAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PosResult | null>(null);
+  const [result, setResult] = useState<PosSaleResult | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -70,14 +68,14 @@ export function PosView() {
         lines: lines.map((line) => ({
           product_id: line.product_id,
           quantity: line.quantity,
-          purchase_mode: "money",
+          purchase_mode: "money" as const,
         })),
         payment: {
           method_code: "cash_counter",
           ...(billAmount ? { change_requested_for_amount: billAmount } : {}),
         },
-      };
-      const sale = await browserApi<PosResult>("/api/v1/pos/sales", {
+      } satisfies PosSaleRequest;
+      const sale = await browserApi<PosSaleResult>("/api/v1/pos/sales", {
         method: "POST",
         body: payload,
       });
@@ -186,7 +184,7 @@ export function PosView() {
           <div role="status" style={{ fontSize: 13, borderTop: "1px solid rgba(0,0,0,0.15)", paddingTop: 8 }}>
             <div style={{ fontWeight: 900 }}>{result.order.public_code} · {result.order.status}</div>
             <div>Total: {formatMoney(result.order.total_money_amount)}</div>
-            {result.payment.change_amount ? (
+            {Number.parseFloat(result.payment.change_amount) > 0 ? (
               <div style={{ fontWeight: 800 }}>Cambio: {formatMoney(result.payment.change_amount)}</div>
             ) : null}
           </div>

@@ -4,24 +4,17 @@
 // permiso. Ocultar botones NO es seguridad — el backend valida cada acción.
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiRequestError } from "@/core/api/api-error";
 import { browserApi } from "@/core/api/browser-client";
+import type {
+  OrderListItem,
+  OrderTransitionRequest,
+} from "@/core/restaurant-api/panel-contracts";
 import { formatMoney } from "@/core/restaurant-api/theme";
 
-type OrderRow = {
-  id: string;
-  public_code: string;
-  source: string;
-  fulfillment_type: string;
-  status: string;
-  payment_status: string;
-  customer_name_snapshot?: string | null;
-  total_money_amount?: string | null;
-  items_subtotal_amount: string;
-  created_at: string;
-};
+type CancelResolution = NonNullable<OrderTransitionRequest["payment_resolution"]>;
 
 // Espejo visual de ORDER_TRANSITIONS del backend (la autoridad es el backend:
 // una transición no permitida responde 409 y se muestra el mensaje real).
@@ -57,12 +50,190 @@ const STATUS_LABELS: Record<string, string> = {
 const FILTERS = ["activos", "todos"] as const;
 const ACTIVE_STATUSES = new Set(Object.keys(NEXT_ACTIONS));
 
+const RESOLUTION_OPTIONS: { value: CancelResolution; label: string; detail: string }[] = [
+  {
+    value: "refund_now",
+    label: "Reembolso registrado ahora",
+    detail: "El dinero ya se devolvió y queda registrado en este momento.",
+  },
+  {
+    value: "refund_pending",
+    label: "Reembolso pendiente de procesar",
+    detail: "La devolución queda abierta en la cola de conciliación.",
+  },
+  {
+    value: "retain",
+    label: "Retener el pago (excepcional)",
+    detail: "El negocio conserva el cobro; requiere motivo obligatorio.",
+  },
+];
+
+// H5: cancelar con cobro exige decisión humana explícita sobre el dinero.
+// Diálogo accesible propio: role="dialog", aria-modal, foco inicial y Escape.
+function CancelDialog({
+  order,
+  busy,
+  error,
+  onClose,
+  onConfirm,
+}: Readonly<{
+  order: OrderListItem;
+  busy: boolean;
+  error: string | null;
+  onClose: () => void;
+  onConfirm: (resolution: CancelResolution | null, reason: string | null) => void;
+}>) {
+  const hasPayments = order.payment_status !== "unpaid";
+  const [resolution, setResolution] = useState<CancelResolution | null>(null);
+  const [reason, setReason] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+
+  function confirm() {
+    if (hasPayments && resolution === null) {
+      setLocalError("Elige cómo se resuelve el cobro antes de cancelar.");
+      return;
+    }
+    if (resolution === "retain" && reason.trim().length === 0) {
+      setLocalError("El motivo es obligatorio para retener el pago.");
+      return;
+    }
+    setLocalError(null);
+    onConfirm(
+      hasPayments ? resolution : null,
+      resolution === "retain" ? reason.trim() : null,
+    );
+  }
+
+  const shownError = error ?? localError;
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 16, zIndex: 50,
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !busy) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancel-dialog-title"
+        tabIndex={-1}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && !busy) onClose();
+        }}
+        style={{
+          background: "var(--surface, #fff)", color: "inherit",
+          borderRadius: 14, border: "1px solid rgba(0,0,0,0.25)",
+          padding: "18px 20px", maxWidth: 460, width: "100%",
+          display: "flex", flexDirection: "column", gap: 12, outline: "none",
+        }}
+      >
+        <h2 id="cancel-dialog-title" style={{ margin: 0, fontSize: 17 }}>
+          Cancelar pedido {order.public_code}
+        </h2>
+        <p style={{ margin: 0, fontSize: 13.5 }}>
+          Cancelar <b>no reembolsa</b> automáticamente: la devolución del dinero
+          es una decisión aparte y queda registrada.
+        </p>
+
+        {hasPayments ? (
+          <fieldset style={{ border: "1px solid rgba(0,0,0,0.2)", borderRadius: 10, padding: "10px 12px", margin: 0 }}>
+            <legend style={{ fontSize: 13, fontWeight: 800, padding: "0 6px" }}>
+              Este pedido tiene pagos registrados. ¿Qué pasa con el cobro?
+            </legend>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {RESOLUTION_OPTIONS.map((option) => (
+                <label key={option.value} style={{ display: "flex", gap: 8, fontSize: 13, alignItems: "flex-start" }}>
+                  <input
+                    type="radio"
+                    name="payment-resolution"
+                    value={option.value}
+                    checked={resolution === option.value}
+                    onChange={() => setResolution(option.value)}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span>
+                    <span style={{ fontWeight: 800, display: "block" }}>{option.label}</span>
+                    <span style={{ opacity: 0.75 }}>{option.detail}</span>
+                  </span>
+                </label>
+              ))}
+              {resolution === "retain" ? (
+                <label style={{ fontSize: 13, fontWeight: 700, display: "block" }}>
+                  Motivo (obligatorio)
+                  <textarea
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    rows={3}
+                    style={{
+                      width: "100%", marginTop: 4, padding: "8px 10px",
+                      borderRadius: 8, border: "1px solid rgba(0,0,0,0.25)",
+                      font: "inherit", fontWeight: 400, resize: "vertical",
+                    }}
+                  />
+                </label>
+              ) : null}
+            </div>
+          </fieldset>
+        ) : (
+          <p style={{ margin: 0, fontSize: 13.5 }}>
+            Este pedido no tiene pagos registrados. ¿Cancelarlo?
+          </p>
+        )}
+
+        {shownError ? (
+          <p role="alert" style={{ margin: 0, color: "#b3261e", fontSize: 13, fontWeight: 700 }}>
+            {shownError}
+          </p>
+        ) : null}
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            style={{
+              padding: "8px 14px", borderRadius: 8, fontWeight: 800, fontSize: 13,
+              border: "1px solid rgba(0,0,0,0.3)", background: "transparent",
+            }}
+          >
+            Volver
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={confirm}
+            style={{
+              padding: "8px 14px", borderRadius: 8, fontWeight: 800, fontSize: 13,
+              border: "1px solid #b3261e", background: "#b3261e18", color: "#b3261e",
+            }}
+          >
+            {busy ? "Cancelando…" : "Cancelar pedido"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>) {
   const perms = new Set(permissions);
-  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [orders, setOrders] = useState<OrderListItem[]>([]);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("activos");
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<OrderListItem | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const [refreshTick, setRefreshTick] = useState(0);
   const load = useCallback(() => setRefreshTick((tick) => tick + 1), []);
@@ -73,7 +244,7 @@ export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>
     let active = true;
     (async () => {
       try {
-        const data = await browserApi<OrderRow[]>("/api/v1/orders?limit=100");
+        const data = await browserApi<OrderListItem[]>("/api/v1/orders?limit=100");
         if (!active) return;
         setOrders(data);
         setError(null);
@@ -89,26 +260,46 @@ export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>
     };
   }, [refreshTick]);
 
-  async function transition(order: OrderRow, to: string) {
-    // H5: cancelar con cobro exige confirmación humana explícita.
-    let acknowledge = false;
+  async function transition(order: OrderListItem, to: string) {
     if (to === "cancelled") {
-      const paid = order.payment_status !== "unpaid";
-      const message = paid
-        ? "Este pedido tiene pagos registrados. Cancelar NO reembolsa automáticamente: deberás resolver el reembolso por separado. ¿Cancelar de todas formas?"
-        : "¿Cancelar este pedido?";
-      if (!window.confirm(message)) return;
-      acknowledge = paid;
+      // La cancelación pasa por el diálogo de resolución (H5).
+      setCancelError(null);
+      setCancelTarget(order);
+      return;
     }
     setBusyId(order.id);
     try {
       await browserApi(`/api/v1/orders/${order.id}/transition`, {
         method: "POST",
-        body: { new_status: to, acknowledge_paid_payments: acknowledge },
+        body: { new_status: to } satisfies OrderTransitionRequest,
       });
       load();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.body.message : "No fue posible.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirmCancel(resolution: CancelResolution | null, reason: string | null) {
+    if (!cancelTarget) return;
+    setBusyId(cancelTarget.id);
+    setCancelError(null);
+    try {
+      await browserApi(`/api/v1/orders/${cancelTarget.id}/transition`, {
+        method: "POST",
+        body: {
+          new_status: "cancelled",
+          ...(resolution ? { payment_resolution: resolution } : {}),
+          ...(reason ? { resolution_reason: reason } : {}),
+        } satisfies OrderTransitionRequest,
+      });
+      setCancelTarget(null);
+      load();
+    } catch (err) {
+      // Los 409 del backend (resolucion_requerida / motivo_requerido) se
+      // muestran tal cual dentro del diálogo.
+      setCancelError(err instanceof ApiRequestError ? err.body.message : "No fue posible cancelar.");
     } finally {
       setBusyId(null);
     }
@@ -176,9 +367,23 @@ export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>
               >
                 {STATUS_LABELS[order.status] ?? order.status}
               </span>
-              <span style={{ fontWeight: 900, minWidth: 80, textAlign: "right" }}>
-                {formatMoney(order.total_money_amount ?? order.items_subtotal_amount)}
-              </span>
+              {order.purchase_mode === "credits" ? (
+                // Pedido por créditos: el chip sustituye al total monetario
+                // como dato principal.
+                <span
+                  style={{
+                    fontSize: 12, fontWeight: 800, padding: "4px 12px", borderRadius: 999,
+                    border: "1px solid rgba(0,0,0,0.3)", background: "rgba(0,0,0,0.04)",
+                    minWidth: 80, textAlign: "center",
+                  }}
+                >
+                  Créditos
+                </span>
+              ) : (
+                <span style={{ fontWeight: 900, minWidth: 80, textAlign: "right" }}>
+                  {formatMoney(order.total_money_amount ?? order.items_subtotal_amount)}
+                </span>
+              )}
               <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 {perms.has("tickets:print") ? (
                   <Link
@@ -210,6 +415,16 @@ export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>
           ))}
         </ul>
       )}
+      {cancelTarget ? (
+        <CancelDialog
+          key={cancelTarget.id}
+          order={cancelTarget}
+          busy={busyId === cancelTarget.id}
+          error={cancelError}
+          onClose={() => setCancelTarget(null)}
+          onConfirm={(resolution, reason) => void confirmCancel(resolution, reason)}
+        />
+      ) : null}
     </div>
   );
 }

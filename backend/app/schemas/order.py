@@ -1,8 +1,8 @@
 """Schemas de pedidos (§14–§17): checkout, captura por personal y lecturas.
 
-El cliente sólo envía IDs y cantidades — nunca precios ni saldos (§22.6). El
-canje con créditos (purchase_mode=credits) queda deshabilitado en la API hasta
-la etapa 8 (ledger y reservas); el pricing ya lo soporta.
+El cliente sólo envía IDs y cantidades — nunca precios ni saldos (§22.6).
+Pedido íntegro (§1.3): `purchase_mode` aplica a TODO el pedido (money XOR
+credits); el backend rechaza mezcla, envío y cargos monetarios en canje.
 """
 
 from datetime import datetime
@@ -56,6 +56,9 @@ class CheckoutRequest(ApiWriteSchema):
     """Checkout del sitio (source=online): SIEMPRE usuario registrado (§1.2)."""
 
     fulfillment_type: Literal["delivery", "pickup"]
+    # Pedido íntegro (§1.3): el modo aplica a TODO el carrito; toda línea debe
+    # coincidir con él (el backend rechaza mezcla con `modo_compra_mixto`).
+    purchase_mode: Literal["money", "credits"] = "money"
     lines: list[OrderLineInput] = Field(min_length=1)
     customer_name: str = Field(min_length=1, max_length=180)
     customer_phone: str = Field(min_length=7, max_length=30)
@@ -68,6 +71,7 @@ class CaptureRequest(ApiWriteSchema):
 
     source: Literal["counter", "phone", "whatsapp", "social", "manual"]
     fulfillment_type: Literal["delivery", "pickup", "counter"]
+    purchase_mode: Literal["money", "credits"] = "money"
     lines: list[OrderLineInput] = Field(min_length=1)
     customer_user_id: Optional[UUID] = None
     customer_name: Optional[str] = Field(default=None, max_length=180)
@@ -176,6 +180,7 @@ class OrderRead(ApiReadSchema):
     customer_user_id: Optional[UUID] = None
     source: str
     fulfillment_type: str
+    purchase_mode: str
     status: str
     payment_status: str
     customer_name_snapshot: Optional[str] = None
@@ -201,6 +206,7 @@ class OrderListItem(ApiReadSchema):
     public_code: str
     source: str
     fulfillment_type: str
+    purchase_mode: str
     status: str
     payment_status: str
     customer_name_snapshot: Optional[str] = None
@@ -217,6 +223,7 @@ class MyOrderRead(ApiReadSchema):
     status: str
     status_label: str
     fulfillment_type: str
+    purchase_mode: str
     items_subtotal_amount: Decimal
     shipping_amount: Optional[Decimal] = None
     shipping_pending_review: bool

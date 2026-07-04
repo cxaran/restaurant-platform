@@ -67,6 +67,10 @@ PAYMENT_STATUSES = (
 # Modo de compra de una línea (§15.1)
 PURCHASE_MODES = ("money", "credits", "complimentary")
 
+# Modo del PEDIDO completo (§1.3 GOALS): íntegramente dinero o íntegramente
+# créditos — jamás híbrido. "complimentary" no es un modo de pedido.
+ORDER_PURCHASE_MODES = ("money", "credits")
+
 # Ajustes (§15.3)
 ADJUSTMENT_TYPES = ("discount", "promotion", "courtesy", "manual_fee")
 ADJUSTMENT_DIRECTIONS = ("charge", "discount")
@@ -131,6 +135,24 @@ class Order(Base):
             "OR (credits_earned_total_snapshot = 0 AND credits_redeemed_total = 0)",
             name="orders_credits_require_customer",
         ),
+        # Pedido íntegro (§1.3 GOALS): un pedido es 100% dinero O 100% créditos.
+        CheckConstraint(
+            _in_clause("purchase_mode", ORDER_PURCHASE_MODES),
+            name="orders_purchase_mode",
+        ),
+        # Un pedido de canje jamás mueve dinero: sin subtotal, sin envío, sin
+        # total monetario y siempre con cliente. La homogeneidad de las líneas
+        # (cross-tabla) la garantiza pricing_service en la misma transacción.
+        CheckConstraint(
+            "purchase_mode != 'credits' OR ("
+            "items_subtotal_amount = 0 "
+            "AND discount_total_amount = 0 "
+            "AND (shipping_total_amount IS NULL OR shipping_total_amount = 0) "
+            "AND (total_money_amount IS NULL OR total_money_amount = 0) "
+            "AND customer_user_id IS NOT NULL"
+            ")",
+            name="orders_credits_mode_no_money",
+        ),
         Index("uq_orders_order_number", "order_number", unique=True),
         Index("uq_orders_public_code", "public_code", unique=True),
         Index("ix_orders_customer_created", "customer_user_id", "created_at"),
@@ -159,6 +181,12 @@ class Order(Base):
     )
     source: Mapped[str] = mapped_column(String(30), nullable=False)
     fulfillment_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    purchase_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="money",
+        comment="Modo íntegro del pedido: money o credits — nunca híbrido (§1.3).",
+    )
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="submitted")
     payment_status: Mapped[str] = mapped_column(String(40), nullable=False, default="unpaid")
     customer_name_snapshot: Mapped[Optional[str]] = mapped_column(

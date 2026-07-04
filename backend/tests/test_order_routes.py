@@ -166,16 +166,56 @@ class OrderRoutesTest(unittest.TestCase):
 
     def test_checkout_credits_on_non_redeemable_product_rejected(self) -> None:
         payload = self._checkout_payload(
+            purchase_mode="credits",
             lines=[{
                 "product_id": str(self.product_id),
                 "quantity": 1,
                 "purchase_mode": "credits",
-            }]
+            }],
         )
         with _As(CUSTOMER_ID):
             response = self.client.post("/api/v1/orders", json=payload)
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["code"], "producto_no_canjeable")
+
+    def test_checkout_mixed_purchase_modes_rejected(self) -> None:
+        """Pedido íntegro (§1.3): una línea credits en pedido money → 422."""
+        payload = self._checkout_payload(
+            lines=[
+                {"product_id": str(self.product_id), "quantity": 1},
+                {
+                    "product_id": str(self.product_id),
+                    "quantity": 1,
+                    "purchase_mode": "credits",
+                },
+            ]
+        )
+        with _As(CUSTOMER_ID):
+            response = self.client.post("/api/v1/orders", json=payload)
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["code"], "modo_compra_mixto")
+
+    def test_checkout_credits_with_delivery_rejected(self) -> None:
+        """Pedido de canje jamás lleva envío a domicilio."""
+        payload = self._checkout_payload(
+            purchase_mode="credits",
+            fulfillment_type="delivery",
+            lines=[{
+                "product_id": str(self.product_id),
+                "quantity": 1,
+                "purchase_mode": "credits",
+            }],
+        )
+        with _As(CUSTOMER_ID):
+            response = self.client.post("/api/v1/orders", json=payload)
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["code"], "canje_sin_envio")
+
+    def test_checkout_money_order_exposes_purchase_mode(self) -> None:
+        with _As(CUSTOMER_ID):
+            response = self.client.post("/api/v1/orders", json=self._checkout_payload())
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.json()["purchase_mode"], "money")
 
     def test_capture_requires_permission(self) -> None:
         payload = {

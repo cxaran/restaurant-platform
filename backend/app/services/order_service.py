@@ -273,6 +273,21 @@ def create_order(
             "Nombre y teléfono de contacto son obligatorios para avisar al cliente.",
         )
 
+    # Pedido íntegro de canje (§1.3): requiere cliente y NO admite envío —
+    # en v1 sólo fulfillment sin costo de envío (pickup o mostrador).
+    if priced.purchase_mode == "credits":
+        if identity.customer_user_id is None:
+            raise OrderRuleError(
+                "canje_sin_cliente",
+                "El canje con créditos requiere un usuario cliente (§22.1).",
+            )
+        if identity.fulfillment_type == "delivery":
+            raise OrderRuleError(
+                "canje_sin_envio",
+                "Un pedido pagado con créditos no permite envío a domicilio; "
+                "elige recoger en tienda.",
+            )
+
     # Créditos SOLO con cliente (CHECK orders_credits_require_customer):
     # sin customer_user_id no se canjea (error) ni se gana (snapshots en cero).
     if identity.customer_user_id is None:
@@ -295,6 +310,7 @@ def create_order(
         customer_user_id=identity.customer_user_id,
         source=identity.source,
         fulfillment_type=identity.fulfillment_type,
+        purchase_mode=priced.purchase_mode,
         status="submitted",
         payment_status="unpaid",
         customer_name_snapshot=identity.customer_name,

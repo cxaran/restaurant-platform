@@ -287,6 +287,7 @@ def _my_order_read(session: SessionDep, order: Order) -> MyOrderRead:
         status=order.status,
         status_label=public_status(order.status),
         fulfillment_type=order.fulfillment_type,
+        purchase_mode=order.purchase_mode,
         items_subtotal_amount=order.items_subtotal_amount,
         shipping_amount=shipping_amount,
         shipping_pending_review=pending_review,
@@ -306,6 +307,17 @@ def _priced_or_422(session: SessionDep, lines: list[OrderLineInput]):
         return price_cart(session, _to_cart(lines))
     except PricingError as exc:
         api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
+
+
+def _require_uniform_mode(purchase_mode: str, lines: list[OrderLineInput]) -> None:
+    """Pedido íntegro (§1.3): toda línea debe coincidir con el modo declarado."""
+    if any(line.purchase_mode != purchase_mode for line in lines):
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "modo_compra_mixto",
+            "Todas las líneas deben usar el modo de compra del pedido "
+            f"({purchase_mode}); no se puede mezclar dinero y créditos.",
+        )
 
 
 def _rule_error(exc: OrderRuleError):
@@ -342,6 +354,15 @@ def checkout(
         api_error(status.HTTP_409_CONFLICT, "entrega_deshabilitada", "La entrega a domicilio está deshabilitada.")
     if payload.fulfillment_type == "pickup" and not settings_row.allow_pickup:
         api_error(status.HTTP_409_CONFLICT, "recoleccion_deshabilitada", "Recoger en tienda está deshabilitado.")
+
+    _require_uniform_mode(payload.purchase_mode, payload.lines)
+    if payload.purchase_mode == "credits" and payload.fulfillment_type == "delivery":
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "canje_sin_envio",
+            "Un pedido pagado con créditos no permite envío a domicilio; "
+            "elige recoger en tienda.",
+        )
 
     priced = _priced_or_422(session, payload.lines)
     if (
@@ -423,6 +444,7 @@ def capture_order(
     if payload.source == "counter" and not settings_row.allow_counter_sales:
         api_error(status.HTTP_409_CONFLICT, "mostrador_deshabilitado", "La venta a mostrador está deshabilitada.")
 
+    _require_uniform_mode(payload.purchase_mode, payload.lines)
     priced = _priced_or_422(session, payload.lines)
     try:
         order = create_order(

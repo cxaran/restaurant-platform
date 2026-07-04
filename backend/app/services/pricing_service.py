@@ -74,6 +74,7 @@ class PricedOrder:
     items_subtotal_amount: Decimal = Decimal("0")
     credits_earned_total: int = 0
     credits_redeemed_total: int = 0
+    purchase_mode: str = "money"
 
 
 def price_cart(session: Session, cart: list[CartLineInput]) -> PricedOrder:
@@ -81,7 +82,17 @@ def price_cart(session: Session, cart: list[CartLineInput]) -> PricedOrder:
     if not cart:
         raise PricingError("carrito_vacio", "El pedido no tiene productos.")
 
-    result = PricedOrder()
+    # Pedido íntegro (§1.3): un único modo para TODO el carrito. Nunca una
+    # línea con dinero y otra con créditos, ni diferencia monetaria en canje.
+    modes = {line.purchase_mode for line in cart}
+    if len(modes) > 1:
+        raise PricingError(
+            "pedido_mixto",
+            "Un pedido se paga completo con dinero o completo con créditos; "
+            "no se pueden mezclar. Crea un pedido separado.",
+        )
+
+    result = PricedOrder(purchase_mode=next(iter(modes)))
     requested_by_product: dict[uuid.UUID, int] = {}
     for line in cart:
         _require_positive_int(line.quantity, what="La cantidad del producto")
@@ -215,6 +226,15 @@ def _price_line(
         raise PricingError("modo_compra_invalido", "Modo de compra no reconocido.")
 
     modifier_rows, modifier_total_per_unit = _price_modifiers(session, product, line)
+
+    # Pedido íntegro: en canje no puede haber cargos monetarios de ningún tipo
+    # — un modificador con precio convertiría el pedido en híbrido (§1.3).
+    if line.purchase_mode == "credits" and modifier_total_per_unit != 0:
+        raise PricingError(
+            "modificador_monetario_en_canje",
+            f"«{product.name}» canjeado con créditos no admite opciones con "
+            "costo monetario. Quita esas opciones o compra con dinero.",
+        )
 
     quantity = line.quantity
     line_total = (unit_price + modifier_total_per_unit) * quantity

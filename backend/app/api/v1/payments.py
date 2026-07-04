@@ -322,6 +322,16 @@ def pos_sale(
         )
 
     priced = _priced_or_422(session, payload.lines)
+    # La venta POS es una operación MONETARIA de un paso (pedido + cobro). El
+    # canje con créditos sigue el ciclo normal (captura → completar), sin
+    # registrar aquí un pago de $0 (§1.3).
+    if priced.purchase_mode != "money":
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "pos_solo_dinero",
+            "La venta de mostrador se cobra en dinero; el canje de créditos "
+            "se captura como pedido normal.",
+        )
     try:
         order = create_order(
             session,

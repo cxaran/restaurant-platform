@@ -107,6 +107,7 @@ class PricingTest(unittest.TestCase):
             extras = ModifierGroup(name="Extras", selection_type="multiple")
             session.add_all([salsas, extras])
             session.flush()
+            self.extras_group_id = extras.id
 
             self.bbq_id = uuid.uuid4()
             self.buffalo_id = uuid.uuid4()
@@ -188,6 +189,50 @@ class PricingTest(unittest.TestCase):
         self.assertEqual(line.credits_earned_total_snapshot, 0)  # canje no genera (§22.1)
         self.assertEqual(line.credits_redeemed_total, 100)  # 50 × 2
         self.assertEqual(priced.credits_redeemed_total, 100)
+        self.assertEqual(priced.purchase_mode, "credits")
+
+    def test_mixed_purchase_modes_rejected(self) -> None:
+        """Pedido íntegro (§1.3): dinero y créditos jamás conviven en un carrito."""
+        with self._session() as session:
+            with self.assertRaises(PricingError) as ctx:
+                price_cart(
+                    session,
+                    [
+                        CartLineInput(
+                            product_id=self.dip_id, quantity=1, purchase_mode="money"
+                        ),
+                        CartLineInput(
+                            product_id=self.dip_id, quantity=1, purchase_mode="credits"
+                        ),
+                    ],
+                )
+        self.assertEqual(ctx.exception.code, "pedido_mixto")
+
+    def test_credits_line_rejects_monetary_modifier(self) -> None:
+        """En canje, un modificador con costo haría al pedido híbrido → error."""
+        with self._session() as session:
+            session.add(
+                ProductModifierGroup(
+                    product_id=self.dip_id,
+                    modifier_group_id=self.extras_group_id,
+                    sort_order=10,
+                )
+            )
+            session.commit()
+            with self.assertRaises(PricingError) as ctx:
+                price_cart(
+                    session,
+                    [
+                        CartLineInput(
+                            product_id=self.dip_id,
+                            quantity=1,
+                            purchase_mode="credits",
+                            modifiers=(CartModifierInput(self.papas_id),),
+                        )
+                    ],
+                )
+        # El dip es canjeable, pero las papas cuestan $35 → híbrido prohibido.
+        self.assertEqual(ctx.exception.code, "modificador_monetario_en_canje")
 
     def test_required_group_must_be_selected(self) -> None:
         with self._session() as session:

@@ -36,7 +36,7 @@ os.environ.update(DEV_ENV)
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
-from sqlmodel import Session  # noqa: E402
+from sqlmodel import Session, select  # noqa: E402
 
 from backend.app.auth.auth_dependencies import get_current_user  # noqa: E402
 from backend.app.core.database import get_db  # noqa: E402
@@ -150,6 +150,30 @@ class PaymentsRoutesTest(unittest.TestCase):
         self.assertEqual(body["order"]["total_money_amount"], "200.00")
         self.assertEqual(body["payment"]["status"], "paid")
         self.assertEqual(body["payment"]["change_amount"], "300.00")  # 500 - 200
+
+    def test_pos_rejects_credits_lines(self) -> None:
+        """POS cobra dinero: el canje de créditos va por captura normal (§1.3)."""
+        redeemable_id = uuid.uuid4()
+        with Session(self.engine) as session:
+            category_id = session.exec(select(Product.category_id)).first()
+            session.add(
+                Product(
+                    id=redeemable_id,
+                    category_id=category_id,
+                    name="Dip canjeable",
+                    money_price_amount=Decimal("15"),
+                    credit_redemption_price=50,
+                )
+            )
+            session.commit()
+        payload = self._pos_payload()
+        payload["lines"] = [
+            {"product_id": str(redeemable_id), "quantity": 1, "purchase_mode": "credits"}
+        ]
+        with _As("orders:capture", "payments:record"):
+            response = self.client.post("/api/v1/pos/sales", json=payload)
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["code"], "pos_solo_dinero")
 
     def test_pos_transfer_stays_pending_verification(self) -> None:
         payload = self._pos_payload(

@@ -64,6 +64,10 @@ class CheckoutRequest(ApiWriteSchema):
     customer_phone: str = Field(min_length=7, max_length=30)
     customer_note: Optional[str] = None
     delivery: Optional[DeliveryInput] = None
+    # Etapa 5 RC: código de descuento fijo, SOLO en checkout web (la captura
+    # por personal jamás aplica códigos). Sólo viaja el string; los montos los
+    # calcula el backend.
+    discount_code: Optional[str] = Field(default=None, max_length=40)
 
 
 class CaptureRequest(ApiWriteSchema):

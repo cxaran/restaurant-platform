@@ -336,6 +336,28 @@ def _reserve_credits_or_422(session: SessionDep, order) -> None:
         api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
 
 
+def _apply_discount_code_or_422(session: SessionDep, order, code: str) -> None:
+    """Cotiza y reserva el código en la MISMA transacción del checkout (Etapa 5 RC)."""
+    from backend.app.services.discount_service import (
+        DiscountRuleError,
+        quote_discount,
+        reserve_redemption,
+    )
+
+    try:
+        outcome = quote_discount(
+            session,
+            code=code,
+            customer_user_id=order.customer_user_id,
+            purchase_mode=order.purchase_mode,
+            source=order.source,
+            eligible_subtotal=order.items_subtotal_amount,
+        )
+        reserve_redemption(session, code_row=outcome.code_row, order=order)
+    except DiscountRuleError as exc:
+        api_error(status.HTTP_422_UNPROCESSABLE_ENTITY, exc.code, exc.message)
+
+
 # ---------------------------------------------------------------------------
 # Cliente: checkout y sus pedidos
 # ---------------------------------------------------------------------------
@@ -358,6 +380,13 @@ def checkout(
         api_error(status.HTTP_409_CONFLICT, "recoleccion_deshabilitada", "Recoger en tienda está deshabilitado.")
 
     _require_uniform_mode(payload.purchase_mode, payload.lines)
+    # Etapa 5 RC: un código de descuento JAMÁS aplica a un pedido de créditos.
+    if payload.discount_code and payload.purchase_mode == "credits":
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "codigo_no_aplicable",
+            "Los códigos de descuento sólo aplican en pedidos web pagados con dinero.",
+        )
     if payload.purchase_mode == "credits" and payload.fulfillment_type == "delivery":
         api_error(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -396,6 +425,8 @@ def checkout(
         _rule_error(exc)
 
     _reserve_credits_or_422(session, order)
+    if payload.discount_code:
+        _apply_discount_code_or_422(session, order, payload.discount_code)
     if payload.fulfillment_type == "delivery":
         _compose_delivery_and_shipping(session, order, payload.delivery, from_staff=False)
 

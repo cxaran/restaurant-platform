@@ -21,6 +21,7 @@ from .catalog import (
 )
 from .credits import CreditLedgerEntry, CreditRedemption
 from .deliveries import CourierLocationEvent, CourierTrackingSession, DeliveryAssignment
+from .discounts import DiscountCode, DiscountCodeRedemption
 from .finances import (
     FinancialCategory,
     FinancialEntry,
@@ -80,6 +81,8 @@ __all__ = [
     "CustomerProfile",
     "DeliveryAssignment",
     "DeliveryZone",
+    "DiscountCode",
+    "DiscountCodeRedemption",
     "FinancialCategory",
     "FinancialEntry",
     "FinancialEntryAttachment",

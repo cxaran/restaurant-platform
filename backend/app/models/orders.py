@@ -29,6 +29,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -74,8 +75,9 @@ ORDER_PURCHASE_MODES = ("money", "credits")
 # H5 (§1.6 GOALS): resolución financiera obligatoria al cancelar con cobro.
 CANCELLATION_MONEY_RESOLUTIONS = ("refund_now", "refund_pending", "retain")
 
-# Ajustes (§15.3)
-ADJUSTMENT_TYPES = ("discount", "promotion", "courtesy", "manual_fee")
+# Ajustes (§15.3); "discount_code" es el ajuste creado por un código de
+# descuento fijo (Etapa 5 RC) y queda ligado a su redención.
+ADJUSTMENT_TYPES = ("discount", "promotion", "courtesy", "manual_fee", "discount_code")
 ADJUSTMENT_DIRECTIONS = ("charge", "discount")
 
 # Envío (§17.2)
@@ -410,6 +412,15 @@ class OrderAdjustment(Base):
         ),
         CheckConstraint("amount >= 0", name="order_adjustments_amount_non_negative"),
         Index("ix_order_adjustments_order", "order_id"),
+        # Una redención de código produce a lo más UN ajuste (índice único
+        # parcial: la columna es NULL en los demás tipos de ajuste).
+        Index(
+            "uq_order_adjustments_discount_redemption",
+            "discount_code_redemption_id",
+            unique=True,
+            postgresql_where=text("discount_code_redemption_id IS NOT NULL"),
+            sqlite_where=text("discount_code_redemption_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -428,6 +439,16 @@ class OrderAdjustment(Base):
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     authorized_by: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="RESTRICT"), nullable=False
+    )
+    discount_code_redemption_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(
+            "discount_code_redemptions.id",
+            ondelete="RESTRICT",
+            name="fk_order_adjustments_discount_code_redemption",
+        ),
+        nullable=True,
+        comment="Redención del código de descuento que originó este ajuste (Etapa 5 RC).",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

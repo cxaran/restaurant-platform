@@ -143,6 +143,11 @@ def transition_order(
         from backend.app.services.credit_service import on_order_completed
 
         on_order_completed(session, order, actor_id=actor_id)
+        # Etapa 5 RC: la redención del código de descuento queda consumida
+        # (definitiva: un reembolso posterior no la reactiva ni libera).
+        from backend.app.services.discount_service import consume_order_redemption
+
+        consume_order_redemption(session, order, actor_id=actor_id)
     elif new_status == "cancelled":
         # H5 (§1.6): cancelar NO reembolsa. Con dinero cobrado, quien cancela
         # elige una resolución explícita: reembolso ahora, reembolso pendiente
@@ -186,6 +191,11 @@ def transition_order(
         from backend.app.services.credit_service import on_order_cancelled
 
         on_order_cancelled(session, order, actor_id=actor_id)
+        # Etapa 5 RC: liberar la reserva del código de descuento (sólo
+        # reserved; una redención consumida jamás se libera).
+        from backend.app.services.discount_service import release_order_redemption
+
+        release_order_redemption(session, order, reason="cancelled")
 
     session.add(
         OrderStatusHistory(

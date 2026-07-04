@@ -1,7 +1,7 @@
 import secrets
 
 import jwt
-from datetime import timedelta
+from datetime import timedelta, timezone
 from passlib.context import CryptContext
 from pydantic import EmailStr, SecretStr
 from sqlmodel import select
@@ -37,7 +37,10 @@ def get_access_token_ttl() -> timedelta:
 
 
 def create_access_token(subject: str, user_token: str | None = None) -> str:
-    now = utc_now()
+    # utc_now() es naive-UTC: convertir a epoch vía .timestamp() lo interpretaría
+    # como hora LOCAL (bug detectado en E2E sobre host no-UTC: el JWT nacía
+    # "en el futuro" e iat lo rechazaba). Se fija la zona ANTES de convertir.
+    now = utc_now().replace(tzinfo=timezone.utc)
     payload = TokenPayload(
         sub=subject,
         exp=int((now + get_access_token_ttl()).timestamp()),

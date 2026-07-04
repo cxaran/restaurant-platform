@@ -6,15 +6,37 @@ import type { PublicMenuCategory, PublicProduct } from "@/core/restaurant-api/co
 import { formatMoney, publicFileUrl } from "@/core/restaurant-api/theme";
 import { useCart } from "@/core/storefront/cart";
 import { isCustomizable, requiresConfiguration } from "@/core/storefront/configurator";
+import { redemptionPrice } from "@/core/storefront/credits-cart";
+import { useMyCredits } from "@/core/storefront/useMyCredits";
+import { CartModeToggle } from "./CartModeToggle";
 import { ProductConfigurator } from "./ProductConfigurator";
 
 export function AddToCartButton({
   productId,
   name,
   priceHint,
+  creditRedemptionPrice = null,
   compact = false,
-}: Readonly<{ productId: string; name: string; priceHint: string | null; compact?: boolean }>) {
-  const { addLine } = useCart();
+}: Readonly<{
+  productId: string;
+  name: string;
+  priceHint: string | null;
+  /** Precio de canje del producto (para bloquear el agregado rápido en modo créditos). */
+  creditRedemptionPrice?: number | null;
+  compact?: boolean;
+}>) {
+  const { mode, addLine } = useCart();
+  // En modo créditos un producto sin precio de canje NO se agrega: se explica.
+  if (
+    mode === "credits" &&
+    !(typeof creditRedemptionPrice === "number" && creditRedemptionPrice > 0)
+  ) {
+    return (
+      <span className="sf-muted" style={{ fontSize: 12, fontWeight: 700 }}>
+        Solo con dinero — crea un pedido separado
+      </span>
+    );
+  }
   return (
     <button
       type="button"
@@ -33,8 +55,13 @@ function ProductCard({
   product,
   onConfigure,
 }: Readonly<{ product: PublicProduct; onConfigure: (product: PublicProduct) => void }>) {
+  const { mode } = useCart();
   const imageUrl = publicFileUrl(product.image_file_ids[0] ?? null);
   const money = product.is_money_purchase_available && product.money_price_amount != null;
+  const redeemPrice = redemptionPrice(product);
+  const credits = mode === "credits";
+  // En modo créditos solo se puede agregar lo canjeable; en dinero, lo comprable.
+  const addable = credits ? redeemPrice !== null : money;
   // Con grupos requeridos (o mínimos > 0) NUNCA se agrega directo al carrito.
   const mustConfigure = requiresConfiguration(product);
   const customizable = isCustomizable(product);
@@ -75,9 +102,17 @@ function ProductCard({
         ) : null}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
           <div style={{ fontWeight: 900, fontSize: 18 }}>
-            {money ? formatMoney(product.money_price_amount) : "Solo con créditos"}
+            {credits
+              ? redeemPrice !== null
+                ? `${redeemPrice} créditos`
+                : money
+                  ? formatMoney(product.money_price_amount)
+                  : "—"
+              : money
+                ? formatMoney(product.money_price_amount)
+                : "Solo con créditos"}
           </div>
-          {money ? (
+          {addable ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {customizable && !mustConfigure ? (
                 <button
@@ -103,10 +138,15 @@ function ProductCard({
                   productId={product.id}
                   name={product.name}
                   priceHint={product.money_price_amount ?? null}
+                  creditRedemptionPrice={product.credit_redemption_price ?? null}
                   compact
                 />
               )}
             </div>
+          ) : credits ? (
+            <span className="sf-muted" style={{ fontSize: 12, fontWeight: 700 }}>
+              Solo con dinero — crea un pedido separado
+            </span>
           ) : null}
         </div>
       </div>
@@ -115,12 +155,21 @@ function ProductCard({
 }
 
 export function MenuView({ categories }: Readonly<{ categories: PublicMenuCategory[] }>) {
+  const { mode } = useCart();
+  const myCredits = useMyCredits();
   const [active, setActive] = useState<string | "all">("all");
   const [configuring, setConfiguring] = useState<PublicProduct | null>(null);
   const visible = useMemo(
     () => (active === "all" ? categories : categories.filter((c) => c.id === active)),
     [categories, active],
   );
+  const productsById = useMemo(() => {
+    const map = new Map<string, PublicProduct>();
+    for (const category of categories) {
+      for (const product of category.products) map.set(product.id, product);
+    }
+    return map;
+  }, [categories]);
 
   if (categories.length === 0) {
     return (
@@ -139,6 +188,10 @@ export function MenuView({ categories }: Readonly<{ categories: PublicMenuCatego
 
   return (
     <div className="sf-container" style={{ paddingBlock: 18 }}>
+      <CartModeToggle
+        productsById={productsById}
+        availableCredits={myCredits ? myCredits.available : null}
+      />
       <div
         role="tablist"
         aria-label="Categorías"
@@ -187,7 +240,11 @@ export function MenuView({ categories }: Readonly<{ categories: PublicMenuCatego
         </section>
       ))}
       {configuring ? (
-        <ProductConfigurator product={configuring} onClose={() => setConfiguring(null)} />
+        <ProductConfigurator
+          product={configuring}
+          mode={mode}
+          onClose={() => setConfiguring(null)}
+        />
       ) : null}
     </div>
   );

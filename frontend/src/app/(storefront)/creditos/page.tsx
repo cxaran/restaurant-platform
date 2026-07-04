@@ -3,19 +3,16 @@ import { cookies } from "next/headers";
 
 import { serverApi } from "@/core/api/server-client";
 import { getSession } from "@/core/auth/session";
+import type {
+  CreditMovementRead,
+  CreditTotalsRead,
+} from "@/core/restaurant-api/contracts";
 
 export const dynamic = "force-dynamic";
 
 // Tarjeta de créditos del cliente (§58.3): tres agregaciones QUE CALCULA EL
-// BACKEND desde el ledger — este frontend jamás deriva saldos.
-type CreditTotals = { available: number; earned: number; redeemed: number };
-type CreditMovement = {
-  id: string;
-  entry_type: string;
-  credit_delta: number;
-  description?: string | null;
-  occurred_at: string;
-};
+// BACKEND desde el ledger — este frontend jamás deriva saldos. Tipos: los
+// generados del OpenAPI (contracts.ts), nunca contratos replicados a mano.
 
 const ENTRY_LABELS: Record<string, string> = {
   earn: "Créditos ganados",
@@ -42,12 +39,12 @@ export default async function CreditosPage() {
   }
 
   const cookieHeader = (await cookies()).toString();
-  let totals: CreditTotals | null = null;
-  let movements: CreditMovement[] = [];
+  let totals: CreditTotalsRead | null = null;
+  let movements: CreditMovementRead[] = [];
   try {
     [totals, movements] = await Promise.all([
-      serverApi<CreditTotals>("/api/v1/credits/me", { cookie: cookieHeader }),
-      serverApi<CreditMovement[]>("/api/v1/credits/me/movements?limit=20", {
+      serverApi<CreditTotalsRead>("/api/v1/credits/me", { cookie: cookieHeader }),
+      serverApi<CreditMovementRead[]>("/api/v1/credits/me/movements?limit=20", {
         cookie: cookieHeader,
       }),
     ]);

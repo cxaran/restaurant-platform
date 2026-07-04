@@ -8,7 +8,8 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import type { PublicModifierGroup, PublicProduct } from "@/core/restaurant-api/contracts";
 import { formatMoney, publicFileUrl } from "@/core/restaurant-api/theme";
-import { useCart, type CartLine } from "@/core/storefront/cart";
+import { useCart, type CartLine, type CartMode } from "@/core/storefront/cart";
+import { redemptionPrice } from "@/core/storefront/credits-cart";
 import {
   cartModifiersToSelection,
   estimatedUnitPrice,
@@ -36,10 +37,13 @@ function groupCounterLabel(group: PublicModifierGroup, count: number): string {
 function GroupControls({
   group,
   entries,
+  creditsMode,
   onChange,
 }: Readonly<{
   group: PublicModifierGroup;
   entries: GroupSelection;
+  /** En canje con créditos los modificadores con costo monetario no se pueden elegir. */
+  creditsMode: boolean;
   onChange: (next: GroupSelection) => void;
 }>) {
   const single = group.selection_type === "single";
@@ -64,8 +68,12 @@ function GroupControls({
       ) : null}
       {group.options.map((option) => {
         const checked = entries.some((entry) => entry.option_id === option.id);
-        const blocked = !single && atMax && !checked;
         const adjustment = Number.parseFloat(option.price_adjustment);
+        const monetary = Number.isFinite(adjustment) && adjustment !== 0;
+        // En canje: opción con costo bloqueada. Si venía marcada (línea previa)
+        // se deja QUITAR — solo se impide elegirla, nunca quedar atrapado.
+        const creditsBlocked = creditsMode && monetary;
+        const blocked = (!single && atMax && !checked) || (creditsBlocked && !checked);
         return (
           <label
             key={option.id}
@@ -96,10 +104,15 @@ function GroupControls({
                 </span>
               ) : null}
             </span>
-            {Number.isFinite(adjustment) && adjustment !== 0 ? (
-              <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>
+            {monetary ? (
+              <span style={{ fontWeight: 700, whiteSpace: "nowrap", textAlign: "right" }}>
                 {adjustment > 0 ? "+" : "−"}
                 {formatMoney(Math.abs(adjustment))}
+                {creditsBlocked ? (
+                  <span className="sf-muted" style={{ display: "block", fontSize: 11, fontWeight: 600 }}>
+                    No disponible en canje
+                  </span>
+                ) : null}
               </span>
             ) : null}
           </label>
@@ -112,11 +125,14 @@ function GroupControls({
 export function ProductConfigurator({
   product,
   editLine = null,
+  mode = "money",
   onClose,
 }: Readonly<{
   product: PublicProduct;
   /** Línea del carrito a editar: precarga selección/cantidad y REEMPLAZA al confirmar. */
   editLine?: CartLine | null;
+  /** Modo del carrito: en "credits" los modificadores con costo quedan bloqueados. */
+  mode?: CartMode;
   onClose: () => void;
 }>) {
   const { addLine, replaceLine } = useCart();
@@ -152,7 +168,12 @@ export function ProductConfigurator({
   // Rechazo, no corrección: una cantidad fuera de política (p. ej. una línea
   // guardada antes de bajar max_units_per_order) bloquea el confirmar.
   const validQuantity = isValidUnitCount(product, quantity);
-  const canConfirm = problems.length === 0 && validQuantity;
+  const creditsMode = mode === "credits";
+  const redeemPrice = redemptionPrice(product);
+  // Invariantes de canje: producto canjeable y CERO modificadores con costo
+  // (el backend rechazaría con producto_no_canjeable / modificador_monetario_en_canje).
+  const creditsConflict = creditsMode && (redeemPrice === null || withAdjustments);
+  const canConfirm = problems.length === 0 && validQuantity && !creditsConflict;
 
   function confirm() {
     if (!canConfirm) return;
@@ -261,6 +282,7 @@ export function ProductConfigurator({
                 <GroupControls
                   group={group}
                   entries={entries}
+                  creditsMode={creditsMode}
                   onChange={(next) =>
                     setSelection((current) => ({ ...current, [group.id]: next }))
                   }
@@ -299,16 +321,29 @@ export function ProductConfigurator({
             gap: 8,
           }}
         >
-          {unitEstimate !== null && withAdjustments ? (
+          {!creditsMode && unitEstimate !== null && withAdjustments ? (
             <p className="sf-muted" style={{ margin: 0, fontSize: 12 }}>
               Precio estimado; el total final lo confirma la cocina.
             </p>
           ) : null}
+          {creditsConflict ? (
+            <p className="sf-error" role="alert" style={{ margin: 0, fontSize: 13 }}>
+              {redeemPrice === null
+                ? "Este producto no es canjeable: solo con dinero — crea un pedido separado."
+                : "Hay modificadores con costo seleccionados; no están disponibles en canje. Quítalos para continuar."}
+            </p>
+          ) : null}
           <button type="button" className="sf-btn" disabled={!canConfirm} onClick={confirm}>
             {editLine ? "Guardar cambios" : "Agregar al carrito"}
-            {unitEstimate !== null ? ` · ${formatMoney(unitEstimate * quantity)}` : ""}
+            {creditsMode
+              ? redeemPrice !== null && validQuantity
+                ? ` · ${redeemPrice * quantity} créditos`
+                : ""
+              : unitEstimate !== null
+                ? ` · ${formatMoney(unitEstimate * quantity)}`
+                : ""}
           </button>
-          {!canConfirm ? (
+          {!canConfirm && !creditsConflict ? (
             <p className="sf-muted" style={{ margin: 0, fontSize: 12, textAlign: "center" }}>
               Completa las opciones marcadas para continuar.
             </p>

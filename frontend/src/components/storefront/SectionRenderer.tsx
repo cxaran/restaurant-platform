@@ -22,7 +22,7 @@ export function ctaHref(cta: unknown): string | null {
     case "menu_page":
       return "/menu";
     case "credits_page":
-      return "/pedidos";
+      return "/creditos";
     case "product":
     case "category":
       // Identificadores publicados → navegación interna controlada al menú.
@@ -227,6 +227,7 @@ function FeaturedProductsSection({ section, preview }: SectionProps) {
                       productId={product.id}
                       name={product.name}
                       priceHint={product.money_price_amount ?? null}
+                      creditRedemptionPrice={product.credit_redemption_price ?? null}
                       compact
                     />
                   ) : null}

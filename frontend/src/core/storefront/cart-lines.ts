@@ -14,8 +14,54 @@ export type CartLine = {
   customer_note?: string;
 };
 
+/** Modo del pedido completo: 100% dinero O 100% créditos (nunca híbrido). */
+export type CartMode = "money" | "credits";
+
+/** Estado persistido del carrito: las líneas MÁS el modo de compra. */
+export type CartState = {
+  mode: CartMode;
+  lines: CartLine[];
+};
+
+export const EMPTY_CART_STATE: CartState = { mode: "money", lines: [] };
+
 export function isValidQuantity(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1;
+}
+
+export function isCartMode(value: unknown): value is CartMode {
+  return value === "money" || value === "credits";
+}
+
+function isCartLine(value: unknown): value is CartLine {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as CartLine).product_id === "string" &&
+    Array.isArray((value as CartLine).modifiers) &&
+    isValidQuantity((value as CartLine).quantity)
+  );
+}
+
+/**
+ * Migración tolerante del almacenamiento local: la v1 guardaba `CartLine[]`
+ * (se interpreta como modo `money`); la forma actual es `{mode, lines}`.
+ * Cualquier basura (modo desconocido, líneas corruptas) degrada a un estado
+ * seguro sin perder las líneas válidas. El modo NUNCA se inventa: solo un
+ * valor explícito "credits" activa el canje.
+ */
+export function normalizeStoredCart(parsed: unknown): CartState {
+  if (Array.isArray(parsed)) {
+    return { mode: "money", lines: parsed.filter(isCartLine) };
+  }
+  if (typeof parsed === "object" && parsed !== null) {
+    const candidate = parsed as { mode?: unknown; lines?: unknown };
+    return {
+      mode: isCartMode(candidate.mode) ? candidate.mode : "money",
+      lines: Array.isArray(candidate.lines) ? candidate.lines.filter(isCartLine) : [],
+    };
+  }
+  return EMPTY_CART_STATE;
 }
 
 /** Firma estable de una línea: mismo producto + mismos modificadores ⇒ misma key. */

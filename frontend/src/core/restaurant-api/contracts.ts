@@ -15,3 +15,8 @@ export type OrderModifierInput = components["schemas"]["OrderModifierInput"];
 export type DeliveryInput = components["schemas"]["DeliveryInput"];
 export type MyOrderRead = components["schemas"]["MyOrderRead"];
 export type PublicCourierInfo = components["schemas"]["PublicCourierInfo"];
+
+export type CreditTotalsRead = components["schemas"]["CreditTotalsRead"];
+export type CreditMovementRead = components["schemas"]["CreditMovementRead"];
+export type CustomerProfileSelfRead = components["schemas"]["CustomerProfileSelfRead"];
+export type UserAddressRead = components["schemas"]["UserAddressRead"];

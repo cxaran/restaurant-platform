@@ -34,7 +34,7 @@ export function StorefrontHeader({
       Boolean(link.label && link.href),
     );
   const session = usePublicSession();
-  const { count, subtotalHint } = useCart();
+  const { count, subtotalHint, mode } = useCart();
   const isOpen = business?.is_open_now ?? false;
 
   return (
@@ -135,7 +135,8 @@ export function StorefrontHeader({
           >
             {count}
           </span>
-          {count > 0 ? <span aria-hidden>{formatMoney(subtotalHint)}</span> : null}
+          {/* En modo canje el hint monetario no aplica: los precios van en créditos. */}
+          {count > 0 && mode === "money" ? <span aria-hidden>{formatMoney(subtotalHint)}</span> : null}
         </Link>
       </div>
     </header>

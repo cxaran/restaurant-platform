@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { CartModeToggle } from "@/components/storefront/CartModeToggle";
 import { ProductConfigurator } from "@/components/storefront/ProductConfigurator";
 import { QuantityStepper } from "@/components/storefront/QuantityStepper";
 import type { PublicProduct } from "@/core/restaurant-api/contracts";
@@ -10,14 +11,19 @@ import { fetchPublicMenu } from "@/core/restaurant-api/menu";
 import { formatMoney } from "@/core/restaurant-api/theme";
 import { useCart, type CartLine } from "@/core/storefront/cart";
 import { isCustomizable } from "@/core/storefront/configurator";
+import { creditsTotal, lineCreditsTotal, redemptionPrice } from "@/core/storefront/credits-cart";
+import { useMyCredits } from "@/core/storefront/useMyCredits";
 
 export default function CartPage() {
-  const { lines, count, subtotalHint, setQuantity, removeLine } = useCart();
+  const { lines, mode, count, subtotalHint, setQuantity, removeLine } = useCart();
+  const myCredits = useMyCredits();
   const [catalog, setCatalog] = useState<Map<string, PublicProduct> | null>(null);
   const [editing, setEditing] = useState<CartLine | null>(null);
+  const credits = mode === "credits";
 
   // Catálogo público para reconstituir el PublicProduct de cada línea al
-  // editar. Si el fetch falla solo se ocultan las acciones de edición.
+  // editar (y para precios de canje). Si el fetch falla solo se ocultan las
+  // acciones de edición y los precios en créditos quedan como "—".
   useEffect(() => {
     let cancelled = false;
     fetchPublicMenu()
@@ -42,6 +48,10 @@ export default function CartPage() {
   return (
     <div className="sf-container" style={{ paddingBlock: 28, maxWidth: 760 }}>
       <h1 className="sf-display" style={{ fontSize: 30, margin: "0 0 18px" }}>Tu carrito</h1>
+      <CartModeToggle
+        productsById={catalog}
+        availableCredits={myCredits ? myCredits.available : null}
+      />
       {lines.length === 0 ? (
         <div className="sf-card" style={{ padding: 28, textAlign: "center" }}>
           <p style={{ fontWeight: 700, marginBottom: 12 }}>Tu carrito está vacío.</p>
@@ -54,6 +64,8 @@ export default function CartPage() {
               const product = catalog?.get(line.product_id) ?? null;
               const editable =
                 product !== null && (line.modifiers.length > 0 || isCustomizable(product));
+              const unitCredits = redemptionPrice(product);
+              const totalCredits = lineCreditsTotal(line, product);
               return (
                 <li key={line.key} className="sf-card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 160 }}>
@@ -69,7 +81,13 @@ export default function CartPage() {
                       </ul>
                     ) : null}
                     <div className="sf-muted" style={{ fontSize: 13 }}>
-                      {line.unit_price_hint ? `${formatMoney(line.unit_price_hint)} c/u` : "Precio al confirmar"}
+                      {credits
+                        ? unitCredits !== null
+                          ? `${unitCredits} créditos c/u`
+                          : "Solo con dinero — crea un pedido separado"
+                        : line.unit_price_hint
+                          ? `${formatMoney(line.unit_price_hint)} c/u`
+                          : "Precio al confirmar"}
                     </div>
                   </div>
                   <QuantityStepper
@@ -77,9 +95,13 @@ export default function CartPage() {
                     onChange={(next) => setQuantity(line.key, next)}
                   />
                   <div style={{ fontWeight: 900, minWidth: 76, textAlign: "right" }}>
-                    {line.unit_price_hint
-                      ? formatMoney(Number.parseFloat(line.unit_price_hint) * line.quantity)
-                      : "—"}
+                    {credits
+                      ? totalCredits !== null
+                        ? `${totalCredits} créditos`
+                        : "—"
+                      : line.unit_price_hint
+                        ? formatMoney(Number.parseFloat(line.unit_price_hint) * line.quantity)
+                        : "—"}
                   </div>
                   {editable ? (
                     <button
@@ -106,12 +128,25 @@ export default function CartPage() {
           <div className="sf-card" style={{ marginTop: 18, padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontWeight: 800 }}>
-                {count} producto{count === 1 ? "" : "s"} · {formatMoney(subtotalHint)}
+                {count} producto{count === 1 ? "" : "s"} ·{" "}
+                {credits
+                  ? catalog
+                    ? `${creditsTotal(lines, catalog)} créditos`
+                    : "créditos por calcular"
+                  : formatMoney(subtotalHint)}
               </div>
-              <div className="sf-muted" style={{ fontSize: 12 }}>
-                Subtotal estimado del menú; el total final (incluido el envío) lo confirma la
-                cocina al procesar tu pedido.
-              </div>
+              {credits ? (
+                <div className="sf-muted" style={{ fontSize: 12 }}>
+                  {myCredits ? `Saldo disponible: ${myCredits.available} créditos. ` : ""}
+                  Canje sin envío (solo recoger en tienda); el backend valida el saldo al
+                  confirmar.
+                </div>
+              ) : (
+                <div className="sf-muted" style={{ fontSize: 12 }}>
+                  Subtotal estimado del menú; el total final (incluido el envío) lo confirma la
+                  cocina al procesar tu pedido.
+                </div>
+              )}
             </div>
             <Link className="sf-btn" href="/checkout">Continuar</Link>
           </div>
@@ -121,6 +156,7 @@ export default function CartPage() {
         <ProductConfigurator
           product={editingProduct}
           editLine={editing}
+          mode={mode}
           onClose={() => setEditing(null)}
         />
       ) : null}

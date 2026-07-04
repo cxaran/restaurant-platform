@@ -16,7 +16,7 @@ import type { SessionUser } from "@/core/auth/types";
 
 export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
   const router = useRouter();
-  const { lines, subtotalHint, clear } = useCart();
+  const { lines, mode, subtotalHint, clear } = useCart();
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup");
   const [name, setName] = useState(`${session.name} ${session.last_name ?? ""}`.trim());
   const [phone, setPhone] = useState("");
@@ -27,6 +27,11 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // INVARIANTE (el backend la revalida): canje con créditos = pedido completo
+  // en créditos, SIN envío (solo pickup), sin códigos de descuento.
+  const credits = mode === "credits";
+  const effectiveFulfillment = credits ? "pickup" : fulfillment;
 
   if (lines.length === 0) {
     return (
@@ -41,15 +46,15 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
     setError(null);
     setSubmitting(true);
     const payload: CheckoutRequest = {
-      fulfillment_type: fulfillment,
-      purchase_mode: "money",
+      fulfillment_type: effectiveFulfillment,
+      purchase_mode: mode,
       customer_name: name,
       customer_phone: phone,
       customer_note: note || null,
       lines: lines.map((line) => ({
         product_id: line.product_id,
         quantity: line.quantity,
-        purchase_mode: "money",
+        purchase_mode: mode,
         modifiers: line.modifiers.map((modifier) => ({
           modifier_option_id: modifier.modifier_option_id,
           quantity: modifier.quantity,
@@ -57,7 +62,7 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
         customer_note: line.customer_note ?? null,
       })),
       delivery:
-        fulfillment === "delivery"
+        effectiveFulfillment === "delivery"
           ? {
               street,
               external_number: externalNumber || null,
@@ -99,21 +104,34 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
         <div className="sf-error" role="alert">{error}</div>
       ) : null}
 
-      <fieldset style={{ border: "none", margin: 0, padding: 0, display: "flex", gap: 10 }}>
-        <legend className="sf-label">¿Cómo recibes tu pedido?</legend>
-        {(["pickup", "delivery"] as const).map((option) => (
-          <button
-            key={option}
-            type="button"
-            className="sf-chip"
-            data-active={fulfillment === option}
-            aria-pressed={fulfillment === option}
-            onClick={() => setFulfillment(option)}
-          >
-            {option === "pickup" ? "Recoger en tienda" : "A domicilio"}
-          </button>
-        ))}
-      </fieldset>
+      {credits ? (
+        <div>
+          <span className="sf-label">¿Cómo recibes tu pedido?</span>
+          <span className="sf-chip" data-active="true" aria-hidden>
+            Recoger en tienda
+          </span>
+          <p className="sf-muted" style={{ margin: "8px 0 0", fontSize: 13 }}>
+            El canje con créditos solo está disponible para recoger en tienda (el envío no se
+            paga con créditos).
+          </p>
+        </div>
+      ) : (
+        <fieldset style={{ border: "none", margin: 0, padding: 0, display: "flex", gap: 10 }}>
+          <legend className="sf-label">¿Cómo recibes tu pedido?</legend>
+          {(["pickup", "delivery"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              className="sf-chip"
+              data-active={fulfillment === option}
+              aria-pressed={fulfillment === option}
+              onClick={() => setFulfillment(option)}
+            >
+              {option === "pickup" ? "Recoger en tienda" : "A domicilio"}
+            </button>
+          ))}
+        </fieldset>
+      )}
 
       <div>
         <label className="sf-label" htmlFor="co-name">Nombre de contacto</label>
@@ -124,7 +142,7 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
         <input id="co-phone" className="sf-input" type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} />
       </div>
 
-      {fulfillment === "delivery" ? (
+      {effectiveFulfillment === "delivery" ? (
         <>
           <div>
             <label className="sf-label" htmlFor="co-street">Calle</label>
@@ -157,7 +175,11 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
       </div>
 
       <button className="sf-btn" type="submit" disabled={submitting}>
-        {submitting ? "Enviando…" : `Enviar pedido · ${formatMoney(subtotalHint)} + envío`}
+        {submitting
+          ? "Enviando…"
+          : credits
+            ? "Canjear pedido con créditos"
+            : `Enviar pedido · ${formatMoney(subtotalHint)} + envío`}
       </button>
     </form>
   );

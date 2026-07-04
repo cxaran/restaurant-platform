@@ -88,8 +88,10 @@ class CaptureRequest(ApiWriteSchema):
 
 class OrderTransitionRequest(ApiWriteSchema):
     new_status: str
-    # H5: cancelar con pago cobrado exige reconocimiento explícito (no reembolsa).
-    acknowledge_paid_payments: bool = False
+    # H5 (§1.6): cancelar con pago cobrado exige RESOLUCIÓN financiera
+    # explícita (cancelar no reembolsa); «retain» exige motivo auditable.
+    payment_resolution: Optional[Literal["refund_now", "refund_pending", "retain"]] = None
+    resolution_reason: Optional[str] = None
     reason_code: Optional[str] = Field(default=None, max_length=80)
     internal_note: Optional[str] = None
     customer_visible_note: Optional[str] = None
@@ -193,6 +195,8 @@ class OrderRead(ApiReadSchema):
     credits_redeemed_total: int
     customer_note: Optional[str] = None
     internal_note: Optional[str] = None
+    cancellation_money_resolution: Optional[str] = None
+    cancellation_resolution_note: Optional[str] = None
     created_by: Optional[UUID] = None
     created_at: datetime
     lines: list[OrderLineRead] = Field(default_factory=list)
@@ -213,6 +217,19 @@ class OrderListItem(ApiReadSchema):
     items_subtotal_amount: Decimal
     total_money_amount: Optional[Decimal] = None
     created_at: datetime
+
+
+class CancelledWithPaymentItem(ApiReadSchema):
+    """Cola de conciliación H5: cancelados con cobro y devolución abierta."""
+
+    order_id: UUID
+    public_code: str
+    cancelled_at: Optional[datetime] = None
+    cancellation_money_resolution: Optional[str] = None
+    cancellation_resolution_note: Optional[str] = None
+    paid_total: Decimal
+    refunded_total: Decimal
+    outstanding_amount: Decimal
 
 
 class MyOrderRead(ApiReadSchema):

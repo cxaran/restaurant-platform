@@ -266,8 +266,8 @@ class FinanceServiceTest(unittest.TestCase):
                 )
             self.assertEqual(ctx.exception.code, "reembolso_excede_dinero_linea")
 
-    def test_cancel_with_paid_payment_requires_acknowledgement(self) -> None:
-        """H5: cancelar no reembolsa; el cobro existente exige reconocimiento."""
+    def test_cancel_with_paid_payment_requires_resolution(self) -> None:
+        """H5 (§1.6): cancelar no reembolsa; el cobro exige RESOLUCIÓN explícita."""
         with Session(self.engine) as session:
             order, _payment = self._paid_payment(session)
 
@@ -276,17 +276,29 @@ class FinanceServiceTest(unittest.TestCase):
                     session, order, "cancelled", actor_id=self.user_id,
                     reason_code="store_cancelled",
                 )
-            self.assertEqual(ctx.exception.code, "pago_registrado")
+            self.assertEqual(ctx.exception.code, "resolucion_requerida")
+            session.rollback()
+
+            # Retener sin motivo auditable también se rechaza.
+            order = session.get(Order, self.order_id)
+            assert order is not None
+            with self.assertRaises(OrderRuleError) as ctx:
+                transition_order(
+                    session, order, "cancelled", actor_id=self.user_id,
+                    reason_code="store_cancelled", payment_resolution="retain",
+                )
+            self.assertEqual(ctx.exception.code, "motivo_requerido")
             session.rollback()
 
             order = session.get(Order, self.order_id)
             assert order is not None
             transition_order(
                 session, order, "cancelled", actor_id=self.user_id,
-                reason_code="store_cancelled", acknowledge_paid_payments=True,
+                reason_code="store_cancelled", payment_resolution="refund_pending",
             )
             session.commit()
             self.assertEqual(order.status, "cancelled")
+            self.assertEqual(order.cancellation_money_resolution, "refund_pending")
             # El hecho queda en la bitácora para conciliación posterior.
             from backend.app.models.orders import OrderStatusHistory
 
@@ -295,7 +307,56 @@ class FinanceServiceTest(unittest.TestCase):
                     OrderStatusHistory.new_status == "cancelled"
                 )
             ).one().internal_note
-            self.assertIn("requiere resolución de reembolso", note or "")
+            self.assertIn("reembolso pendiente de procesar", note or "")
+
+    def test_pending_refunds_queue_lists_open_cancellations(self) -> None:
+        """H5: la cola de conciliación expone cancelados con cobro sin devolver."""
+        from backend.app.auth.auth_dependencies import get_current_user
+        from backend.app.core.database import get_db
+        from backend.app.main import app
+        from backend.app.schemas.user import SessionUser
+
+        with Session(self.engine) as session:
+            order, payment = self._paid_payment(session)
+            transition_order(
+                session, order, "cancelled", actor_id=self.user_id,
+                reason_code="store_cancelled", payment_resolution="refund_pending",
+            )
+            session.commit()
+            payment_id = payment.id
+
+        def override_db():
+            with Session(self.engine) as session:
+                yield session
+
+        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_current_user] = lambda: SessionUser(
+            id=self.user_id, name="T", last_name="T", email="t@example.com",
+            permissions={"payments:read", "payments:refund"},
+        )
+        try:
+            client = TestClient(app)
+            body = client.get("/api/v1/orders/cancellations/pending-refunds").json()
+            self.assertEqual(len(body), 1)
+            self.assertEqual(body[0]["public_code"], "ORD-000001")
+            self.assertEqual(body[0]["outstanding_amount"], "200.00")
+            self.assertEqual(body[0]["cancellation_money_resolution"], "refund_pending")
+
+            # Al devolver el dinero completo, la cola queda vacía.
+            with Session(self.engine) as session:
+                order = session.get(Order, self.order_id)
+                payment = session.get(Payment, payment_id)
+                assert order is not None and payment is not None
+                create_refund(
+                    session, order, payment, amount=Decimal("200"),
+                    reason="Cliente canceló", processed_by=self.user_id,
+                    allocations=[],
+                )
+                session.commit()
+            body = client.get("/api/v1/orders/cancellations/pending-refunds").json()
+            self.assertEqual(body, [])
+        finally:
+            app.dependency_overrides.clear()
 
     def test_approval_recomputes_payment_status(self) -> None:
         """H4: si el total congelado supera lo cobrado, deja de ser «paid»."""

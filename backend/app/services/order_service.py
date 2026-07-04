@@ -26,6 +26,7 @@ from sqlalchemy import text as sa_text
 from sqlmodel import Session, select
 
 from backend.app.models.orders import (
+    CANCELLATION_MONEY_RESOLUTIONS,
     FULFILLMENT_TYPES,
     ORDER_SOURCES,
     Order,
@@ -109,7 +110,8 @@ def transition_order(
     reason_code: Optional[str] = None,
     internal_note: Optional[str] = None,
     customer_visible_note: Optional[str] = None,
-    acknowledge_paid_payments: bool = False,
+    payment_resolution: Optional[str] = None,
+    resolution_reason: Optional[str] = None,
 ) -> Order:
     """Aplica una transición válida, sus efectos y la bitácora. NO hace commit."""
     allowed = ORDER_TRANSITIONS.get(order.status, ())
@@ -142,9 +144,10 @@ def transition_order(
 
         on_order_completed(session, order, actor_id=actor_id)
     elif new_status == "cancelled":
-        # H5: cancelar NO reembolsa. Si hay dinero cobrado, quien cancela debe
-        # reconocerlo explícitamente y el hecho queda en la bitácora; el
-        # reembolso es un flujo aparte y posterior.
+        # H5 (§1.6): cancelar NO reembolsa. Con dinero cobrado, quien cancela
+        # elige una resolución explícita: reembolso ahora, reembolso pendiente
+        # o retención excepcional con motivo. El reembolso en sí es un flujo
+        # aparte; la cola de conciliación vive sobre esta resolución.
         from backend.app.models.payments import Payment as _Payment
 
         paid = session.exec(
@@ -154,15 +157,28 @@ def transition_order(
             )
         ).first()
         if paid is not None:
-            if not acknowledge_paid_payments:
+            if payment_resolution not in CANCELLATION_MONEY_RESOLUTIONS:
                 raise OrderRuleError(
-                    "pago_registrado",
+                    "resolucion_requerida",
                     "Este pedido tiene pagos cobrados: cancelar no reembolsa. "
-                    "Confirma la cancelación y resuelve el reembolso por separado.",
+                    "Elige una resolución: reembolsar ahora, dejar el reembolso "
+                    "pendiente o retener el pago con motivo.",
                 )
+            if payment_resolution == "retain" and not (resolution_reason or "").strip():
+                raise OrderRuleError(
+                    "motivo_requerido",
+                    "Retener un pago cobrado exige un motivo auditable.",
+                )
+            order.cancellation_money_resolution = payment_resolution
+            order.cancellation_resolution_note = resolution_reason
+            resolution_label = {
+                "refund_now": "reembolso registrado ahora",
+                "refund_pending": "reembolso pendiente de procesar",
+                "retain": "pago retenido excepcionalmente",
+            }[payment_resolution]
             internal_note = (
                 (internal_note + " · " if internal_note else "")
-                + "Cancelado con pago cobrado: requiere resolución de reembolso."
+                + f"Cancelado con pago cobrado; resolución: {resolution_label}."
             )
         order.cancelled_at = now
         order.cancelled_by = actor_id

@@ -71,6 +71,9 @@ PURCHASE_MODES = ("money", "credits", "complimentary")
 # créditos — jamás híbrido. "complimentary" no es un modo de pedido.
 ORDER_PURCHASE_MODES = ("money", "credits")
 
+# H5 (§1.6 GOALS): resolución financiera obligatoria al cancelar con cobro.
+CANCELLATION_MONEY_RESOLUTIONS = ("refund_now", "refund_pending", "retain")
+
 # Ajustes (§15.3)
 ADJUSTMENT_TYPES = ("discount", "promotion", "courtesy", "manual_fee")
 ADJUSTMENT_DIRECTIONS = ("charge", "discount")
@@ -152,6 +155,19 @@ class Order(Base):
             "AND customer_user_id IS NOT NULL"
             ")",
             name="orders_credits_mode_no_money",
+        ),
+        # H5 (§1.6): la resolución sólo toma valores conocidos y «retener»
+        # exige motivo auditable. Que EXISTA resolución cuando hubo cobro lo
+        # exige transition_order (cross-tabla con payments).
+        CheckConstraint(
+            "cancellation_money_resolution IS NULL OR "
+            + _in_clause("cancellation_money_resolution", CANCELLATION_MONEY_RESOLUTIONS),
+            name="orders_cancel_resolution",
+        ),
+        CheckConstraint(
+            "cancellation_money_resolution != 'retain' "
+            "OR cancellation_resolution_note IS NOT NULL",
+            name="orders_retain_requires_note",
         ),
         Index("uq_orders_order_number", "order_number", unique=True),
         Index("uq_orders_public_code", "public_code", unique=True),
@@ -235,6 +251,14 @@ class Order(Base):
     )
     cancelled_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("user.id", ondelete="RESTRICT"), nullable=True
+    )
+    cancellation_money_resolution: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="H5: refund_now | refund_pending | retain; sólo al cancelar con cobro.",
+    )
+    cancellation_resolution_note: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Motivo de la resolución (obligatorio al retener)."
     )
     created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True),

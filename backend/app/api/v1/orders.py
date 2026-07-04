@@ -28,6 +28,7 @@ from backend.app.models.orders import (
 from backend.app.models.shipping import ShippingRateRule
 from backend.app.schemas.address import GeoPoint
 from backend.app.schemas.order import (
+    CancelledWithPaymentItem,
     CaptureRequest,
     CheckoutRequest,
     DeliveryInput,
@@ -45,6 +46,7 @@ from backend.app.schemas.order import (
     OrderTransitionRequest,
 )
 from backend.app.security.groups.orders import OrderPermissions
+from backend.app.security.groups.payments import PaymentPermissions
 from backend.app.services.business_service import (
     get_business_profile,
     get_business_settings,
@@ -501,6 +503,69 @@ def list_orders(
     ]
 
 
+@router.get(
+    "/cancellations/pending-refunds",
+    response_model=list[CancelledWithPaymentItem],
+)
+def list_cancelled_pending_refunds(
+    session: SessionDep,
+    _: PaymentPermissions.READ.requiere,
+    limit: int = Query(default=50, ge=1, le=100),
+) -> list[CancelledWithPaymentItem]:
+    """Cola de conciliación H5: cancelados con cobro cuya devolución sigue abierta.
+
+    Incluye resoluciones refund_now/refund_pending mientras el dinero devuelto
+    no cubra lo cobrado; «retain» queda fuera (decisión auditada aparte).
+    """
+    from backend.app.models.payments import Payment, PaymentRefund
+
+    orders = session.exec(
+        select(Order)
+        .where(Order.status == "cancelled")
+        .where(
+            Order.cancellation_money_resolution.in_(("refund_now", "refund_pending"))  # pyright: ignore[reportAttributeAccessIssue]
+        )
+        .order_by(Order.cancelled_at.desc())  # pyright: ignore[reportAttributeAccessIssue]
+        .limit(limit)
+    ).all()
+
+    items: list[CancelledWithPaymentItem] = []
+    for order in orders:
+        payments = session.exec(
+            select(Payment).where(
+                Payment.order_id == order.id,
+                Payment.status.in_(("paid", "partially_refunded", "refunded")),  # pyright: ignore[reportAttributeAccessIssue]
+            )
+        ).all()
+        paid_total = sum((p.received_amount for p in payments), Decimal("0"))
+        payment_ids = [p.id for p in payments]
+        refunded_total = Decimal("0")
+        if payment_ids:
+            refunds = session.exec(
+                select(PaymentRefund).where(
+                    PaymentRefund.payment_id.in_(payment_ids),  # pyright: ignore[reportAttributeAccessIssue]
+                    PaymentRefund.status != "voided",
+                )
+            ).all()
+            refunded_total = sum((r.amount for r in refunds), Decimal("0"))
+        outstanding = paid_total - refunded_total
+        if outstanding <= 0:
+            continue
+        items.append(
+            CancelledWithPaymentItem(
+                order_id=order.id,
+                public_code=order.public_code,
+                cancelled_at=order.cancelled_at,
+                cancellation_money_resolution=order.cancellation_money_resolution,
+                cancellation_resolution_note=order.cancellation_resolution_note,
+                paid_total=paid_total,
+                refunded_total=refunded_total,
+                outstanding_amount=outstanding,
+            )
+        )
+    return items
+
+
 @router.get("/{order_id}", response_model=OrderRead)
 def get_order(
     order_id: uuid.UUID,
@@ -539,7 +604,8 @@ def transition(
             reason_code=payload.reason_code,
             internal_note=payload.internal_note,
             customer_visible_note=payload.customer_visible_note,
-            acknowledge_paid_payments=payload.acknowledge_paid_payments,
+            payment_resolution=payload.payment_resolution,
+            resolution_reason=payload.resolution_reason,
         )
     except OrderRuleError as exc:
         api_error(status.HTTP_409_CONFLICT, exc.code, exc.message)

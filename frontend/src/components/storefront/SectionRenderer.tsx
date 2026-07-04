@@ -106,15 +106,21 @@ function HeroSection({ section }: SectionProps) {
   const style = section.style as { color_scheme?: string; content_alignment?: string };
   const scheme = sectionScheme(style.color_scheme);
   const mainMedia = section.media.main ?? section.media.hero ?? null;
+  // Los CTA se renderizan AQUÍ (Server Component): un callback no puede
+  // cruzar la frontera hacia el carrusel cliente, los elementos sí.
+  const slidesWithCtas = slides.map((slide) => ({
+    ...slide,
+    primaryCtaNode: <CtaLink cta={slide.primary_cta} variant="solid" />,
+    secondaryCtaNode: <CtaLink cta={slide.secondary_cta} variant="outline" />,
+  }));
   return (
     <HeroCarousel
-      slides={slides}
+      slides={slidesWithCtas}
       background={scheme.background}
       color={scheme.color}
       alignment={style.content_alignment === "center" ? "center" : "left"}
       mediaUrl={publicFileUrl(mainMedia?.desktop_file_id ?? mainMedia?.mobile_file_id)}
       mediaAlt={mainMedia?.alt_text ?? ""}
-      renderCta={(cta, variant) => <CtaLink cta={cta} variant={variant} />}
     />
   );
 }

@@ -14,6 +14,10 @@ export type HeroSlideVM = {
   description?: string | null;
   primary_cta?: unknown;
   secondary_cta?: unknown;
+  // Los CTA llegan YA renderizados desde el Server Component (un callback no
+  // puede cruzar la frontera server→client; los elementos sí son serializables).
+  primaryCtaNode?: ReactNode;
+  secondaryCtaNode?: ReactNode;
 };
 
 export function HeroCarousel({
@@ -23,7 +27,6 @@ export function HeroCarousel({
   alignment,
   mediaUrl = null,
   mediaAlt = "",
-  renderCta,
 }: Readonly<{
   slides: HeroSlideVM[];
   background: string;
@@ -31,7 +34,6 @@ export function HeroCarousel({
   alignment: "left" | "center";
   mediaUrl?: string | null;
   mediaAlt?: string;
-  renderCta: (cta: unknown, variant: "solid" | "outline") => ReactNode;
 }>) {
   const [index, setIndex] = useState(0);
   const slide = slides[Math.min(index, slides.length - 1)];
@@ -78,8 +80,8 @@ export function HeroCarousel({
             </p>
           ) : null}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: alignment === "center" ? "center" : "flex-start" }}>
-            {renderCta(slide.primary_cta, "solid")}
-            {renderCta(slide.secondary_cta, "outline")}
+            {slide.primaryCtaNode}
+            {slide.secondaryCtaNode}
           </div>
         </div>
         {slide.variant === "split" ? (

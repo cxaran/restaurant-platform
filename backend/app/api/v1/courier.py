@@ -210,15 +210,11 @@ def start(
         _raise(exc)
     commit_or_conflict(session, "No fue posible iniciar el reparto.")
     session.refresh(assignment)
-    # Notificación C (§1.13): «en camino» al cliente, best-effort tras commit.
-    from backend.app.models.orders import Order as _Order, OrderDelivery
-    from backend.app.services.order_notifications import notify_order_progress
+    # La campana «en camino» ya viajó con la transición (transition_order);
+    # aquí solo se despachan los correos pendientes, best-effort tras commit.
+    from backend.app.services.notification_service import kick_email_dispatch
 
-    delivery = session.get(OrderDelivery, order_delivery_id)
-    if delivery is not None:
-        order = session.get(_Order, delivery.order_id)
-        if order is not None:
-            notify_order_progress(order, "out_for_delivery")
+    kick_email_dispatch()
     return _assignment_read(assignment)
 
 

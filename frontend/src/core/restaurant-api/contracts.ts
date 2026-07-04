@@ -4,6 +4,8 @@ import type { components } from "@/generated/openapi";
 
 export type PublicBusiness = components["schemas"]["PublicBusinessRead"];
 export type PublicBusinessPhone = components["schemas"]["PublicBusinessPhone"];
+export type PublicLegalTerms = components["schemas"]["PublicLegalTermsRead"];
+export type PublicLegalCoupon = components["schemas"]["PublicLegalCoupon"];
 export type PublicMenuCategory = components["schemas"]["PublicMenuCategory"];
 export type PublicProduct = components["schemas"]["PublicProduct"];
 export type PublicModifierGroup = components["schemas"]["PublicModifierGroup"];

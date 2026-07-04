@@ -22,6 +22,7 @@ from backend.app.security.groups.catalog import CatalogPermissions
 from backend.app.security.groups.deliveries import DeliveryPermissions
 from backend.app.security.groups.discounts import DiscountCodePermissions
 from backend.app.security.groups.finances import FinancePermissions
+from backend.app.security.groups.notifications import NotificationPermissions
 from backend.app.security.groups.orders import OrderPermissions
 from backend.app.security.groups.profiles import ProfilePermissions
 from backend.app.security.groups.shipping import ShippingPermissions
@@ -112,6 +113,13 @@ NAVIGATION_REGISTRY: tuple[NavigationModuleDef, ...] = (
         href="/admin/reportes",
         section="admin",
         permissions=(FinancePermissions.READ,),
+    ),
+    NavigationModuleDef(
+        name="notificaciones",
+        label="Notificaciones",
+        href="/admin/notificaciones",
+        section="admin",
+        permissions=(NotificationPermissions.SEND,),
     ),
     NavigationModuleDef(
         name="pedidos",

@@ -124,6 +124,30 @@ def quote_discount(
     )
 
 
+def list_public_coupons(session: Session) -> list[DiscountCode]:
+    """Cupones GENERALES vigentes ahora, para el documento legal público.
+
+    Vigente = activo, dentro de su ventana temporal (o sin ventana) y SIN
+    destinatario (los códigos personales jamás se anuncian). Ordenados por
+    fecha de creación para una lista estable.
+    """
+    now = utc_now()
+    rows = session.exec(
+        select(DiscountCode)
+        .where(DiscountCode.is_active == True)  # noqa: E712
+        .where(DiscountCode.target_customer_user_id.is_(None))  # pyright: ignore[reportAttributeAccessIssue]
+        .order_by(DiscountCode.created_at)  # pyright: ignore[reportArgumentType]
+    ).all()
+    vigentes: list[DiscountCode] = []
+    for row in rows:
+        if row.valid_from is not None and now < _naive_utc(row.valid_from):
+            continue
+        if row.valid_until is not None and now >= _naive_utc(row.valid_until):
+            continue
+        vigentes.append(row)
+    return vigentes
+
+
 def _recalc_discount_total(session: Session, order: Order) -> None:
     """Recalcula el descuento corriente del pedido desde sus ajustes."""
     total = session.exec(

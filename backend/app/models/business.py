@@ -58,6 +58,22 @@ class BusinessProfile(Base):
     slogan: Mapped[Optional[str]] = mapped_column(String(180), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(180), nullable=True)
     main_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    terms_extra: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment=(
+            "Cláusulas adicionales de los Términos y Condiciones, editables por el "
+            "administrador; se anexan al documento autogenerado de /terminos."
+        ),
+    )
+    privacy_extra: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment=(
+            "Texto adicional del Aviso de Privacidad, editable por el administrador; "
+            "se anexa a la sección de privacidad autogenerada de /terminos."
+        ),
+    )
     currency_code: Mapped[str] = mapped_column(
         CHAR(3),
         nullable=False,

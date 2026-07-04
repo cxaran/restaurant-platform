@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { usePublicSession } from "@/core/storefront/PublicSessionProvider";
 import { useCart } from "@/core/storefront/cart";
 import type { PublicBusiness } from "@/core/restaurant-api/contracts";
@@ -62,6 +63,7 @@ export function StorefrontHeader({
           />
           <span className="sf-header-state">{isOpen ? "Abierto" : "Cerrado"}</span>
         </span>
+        {session ? <NotificationsBell variant="sf" /> : null}
         {session ? (
           <Link
             href="/cuenta"

@@ -129,7 +129,14 @@ page is a FIXED composition hero-carousel → highlight strip → live menu → 
 `storefront_settings`/`storefront_heros`/`storefront_highlights`/`storefront_footer`,
 Pydantic contracts in `app/storefront/templates.py`, saving publishes instantly — the only
 gate is `is_active`; public payload at `GET /public/storefront/site` + `/highlights?surface=`),
-profiles (customer/staff, `can_deliver`), discount codes (fixed-amount, web-only).
+profiles (customer/staff, `can_deliver`), discount codes (fixed-amount, web-only),
+notifications (persistent per-user rows = in-app bell + email queue on the SAME row
+(`email_status` pending→sent/failed/skipped); rows are created INSIDE the triggering
+transaction — web-order created → users whose role grants `notifications:order_alerts`;
+status transition → customer, hooked centrally in `transition_order`; admin broadcast via
+`notifications:send` at `/admin/notificaciones` — emails dispatched by a post-commit
+best-effort thread plus the `notifications.tick` Taskiq cron as safety net with
+`FOR UPDATE SKIP LOCKED`).
 
 Non-negotiable domain invariants (enforced backend + DB, never frontend-only):
 

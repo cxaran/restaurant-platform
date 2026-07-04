@@ -1,14 +1,15 @@
-"""Notificaciones priorizadas de pedidos (§1.13 GOALS): A, C y G.
+"""Notificación G de pedidos (§1.13 GOALS): correo directo al negocio.
 
-A — Cliente: pedido recibido (checkout web).
-C — Cliente: pedido listo (pickup) o en camino (delivery).
-G — Administrador: pedido cancelado con pago cobrado sin reembolso resuelto.
+Las notificaciones al CLIENTE (recibido/estado) y las alertas de pedido web
+nuevo al personal viven ahora en ``notification_service`` (campana + correo
+persistentes). Aquí queda solo la G, que va al CORREO DEL NEGOCIO (no a un
+usuario de la plataforma): cancelación con dinero cobrado y devolución
+abierta.
 
 Best-effort SIEMPRE: un fallo de correo jamás afecta la transacción del
 pedido. El envío corre en un hilo aparte con su PROPIA sesión (el transporte
 se resuelve en system_settings) — nada de esto simula envíos: en desarrollo
-los captura Mailpit. Más notificaciones (reparto asignado, etc.) llegarán
-cuando el ciclo de reparto esté estable — decisión explícita del roadmap.
+los captura Mailpit.
 """
 
 import asyncio
@@ -42,36 +43,6 @@ def _send_in_background(*, subject: str, email_to: Optional[str], message: str) 
             logger.warning("order_notification_failed subject=%s", subject)
 
     threading.Thread(target=_runner, name="order-notification", daemon=True).start()
-
-
-def notify_order_received(order: Order) -> None:
-    """A: confirmación al cliente al crear su pedido web."""
-    _send_in_background(
-        subject=f"Recibimos tu pedido {order.public_code}",
-        email_to=order.customer_email_snapshot,
-        message=(
-            f"¡Gracias! Recibimos tu pedido {order.public_code} y lo estamos "
-            "revisando. Te avisaremos cuando esté listo o en camino.\n\n"
-            "Puedes seguirlo en la sección «Mis pedidos» del sitio."
-        ),
-    )
-
-
-def notify_order_progress(order: Order, new_status: str) -> None:
-    """C: listo (pickup/mostrador) o en camino (delivery)."""
-    if new_status == "ready" and order.fulfillment_type != "delivery":
-        subject = f"Tu pedido {order.public_code} está listo"
-        body = "Tu pedido está listo. ¡Te esperamos para entregártelo!"
-    elif new_status == "out_for_delivery":
-        subject = f"Tu pedido {order.public_code} va en camino"
-        body = "Tu pedido salió del restaurante y va en camino a tu dirección."
-    else:
-        return
-    _send_in_background(
-        subject=subject,
-        email_to=order.customer_email_snapshot,
-        message=f"{body}\n\nSigue el estado en «Mis pedidos».",
-    )
 
 
 def notify_admin_unresolved_refund(session, order: Order) -> None:

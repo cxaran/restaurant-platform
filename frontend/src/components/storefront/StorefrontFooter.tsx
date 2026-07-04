@@ -128,6 +128,7 @@ export function StorefrontFooter({
   const legal = (
     <div className="sf-ft-legal">
       <span>© {year} {name} · Todos los derechos reservados</span>
+      <Link href="/terminos">Términos y condiciones</Link>
     </div>
   );
 
@@ -168,12 +169,7 @@ export function StorefrontFooter({
             {schedule ? <span className="sf-ft-line">🕑 {schedule}</span> : null}
           </div>
         </div>
-        <div className="sf-container">
-          <div className="sf-ft-legal">
-            <span>© {year} {name} · Todos los derechos reservados</span>
-            <span>Aviso de privacidad · Términos</span>
-          </div>
-        </div>
+        <div className="sf-container">{legal}</div>
       </footer>
     );
   }

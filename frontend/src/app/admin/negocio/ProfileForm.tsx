@@ -30,6 +30,8 @@ export function ProfileForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
   const [timezone, setTimezone] = useState("");
   const [orderPrefix, setOrderPrefix] = useState("");
   const [acceptingOrders, setAcceptingOrders] = useState(true);
+  const [termsExtra, setTermsExtra] = useState("");
+  const [privacyExtra, setPrivacyExtra] = useState("");
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
@@ -51,6 +53,8 @@ export function ProfileForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
     setTimezone(data.timezone);
     setOrderPrefix(data.order_prefix);
     setAcceptingOrders(data.is_accepting_orders);
+    setTermsExtra(data.terms_extra ?? "");
+    setPrivacyExtra(data.privacy_extra ?? "");
   }
 
   useEffect(() => {
@@ -87,6 +91,8 @@ export function ProfileForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
         timezone: timezone.trim(),
         order_prefix: orderPrefix.trim(),
         is_accepting_orders: acceptingOrders,
+        terms_extra: termsExtra.trim() || null,
+        privacy_extra: privacyExtra.trim() || null,
       };
       applyProfile(await updateBusinessProfile(body));
       setNotice("Perfil guardado.");
@@ -335,6 +341,46 @@ export function ProfileForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
                 aria-describedby={fieldErrors.order_prefix ? "bp-prefix-error" : undefined}
               />
               <FieldError id="bp-prefix-error" message={fieldErrors.order_prefix} />
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <div>
+              <label className={labelClass} htmlFor="bp-terms-extra">
+                Términos y condiciones adicionales (opcional)
+              </label>
+              <textarea
+                id="bp-terms-extra"
+                rows={5}
+                disabled={!canEdit}
+                value={termsExtra}
+                onChange={(event) => setTermsExtra(event.target.value)}
+                className="w-full rounded-[11px] border border-[var(--border)] bg-[var(--bg2)] px-3 py-2 text-sm text-[var(--tx)] outline-none focus:border-[var(--accent-bd)] disabled:opacity-60"
+                aria-describedby={fieldErrors.terms_extra ? "bp-terms-extra-error" : undefined}
+              />
+              <p className="m-0 mt-1 text-xs text-[var(--tx3)]">
+                Se anexan a la página pública de Términos y Condiciones, debajo de las
+                cláusulas del negocio y de los cupones (generadas automáticamente).
+              </p>
+              <FieldError id="bp-terms-extra-error" message={fieldErrors.terms_extra} />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="bp-privacy-extra">
+                Aviso de privacidad adicional (opcional)
+              </label>
+              <textarea
+                id="bp-privacy-extra"
+                rows={5}
+                disabled={!canEdit}
+                value={privacyExtra}
+                onChange={(event) => setPrivacyExtra(event.target.value)}
+                className="w-full rounded-[11px] border border-[var(--border)] bg-[var(--bg2)] px-3 py-2 text-sm text-[var(--tx)] outline-none focus:border-[var(--accent-bd)] disabled:opacity-60"
+                aria-describedby={fieldErrors.privacy_extra ? "bp-privacy-extra-error" : undefined}
+              />
+              <p className="m-0 mt-1 text-xs text-[var(--tx3)]">
+                Se anexa a la sección de Aviso de Privacidad de esa misma página.
+              </p>
+              <FieldError id="bp-privacy-extra-error" message={fieldErrors.privacy_extra} />
             </div>
           </div>
 

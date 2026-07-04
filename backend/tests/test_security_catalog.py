@@ -39,6 +39,7 @@ from backend.app.security.groups.deliveries import DeliveryPermissions  # noqa: 
 from backend.app.security.groups.discounts import DiscountCodePermissions  # noqa: E402
 from backend.app.security.groups.files import FilePermissions  # noqa: E402
 from backend.app.security.groups.finances import FinancePermissions  # noqa: E402
+from backend.app.security.groups.notifications import NotificationPermissions  # noqa: E402
 from backend.app.security.groups.orders import OrderPermissions  # noqa: E402
 from backend.app.security.groups.payments import PaymentPermissions, TicketPermissions  # noqa: E402
 from backend.app.security.groups.permissions import PermissionPermissions  # noqa: E402
@@ -74,6 +75,7 @@ class SecurityCatalogTest(unittest.TestCase):
                 StorefrontPermissions,
                 ProfilePermissions,
                 DiscountCodePermissions,
+                NotificationPermissions,
             ],
         )
 
@@ -140,6 +142,8 @@ class SecurityCatalogTest(unittest.TestCase):
                 "profiles:manage_staff",
                 "discount_codes:read",
                 "discount_codes:manage",
+                "notifications:send",
+                "notifications:order_alerts",
             ],
         )
 

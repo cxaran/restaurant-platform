@@ -26,6 +26,8 @@ class BusinessProfileRead(ApiReadSchema):
     slogan: Optional[str] = None
     email: Optional[str] = None
     main_address: Optional[str] = None
+    terms_extra: Optional[str] = None
+    privacy_extra: Optional[str] = None
     currency_code: str
     timezone: str
     order_prefix: str
@@ -40,6 +42,8 @@ class BusinessProfileUpdate(ApiPatchSchema):
     slogan: Optional[str] = Field(default=None, max_length=180)
     email: Optional[str] = Field(default=None, max_length=180)
     main_address: Optional[str] = None
+    terms_extra: Optional[str] = Field(default=None, max_length=20_000)
+    privacy_extra: Optional[str] = Field(default=None, max_length=20_000)
     currency_code: Optional[str] = Field(default=None, min_length=3, max_length=3)
     timezone: Optional[str] = Field(default=None, max_length=64)
     order_prefix: Optional[str] = Field(default=None, min_length=1, max_length=12)
@@ -240,3 +244,35 @@ class PublicBusinessRead(ApiReadSchema):
     allow_pickup: bool
     minimum_delivery_order_amount: Optional[Decimal] = None
     free_shipping_global_from_amount: Optional[Decimal] = None
+
+
+# ---------------------------------------------------------------------------
+# Página legal pública (Términos y Condiciones + Aviso de Privacidad)
+# ---------------------------------------------------------------------------
+
+class PublicLegalCoupon(ApiReadSchema):
+    """Definición vigente de un cupón GENERAL, para generar sus cláusulas."""
+
+    code: str
+    name: str
+    description: Optional[str] = None
+    discount_amount: Decimal
+    minimum_order_amount: Decimal
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
+
+
+class PublicLegalTermsRead(ApiReadSchema):
+    """Datos para armar el documento legal autogenerado del sitio (/terminos)."""
+
+    trade_name: str
+    legal_name: Optional[str] = None
+    main_address: Optional[str] = None
+    email: Optional[str] = None
+    currency_code: str
+    phones: list[PublicBusinessPhone] = Field(default_factory=list)
+    coupons: list[PublicLegalCoupon] = Field(default_factory=list)
+    # Cláusulas opcionales que el administrador edita en el perfil del negocio.
+    terms_extra: Optional[str] = None
+    privacy_extra: Optional[str] = None
+    generated_at: datetime

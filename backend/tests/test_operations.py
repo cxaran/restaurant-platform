@@ -212,27 +212,9 @@ class OrderNotificationsTest(unittest.TestCase):
         defaults.update(overrides)
         return Order(**defaults)
 
-    def test_notify_received_and_progress(self) -> None:
-        sent: list[dict] = []
-        with mock.patch.object(
-            order_notifications, "_send_in_background",
-            side_effect=lambda **kw: sent.append(kw),
-        ):
-            order_notifications.notify_order_received(self._order_stub())
-            order_notifications.notify_order_progress(self._order_stub(), "ready")
-            order_notifications.notify_order_progress(
-                self._order_stub(fulfillment_type="delivery"), "out_for_delivery"
-            )
-            # «ready» de un delivery NO notifica (avisa hasta salir en camino).
-            order_notifications.notify_order_progress(
-                self._order_stub(fulfillment_type="delivery"), "ready"
-            )
-        self.assertEqual(len(sent), 3)
-        self.assertIn("Recibimos tu pedido", sent[0]["subject"])
-        self.assertIn("está listo", sent[1]["subject"])
-        self.assertIn("en camino", sent[2]["subject"])
-        for item in sent:
-            self.assertEqual(item["email_to"], "cliente@example.com")
+    # Las notificaciones A (recibido) y C (listo/en camino) al cliente viven
+    # ahora en notification_service (campana + correo persistentes) y se
+    # cubren en test_notifications; aquí queda solo la G (correo al negocio).
 
     def test_notify_admin_only_for_open_resolutions(self) -> None:
         engine = _engine()

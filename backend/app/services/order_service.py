@@ -212,6 +212,12 @@ def transition_order(
     order.status = new_status
     order.updated_at = now
     session.add(order)
+    # Campana + correo del CLIENTE en la MISMA transacción de la transición
+    # (todos los caminos: panel, POS, courier, expiración). Import tardío:
+    # sin ciclo. El despacho del correo es post-commit (hilo/tick).
+    from backend.app.services.notification_service import notify_order_status
+
+    notify_order_status(session, order, new_status)
     session.flush()
     return order
 

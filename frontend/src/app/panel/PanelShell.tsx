@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { TTShell, type TTShellNavSection } from "@/components/layout/TTShell";
 import type { NavigationModule } from "@/core/api/contracts";
 import type { SessionUser } from "@/core/auth/types";
@@ -29,13 +30,18 @@ export function PanelShell({
   const activeModule = modules.find(
     (module_) => pathname === module_.href || pathname.startsWith(`${module_.href}/`),
   );
-  // Alerta de conciliación H5 en la BARRA del título de Pedidos: icono con
-  // contador que abre el detalle en un diálogo — no roba espacio al tablero.
+  // Barra del título: campana de notificaciones SIEMPRE (nueva orden web,
+  // etc.) y, en Pedidos, la alerta de conciliación H5 — iconos con contador
+  // que abren su detalle sin robar espacio al contenido.
   const isPedidos = pathname === "/panel/pedidos" || pathname.startsWith("/panel/pedidos/");
-  const headerExtra =
-    isPedidos && permissions.includes("payments:read") ? (
-      <PendingRefundsAlert canRefund={permissions.includes("payments:refund")} />
-    ) : null;
+  const headerExtra = (
+    <>
+      {isPedidos && permissions.includes("payments:read") ? (
+        <PendingRefundsAlert canRefund={permissions.includes("payments:refund")} />
+      ) : null}
+      <NotificationsBell variant="tt" />
+    </>
+  );
   const isCuenta = pathname === "/panel/cuenta" || pathname.startsWith("/panel/cuenta/");
   const title =
     pathname === "/panel"

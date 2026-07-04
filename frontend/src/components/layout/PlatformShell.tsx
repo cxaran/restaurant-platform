@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { TTShell, type TTShellNavSection } from "@/components/layout/TTShell";
 import type {
   NavigationModule,
@@ -114,6 +115,7 @@ export function PlatformShell({
       sections={sections}
       user={{ name: session.name, detail: session.email }}
       title={title}
+      headerExtra={<NotificationsBell variant="tt" />}
     >
       {children}
     </TTShell>

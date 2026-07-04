@@ -1587,6 +1587,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Notifications */
+        get: operations["my_notifications_api_v1_notifications_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/me/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read All My Notifications */
+        post: operations["read_all_my_notifications_api_v1_notifications_me_read_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read Notification */
+        post: operations["read_notification_api_v1_notifications__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/broadcast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Broadcast */
+        post: operations["send_broadcast_api_v1_notifications_broadcast_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders": {
         parameters: {
             query?: never;
@@ -2109,6 +2177,31 @@ export interface paths {
         };
         /** Read Public Business */
         get: operations["read_public_business_api_v1_public_business_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/legal/terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Public Legal Terms
+         * @description Datos para el documento legal autogenerado del sitio (/terminos).
+         *
+         *     Reúne la identidad del negocio, sus teléfonos públicos, los cupones
+         *     GENERALES vigentes (para generar sus cláusulas) y las secciones opcionales
+         *     que el administrador edita en el perfil. Los códigos personales nunca se
+         *     exponen aquí.
+         */
+        get: operations["read_public_legal_terms_api_v1_public_legal_terms_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3529,6 +3622,19 @@ export interface components {
              */
             description: string | null;
         };
+        /** BroadcastRequest */
+        BroadcastRequest: {
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /**
+             * Audience
+             * @default all
+             * @enum {string}
+             */
+            audience: "all" | "customers" | "staff";
+        };
         /** BusinessPhoneCreate */
         BusinessPhoneCreate: {
             /** Label */
@@ -3609,6 +3715,10 @@ export interface components {
             email?: string | null;
             /** Main Address */
             main_address?: string | null;
+            /** Terms Extra */
+            terms_extra?: string | null;
+            /** Privacy Extra */
+            privacy_extra?: string | null;
             /** Currency Code */
             currency_code: string;
             /** Timezone */
@@ -3634,6 +3744,10 @@ export interface components {
             email?: string | null;
             /** Main Address */
             main_address?: string | null;
+            /** Terms Extra */
+            terms_extra?: string | null;
+            /** Privacy Extra */
+            privacy_extra?: string | null;
             /** Currency Code */
             currency_code?: string | null;
             /** Timezone */
@@ -5170,6 +5284,13 @@ export interface components {
             /** Assignment Status */
             assignment_status: string;
         };
+        /** MyNotifications */
+        MyNotifications: {
+            /** Unread Count */
+            unread_count: number;
+            /** Items */
+            items?: components["schemas"]["NotificationRead"][];
+        };
         /**
          * MyOrderRead
          * @description Vista del CLIENTE: etiqueta pública, sin datos internos (§58.2).
@@ -5251,6 +5372,26 @@ export interface components {
             section: "admin" | "panel";
             /** Required Permissions */
             required_permissions: string[];
+        };
+        /** NotificationRead */
+        NotificationRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Order Id */
+            order_id?: string | null;
+            /** Read At */
+            read_at?: string | null;
+            /** Created At */
+            created_at: string;
         };
         /** OffsetPage[AuditEventListItem] */
         OffsetPage_AuditEventListItem_: {
@@ -6585,6 +6726,55 @@ export interface components {
             name: string;
             /** Description */
             description?: string | null;
+        };
+        /**
+         * PublicLegalCoupon
+         * @description Definición vigente de un cupón GENERAL, para generar sus cláusulas.
+         */
+        PublicLegalCoupon: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Discount Amount */
+            discount_amount: string;
+            /** Minimum Order Amount */
+            minimum_order_amount: string;
+            /** Valid From */
+            valid_from?: string | null;
+            /** Valid Until */
+            valid_until?: string | null;
+        };
+        /**
+         * PublicLegalTermsRead
+         * @description Datos para armar el documento legal autogenerado del sitio (/terminos).
+         */
+        PublicLegalTermsRead: {
+            /** Trade Name */
+            trade_name: string;
+            /** Legal Name */
+            legal_name?: string | null;
+            /** Main Address */
+            main_address?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Currency Code */
+            currency_code: string;
+            /** Phones */
+            phones?: components["schemas"]["PublicBusinessPhone"][];
+            /** Coupons */
+            coupons?: components["schemas"]["PublicLegalCoupon"][];
+            /** Terms Extra */
+            terms_extra?: string | null;
+            /** Privacy Extra */
+            privacy_extra?: string | null;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
         };
         /** PublicMenuCategory */
         PublicMenuCategory: {
@@ -12016,6 +12206,142 @@ export interface operations {
             };
         };
     };
+    my_notifications_api_v1_notifications_me_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyNotifications"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_all_my_notifications_api_v1_notifications_me_read_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_notification_api_v1_notifications__notification_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: string;
+            };
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_broadcast_api_v1_notifications_broadcast_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BroadcastRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_orders_api_v1_orders_get: {
         parameters: {
             query?: {
@@ -13224,6 +13550,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicBusinessRead"];
+                };
+            };
+        };
+    };
+    read_public_legal_terms_api_v1_public_legal_terms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicLegalTermsRead"];
                 };
             };
         };

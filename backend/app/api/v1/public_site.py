@@ -20,6 +20,8 @@ from backend.app.schemas.business import (
     PublicBusinessPhone,
     PublicBusinessRead,
     PublicDaySlot,
+    PublicLegalCoupon,
+    PublicLegalTermsRead,
 )
 from backend.app.schemas.catalog import PublicMenuCategory
 from backend.app.schemas.shipping import (
@@ -35,8 +37,10 @@ from backend.app.services.business_service import (
     is_open_at,
 )
 from backend.app.services.catalog_service import build_public_menu
+from backend.app.services.discount_service import list_public_coupons
 from backend.app.services.file_service import get_active_file
 from backend.app.services.shipping_service import quote_shipping
+from backend.app.utils.utc_now import utc_now
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -84,6 +88,58 @@ def read_public_business(session: SessionDep, response: Response) -> PublicBusin
         allow_pickup=settings_row.allow_pickup,
         minimum_delivery_order_amount=settings_row.minimum_delivery_order_amount,
         free_shipping_global_from_amount=settings_row.free_shipping_global_from_amount,
+    )
+
+
+@router.get("/legal/terms", response_model=PublicLegalTermsRead)
+def read_public_legal_terms(
+    session: SessionDep, response: Response
+) -> PublicLegalTermsRead:
+    """Datos para el documento legal autogenerado del sitio (/terminos).
+
+    Reúne la identidad del negocio, sus teléfonos públicos, los cupones
+    GENERALES vigentes (para generar sus cláusulas) y las secciones opcionales
+    que el administrador edita en el perfil. Los códigos personales nunca se
+    exponen aquí.
+    """
+    profile = get_business_profile(session)
+
+    phones = session.exec(
+        select(BusinessPhone)
+        .where(BusinessPhone.is_public == True)  # noqa: E712
+        .where(BusinessPhone.is_active == True)  # noqa: E712
+        .order_by(
+            BusinessPhone.sort_order,  # pyright: ignore[reportArgumentType]
+            BusinessPhone.created_at,  # pyright: ignore[reportArgumentType]
+        )
+    ).all()
+
+    coupons = [
+        PublicLegalCoupon(
+            code=coupon.code,
+            name=coupon.name,
+            description=coupon.description,
+            discount_amount=coupon.discount_amount,
+            minimum_order_amount=coupon.minimum_order_amount,
+            valid_from=coupon.valid_from,
+            valid_until=coupon.valid_until,
+        )
+        for coupon in list_public_coupons(session)
+    ]
+
+    # Config pública cacheable corto: cambia sólo al editar negocio o cupones.
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return PublicLegalTermsRead(
+        trade_name=profile.trade_name,
+        legal_name=profile.legal_name,
+        main_address=profile.main_address,
+        email=profile.email,
+        currency_code=profile.currency_code,
+        phones=serialize_many(PublicBusinessPhone, phones),
+        coupons=coupons,
+        terms_extra=profile.terms_extra,
+        privacy_extra=profile.privacy_extra,
+        generated_at=utc_now(),
     )
 
 

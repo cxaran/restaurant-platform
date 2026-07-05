@@ -181,6 +181,9 @@ class StorefrontHero(Base):
     button_variant: Mapped[str] = mapped_column(String(10), nullable=False, default="solid")
     overlay: Mapped[str] = mapped_column(String(10), nullable=False, default="soft")
     image_position: Mapped[str] = mapped_column(String(10), nullable=False, default="right")
+    # Solo plantilla split: recuadro redondeado + sombra detrás de la imagen. False = la
+    # imagen se muestra sin ningún efecto extra.
+    image_frame: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

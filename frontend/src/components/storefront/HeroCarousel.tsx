@@ -191,7 +191,11 @@ function HeroBody({ hero, creditsEnabled = true }: Readonly<{ hero: HeroVM; cred
     <div className="sf-hero-surface" data-inverse={inverse ? "1" : "0"} style={{ background: scheme.background, color: scheme.color }}>
       <div className="sf-container sf-hero-pad sf-hero-grid" data-image-left={hero.image_position === "left" ? "1" : "0"}>
         {textCol}
-        <div className="sf-hero-imgbox" aria-hidden={imageUrl ? undefined : true}>
+        <div
+          className="sf-hero-imgbox"
+          data-frame={hero.image_frame ? "1" : "0"}
+          aria-hidden={imageUrl ? undefined : true}
+        >
           {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- media publicada del backend
             <img src={imageUrl} alt={hero.image.alt_text ?? ""} style={{ objectPosition: focal }} />

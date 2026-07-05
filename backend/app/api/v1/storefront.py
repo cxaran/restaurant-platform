@@ -88,6 +88,7 @@ class HeroRead(ApiReadSchema):
     button_variant: str
     overlay: str
     image_position: str
+    image_frame: bool
 
 
 class HighlightRead(ApiReadSchema):

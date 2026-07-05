@@ -108,6 +108,7 @@ export function toHeroVM(hero: PublicHero): HeroVM {
     button_variant: hero.button_variant ?? "solid",
     overlay: hero.overlay ?? "soft",
     image_position: hero.image_position ?? "right",
+    image_frame: hero.image_frame ?? true,
   };
 }
 

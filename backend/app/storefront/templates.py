@@ -115,6 +115,7 @@ class HeroWrite(_Config):
     button_variant: Literal["solid", "outline"] = "solid"
     overlay: Literal["none", "soft", "strong"] = "soft"
     image_position: Literal["left", "right"] = "right"
+    image_frame: bool = True
 
     @model_validator(mode="after")
     def _semantic_rules(self) -> "HeroWrite":

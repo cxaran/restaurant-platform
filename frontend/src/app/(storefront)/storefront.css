@@ -1209,6 +1209,19 @@
   filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.35));
 }
 
+/* image_frame=false (opción del hero split): la imagen se muestra SIN recuadro,
+   sin borde redondeado ni sombra — solo la imagen. El segundo selector gana por
+   especificidad al fondo radial del esquema inverso definido más abajo. */
+.sf-hero-imgbox[data-frame="0"],
+.sf-hero-surface[data-inverse="1"] .sf-hero-imgbox[data-frame="0"] {
+  background: none;
+  border-radius: 0;
+}
+
+.sf-hero-imgbox[data-frame="0"] img {
+  filter: none;
+}
+
 .sf-hero-glyph { font-size: 56px; opacity: 0.18; }
 
 /* En esquemas oscuros (dark/brand/brand_inverse) la caja de imagen integra el

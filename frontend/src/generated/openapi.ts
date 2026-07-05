@@ -4905,6 +4905,8 @@ export interface components {
             overlay: string;
             /** Image Position */
             image_position: string;
+            /** Image Frame */
+            image_frame: boolean;
         };
         /**
          * HeroWrite
@@ -4985,6 +4987,11 @@ export interface components {
              * @enum {string}
              */
             image_position: "left" | "right";
+            /**
+             * Image Frame
+             * @default true
+             */
+            image_frame: boolean;
         };
         /**
          * HerosSortRequest
@@ -6723,6 +6730,11 @@ export interface components {
              * @default right
              */
             image_position: string;
+            /**
+             * Image Frame
+             * @default true
+             */
+            image_frame: boolean;
         };
         /** PublicHeroImage */
         PublicHeroImage: {

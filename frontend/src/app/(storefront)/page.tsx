@@ -41,6 +41,7 @@ async function fallbackHero(): Promise<HeroVM> {
     button_variant: "solid",
     overlay: "soft",
     image_position: "right",
+    image_frame: true,
   };
 }
 

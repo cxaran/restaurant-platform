@@ -106,6 +106,7 @@ function heroToWrite(hero: HeroRead): HeroWrite {
     button_variant: hero.button_variant as HeroWrite["button_variant"],
     overlay: hero.overlay as HeroWrite["overlay"],
     image_position: hero.image_position as HeroWrite["image_position"],
+    image_frame: hero.image_frame ?? true,
   };
 }
 
@@ -133,6 +134,7 @@ function heroWriteToVM(id: string, hero: HeroWrite): HeroVM {
     button_variant: hero.button_variant ?? "solid",
     overlay: hero.overlay ?? "soft",
     image_position: hero.image_position ?? "right",
+    image_frame: hero.image_frame ?? true,
   };
 }
 
@@ -178,6 +180,7 @@ const EMPTY_HERO: HeroWrite = {
   button_variant: "solid",
   overlay: "soft",
   image_position: "right",
+  image_frame: true,
 };
 
 const EMPTY_HIGHLIGHT: HighlightWrite = {
@@ -728,6 +731,13 @@ function HerosTab({ config, tokens, canEdit, busy, run }: TabProps) {
                 </Field>
               ) : null}
             </div>
+            {form.template === "split" ? (
+              <Toggle
+                label="Recuadro y sombra detrás de la imagen"
+                checked={form.image_frame ?? true}
+                onChange={(next) => set({ image_frame: next })}
+              />
+            ) : null}
             <Toggle label="Activo (visible en el sitio)" checked={form.is_active ?? true} onChange={(next) => set({ is_active: next })} />
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
               <button

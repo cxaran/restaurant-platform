@@ -54,6 +54,7 @@ class PublicHero(ApiSchema):
     button_variant: str = "solid"
     overlay: str = "soft"
     image_position: str = "right"
+    image_frame: bool = True
 
 
 class PublicCarousel(ApiSchema):

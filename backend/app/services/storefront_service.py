@@ -151,6 +151,7 @@ def hero_public_payload(session: Session, hero: StorefrontHero) -> dict:
         "button_variant": hero.button_variant,
         "overlay": hero.overlay,
         "image_position": hero.image_position,
+        "image_frame": hero.image_frame,
     }
 
 

@@ -251,6 +251,26 @@ function AdminStep({
       {shouldShowBootstrapTokenField(status) ? (
         <TextField id="setup-token" label="Token de Bootstrap" type="password" value={token} autoComplete="off" onChange={setToken} />
       ) : null}
+      <section className="rounded-2xl border border-[var(--border2)] bg-[var(--bg2)] p-4">
+        <h3 className="text-base font-semibold">Dominio público de la instalación</h3>
+        <p className="mt-1 text-sm text-[var(--tx2)]">
+          Lo detectamos desde tu navegador. Confirma que sea la dirección pública
+          real por la que se accede a la plataforma.
+        </p>
+        <div className="mt-3">
+          <TextField
+            id="app-base-url"
+            label="Dirección pública"
+            value={draft.app_base_url}
+            error={fieldErrors["app_base_url"]?.join(" ")}
+            onChange={(value) => setDraft({ ...draft, app_base_url: value })}
+          />
+          <p className="mt-1 text-xs text-[var(--tx3)]">
+            P. ej. https://mi-dominio.com. Habilita las sesiones desde ese origen;
+            puedes ajustarla después en Configuración del sistema.
+          </p>
+        </div>
+      </section>
       <div className="flex justify-end">
         <Button type="submit" disabled={pending || !canRequestBootstrapCatalog(status, token)}>
           {pending ? "Validando..." : "Continuar"}
@@ -331,20 +351,6 @@ function RolesStep({
           Decisiones editables después en Configuración del sistema. Las integraciones
           (correo, respaldos, IA) se configuran tras iniciar sesión, de forma guiada.
         </p>
-        <div className="mt-4">
-          <TextField
-            id="app-base-url"
-            label="Dominio público de la instalación"
-            value={draft.app_base_url}
-            error={fieldErrors["app_base_url"]?.join(" ")}
-            onChange={(value) => setDraft({ ...draft, app_base_url: value })}
-          />
-          <p className="mt-1 text-xs text-[var(--tx3)]">
-            Detectado desde tu navegador. Verifica que sea la dirección pública real
-            (p. ej. https://mi-dominio.com): habilita las sesiones desde ese origen y
-            puedes ajustarla después en Configuración del sistema.
-          </p>
-        </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-[1.3fr_1fr]">
           <TextField
             id="institution-name"

@@ -169,7 +169,10 @@ export function canAddAdditionalRole(draft: BootstrapWizardDraft, catalog: Boots
  * administrador al enviar desde el paso 2. Los errores de roles no aplican aquí.
  */
 export function adminStepHasFieldError(fields: WizardFieldErrors): boolean {
-  return Object.keys(fields).some((field) => field.startsWith("user."));
+  // El paso 1 incluye los datos del usuario y el dominio de la instalación.
+  return Object.keys(fields).some(
+    (field) => field.startsWith("user.") || field === "app_base_url",
+  );
 }
 
 export function parseBootstrapFormError(

@@ -306,10 +306,13 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
     setDiscountError(null);
   }
 
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (missingLocation) return; // la entrega exige un punto de ubicación
     if (closedBySchedule) return; // cerrado por horario: el backend rechazaría igual
+    if (!acceptedTerms) return; // debe aceptar términos y aviso de privacidad
     setError(null);
     setSubmitting(true);
     const payload: CheckoutRequest = {
@@ -714,10 +717,33 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
           tu carrito se conserva.
         </div>
       ) : null}
+      <label
+        style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, marginBottom: 12 }}
+      >
+        <input
+          type="checkbox"
+          checked={acceptedTerms}
+          onChange={(event) => setAcceptedTerms(event.target.checked)}
+          data-testid="checkout-accept-terms"
+          style={{ marginTop: 2 }}
+        />
+        <span>
+          Acepto los{" "}
+          <a
+            href="/terminos"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontWeight: 700, textDecoration: "underline" }}
+          >
+            Términos y Condiciones y el Aviso de Privacidad
+          </a>
+          .
+        </span>
+      </label>
       <button
         className="sf-btn"
         type="submit"
-        disabled={submitting || missingLocation || closedBySchedule}
+        disabled={submitting || missingLocation || closedBySchedule || !acceptedTerms}
         style={{ width: "100%", padding: "15px 18px", justifyContent: "space-between" }}
       >
         {submitting ? (

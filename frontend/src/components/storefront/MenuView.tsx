@@ -51,7 +51,10 @@ export function AddToCartButton({
   );
 }
 
-function ProductCard({ product }: Readonly<{ product: PublicProduct }>) {
+function ProductCard({
+  product,
+  creditsEnabled = true,
+}: Readonly<{ product: PublicProduct; creditsEnabled?: boolean }>) {
   const { mode } = useCart();
   const imageUrl = publicFileUrl(product.image_file_ids[0] ?? null);
   const money = product.is_money_purchase_available && product.money_price_amount != null;
@@ -99,7 +102,7 @@ function ProductCard({ product }: Readonly<{ product: PublicProduct }>) {
         ) : (
           <div style={{ flex: 1 }} />
         )}
-        {product.credits_awarded_per_unit > 0 ? (
+        {creditsEnabled && product.credits_awarded_per_unit > 0 ? (
           <div style={{ fontSize: 12, fontWeight: 700, color: "var(--sf-brand)" }}>
             Gana {product.credits_awarded_per_unit} créditos
           </div>
@@ -162,7 +165,10 @@ function ProductCard({ product }: Readonly<{ product: PublicProduct }>) {
   );
 }
 
-export function MenuView({ categories }: Readonly<{ categories: PublicMenuCategory[] }>) {
+export function MenuView({
+  categories,
+  creditsEnabled = true,
+}: Readonly<{ categories: PublicMenuCategory[]; creditsEnabled?: boolean }>) {
   const myCredits = useMyCredits();
   const [active, setActive] = useState<string | "all">("all");
   const visible = useMemo(
@@ -240,7 +246,7 @@ export function MenuView({ categories }: Readonly<{ categories: PublicMenuCatego
             }}
           >
             {category.products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} creditsEnabled={creditsEnabled} />
             ))}
           </div>
         </section>

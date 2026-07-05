@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Alfa_Slab_One, Archivo, Baloo_2, Lora } from "next/font/google";
 import type { ReactNode } from "react";
 
+import { CreditsModeGuard } from "@/components/storefront/CreditsModeGuard";
 import { GlobalRibbon } from "@/components/storefront/Highlights";
 import { StorefrontFooter } from "@/components/storefront/StorefrontFooter";
 import { StorefrontHeader } from "@/components/storefront/StorefrontHeader";
@@ -63,6 +64,7 @@ export default async function StorefrontLayout({
   return (
     <PublicSessionProvider initialSession={session}>
       <CartProvider>
+        <CreditsModeGuard />
         <StorefrontThemeProvider tokens={site?.theme_tokens ?? FALLBACK_TOKENS} fontVars={fontVars}>
           {/* Cinta global (highlight `global`): SIEMPRE sobre el header. */}
           <GlobalRibbon highlights={globalHighlights} />

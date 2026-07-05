@@ -20,17 +20,26 @@ import { usePublicSession } from "@/core/storefront/PublicSessionProvider";
 export function CartModeToggle({
   productsById,
   availableCredits,
+  creditsEnabled = true,
 }: Readonly<{
   /** Catálogo publicado (id → producto) para validar elegibilidad; null = aún cargando. */
   productsById: ReadonlyMap<string, PublicProduct> | null;
   /** Saldo disponible según el backend; null = sin sesión o sin dato. */
   availableCredits: number | null;
+  /** Interruptor del negocio; false oculta la opción de créditos (null = aún cargando). */
+  creditsEnabled?: boolean | null;
 }>) {
   const session = usePublicSession();
   const { mode, lines, setMode, removeLine } = useCart();
   const [showBlockers, setShowBlockers] = useState(false);
 
-  const offerCredits = session !== null && availableCredits !== null && availableCredits > 0;
+  // El programa apagado NO ofrece créditos; el CreditsModeGuard ya devolvió el
+  // carrito a dinero, así que este control desaparece en cuanto se resuelve.
+  const offerCredits =
+    creditsEnabled !== false &&
+    session !== null &&
+    availableCredits !== null &&
+    availableCredits > 0;
   // Ocultar (no deshabilitar) cuando no hay nada que ofrecer; pero si el modo
   // persistido ya es credits, el cliente necesita el control para volver a dinero.
   if (!offerCredits && mode !== "credits") return null;

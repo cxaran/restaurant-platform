@@ -126,6 +126,18 @@ class BusinessSettings(Base):
     allow_delivery: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     allow_pickup: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     allow_counter_sales: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    credits_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        comment=(
+            "Programa de créditos/puntos. Al apagarlo NO se emiten créditos nuevos "
+            "(no hay asiento «earn» al completar), no se muestran en el sitio "
+            "(/cuenta, /creditos, toggle del carrito) y NO se permite pagar con "
+            "créditos. Los saldos existentes se conservan (ledger inmutable) y "
+            "vuelven a estar disponibles si se reactiva."
+        ),
+    )
     allow_customer_registration: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

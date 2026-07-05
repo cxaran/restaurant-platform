@@ -33,6 +33,7 @@ import {
   closedBannerText,
   useBusinessOpenStatus,
 } from "@/core/storefront/useBusinessOpenStatus";
+import { useCreditsEnabled } from "@/core/storefront/useCreditsEnabled";
 import { useMyCredits } from "@/core/storefront/useMyCredits";
 
 export default function CartPage() {
@@ -41,6 +42,7 @@ export default function CartPage() {
   const openStatus = useBusinessOpenStatus();
   const closedBySchedule = openStatus?.blockedBySchedule === true;
   const myCredits = useMyCredits();
+  const creditsEnabled = useCreditsEnabled();
   const [catalog, setCatalog] = useState<Map<string, PublicProduct> | null>(null);
   const [editing, setEditing] = useState<CartLine | null>(null);
   const credits = mode === "credits";
@@ -128,6 +130,7 @@ export default function CartPage() {
       <CartModeToggle
         productsById={catalog}
         availableCredits={myCredits ? myCredits.available : null}
+        creditsEnabled={creditsEnabled}
       />
       {lines.length === 0 ? (
         <div className="sf-card" style={{ padding: 28, textAlign: "center" }}>

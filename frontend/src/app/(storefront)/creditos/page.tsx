@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 
 import { serverApi } from "@/core/api/server-client";
 import { getSession } from "@/core/auth/session";
+import { getPublicBusiness } from "@/core/restaurant-api/business";
 import type {
   CreditMovementRead,
   CreditTotalsRead,
@@ -20,6 +21,26 @@ export const dynamic = "force-dynamic";
 
 export default async function CreditosPage() {
   const session = await getSession();
+
+  // Programa de créditos apagado: la página no está disponible (los saldos se
+  // conservan y vuelven si el negocio lo reactiva).
+  const business = await getPublicBusiness();
+  if (business?.credits_enabled === false) {
+    return (
+      <div className="sf-container" style={{ paddingBlock: 40, maxWidth: 620 }}>
+        <div className="sf-card" style={{ padding: 26, textAlign: "center" }}>
+          <p style={{ fontWeight: 700, marginBottom: 8 }}>
+            El programa de créditos no está disponible por ahora.
+          </p>
+          <p className="sf-muted" style={{ margin: "0 0 14px", fontSize: 14 }}>
+            Vuelve más tarde o explora nuestro menú.
+          </p>
+          <Link className="sf-btn" href="/menu">Ver menú</Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!session) {
     return (
       <div className="sf-container" style={{ paddingBlock: 40, maxWidth: 620 }}>

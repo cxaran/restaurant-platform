@@ -7,6 +7,7 @@ import { HighlightBanner } from "@/components/storefront/Highlights";
 import { AddressBook } from "./AddressBook";
 import { serverApi } from "@/core/api/server-client";
 import { getSession } from "@/core/auth/session";
+import { getPublicBusiness } from "@/core/restaurant-api/business";
 import { getPublicHighlights } from "@/core/restaurant-api/storefront";
 import type {
   CreditMovementRead,
@@ -64,24 +65,30 @@ export default async function CuentaPage() {
   }
 
   const cookieHeader = (await cookies()).toString();
-  const [profile, orders, addresses, credits, movements, highlights] = await Promise.all([
-    fetchOrNull(
-      serverApi<CustomerProfileSelfRead>("/api/v1/profiles/me", { cookie: cookieHeader }),
-    ),
-    fetchOrNull(
-      serverApi<MyOrderRead[]>("/api/v1/orders/mine?limit=5", { cookie: cookieHeader }),
-    ),
-    fetchOrNull(
-      serverApi<UserAddressRead[]>("/api/v1/users/me/addresses", { cookie: cookieHeader }),
-    ),
-    fetchOrNull(serverApi<CreditTotalsRead>("/api/v1/credits/me", { cookie: cookieHeader })),
-    fetchOrNull(
-      serverApi<CreditMovementRead[]>("/api/v1/credits/me/movements?limit=4", {
-        cookie: cookieHeader,
-      }),
-    ),
-    getPublicHighlights("account"),
-  ]);
+  const [profile, orders, addresses, credits, movements, highlights, business] =
+    await Promise.all([
+      fetchOrNull(
+        serverApi<CustomerProfileSelfRead>("/api/v1/profiles/me", { cookie: cookieHeader }),
+      ),
+      fetchOrNull(
+        serverApi<MyOrderRead[]>("/api/v1/orders/mine?limit=5", { cookie: cookieHeader }),
+      ),
+      fetchOrNull(
+        serverApi<UserAddressRead[]>("/api/v1/users/me/addresses", { cookie: cookieHeader }),
+      ),
+      fetchOrNull(serverApi<CreditTotalsRead>("/api/v1/credits/me", { cookie: cookieHeader })),
+      fetchOrNull(
+        serverApi<CreditMovementRead[]>("/api/v1/credits/me/movements?limit=4", {
+          cookie: cookieHeader,
+        }),
+      ),
+      getPublicHighlights("account"),
+      getPublicBusiness(),
+    ]);
+
+  // Programa de créditos apagado: la cuenta no muestra saldo ni movimientos (los
+  // saldos se conservan en el backend; sólo se ocultan). null = mostrar.
+  const creditsEnabled = business?.credits_enabled ?? true;
 
   const displayName =
     profile?.full_name ?? `${session.name} ${session.last_name}`.trim();
@@ -113,31 +120,35 @@ export default async function CuentaPage() {
           </Link>
         </section>
 
-        {/* Saldo de créditos destacado (3a). */}
-        {credits ? (
-          <CreditsHero totals={credits} />
-        ) : (
-          <div className="sf-card" style={{ padding: "16px 20px" }}>
-            <p className="sf-muted" style={{ margin: 0, fontSize: 14 }}>
-              No fue posible consultar tus créditos en este momento.
-            </p>
-          </div>
-        )}
+        {/* Saldo de créditos destacado (3a): sólo con el programa activo. */}
+        {creditsEnabled ? (
+          credits ? (
+            <CreditsHero totals={credits} />
+          ) : (
+            <div className="sf-card" style={{ padding: "16px 20px" }}>
+              <p className="sf-muted" style={{ margin: 0, fontSize: 14 }}>
+                No fue posible consultar tus créditos en este momento.
+              </p>
+            </div>
+          )
+        ) : null}
 
-        <section>
-          <SectionHeading
-            label="Movimientos de créditos"
-            action={
-              <Link
-                href="/creditos"
-                style={{ fontSize: 12, fontWeight: 700, color: "inherit" }}
-              >
-                Ver todos
-              </Link>
-            }
-          />
-          <CreditMovementsList movements={movements ?? []} />
-        </section>
+        {creditsEnabled ? (
+          <section>
+            <SectionHeading
+              label="Movimientos de créditos"
+              action={
+                <Link
+                  href="/creditos"
+                  style={{ fontSize: 12, fontWeight: 700, color: "inherit" }}
+                >
+                  Ver todos
+                </Link>
+              }
+            />
+            <CreditMovementsList movements={movements ?? []} />
+          </section>
+        ) : null}
 
         <section>
           <SectionHeading

@@ -20,6 +20,7 @@ type ToggleKey =
   | "allow_delivery"
   | "allow_pickup"
   | "allow_counter_sales"
+  | "credits_enabled"
   | "allow_customer_registration"
   | "require_registered_user_for_checkout"
   | "order_approval_required"
@@ -45,6 +46,14 @@ const TOGGLES: ReadonlyArray<{ key: ToggleKey; label: string; description: strin
     key: "allow_counter_sales",
     label: "Venta de mostrador",
     description: "Habilita la captura de ventas en el POS del panel.",
+  },
+  {
+    key: "credits_enabled",
+    label: "Programa de créditos",
+    description:
+      "Acumular y pagar con créditos/puntos. Apagado: no se emiten créditos, no " +
+      "se muestran en el sitio ni se permite pagar con ellos. Los saldos existentes " +
+      "se conservan y vuelven al reactivarlo.",
   },
   {
     key: "allow_customer_registration",
@@ -80,6 +89,7 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
     allow_delivery: false,
     allow_pickup: false,
     allow_counter_sales: false,
+    credits_enabled: false,
     allow_customer_registration: false,
     require_registered_user_for_checkout: false,
     order_approval_required: false,
@@ -101,6 +111,7 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
       allow_delivery: data.allow_delivery,
       allow_pickup: data.allow_pickup,
       allow_counter_sales: data.allow_counter_sales,
+      credits_enabled: data.credits_enabled,
       allow_customer_registration: data.allow_customer_registration,
       require_registered_user_for_checkout: data.require_registered_user_for_checkout,
       order_approval_required: data.order_approval_required,

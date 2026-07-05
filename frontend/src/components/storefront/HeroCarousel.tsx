@@ -59,7 +59,7 @@ function heroImageUrl(hero: HeroVM): string | null {
   return publicFileUrl(hero.image.desktop_file_id ?? hero.image.mobile_file_id);
 }
 
-function HeroBody({ hero }: Readonly<{ hero: HeroVM }>) {
+function HeroBody({ hero, creditsEnabled = true }: Readonly<{ hero: HeroVM; creditsEnabled?: boolean }>) {
   const scheme = sectionScheme(hero.color_scheme);
   const inverse = hero.color_scheme !== "surface" && hero.color_scheme !== "surface_muted";
   const centered = hero.alignment === "center";
@@ -111,7 +111,7 @@ function HeroBody({ hero }: Readonly<{ hero: HeroVM }>) {
     const price =
       product?.money_price_amount != null
         ? formatMoney(product.money_price_amount)
-        : product?.credit_redemption_price != null
+        : creditsEnabled && product?.credit_redemption_price != null
           ? `${product.credit_redemption_price} créditos`
           : null;
     return (
@@ -183,7 +183,8 @@ export function HeroCarousel({
   heros,
   carousel,
   preview = false,
-}: Readonly<{ heros: HeroVM[]; carousel: CarouselVM; preview?: boolean }>) {
+  creditsEnabled = true,
+}: Readonly<{ heros: HeroVM[]; carousel: CarouselVM; preview?: boolean; creditsEnabled?: boolean }>) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -241,7 +242,7 @@ export function HeroCarousel({
         className="sf-hero-slide"
         data-transition={carousel.transition === "fade" ? "fade" : "slide"}
       >
-        <HeroBody hero={hero} />
+        <HeroBody hero={hero} creditsEnabled={creditsEnabled} />
       </div>
 
       {multiple && playing ? (

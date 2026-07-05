@@ -25,7 +25,10 @@ import { redemptionPrice } from "@/core/storefront/credits-cart";
 import { ModifierGroupFields } from "./ModifierGroupFields";
 import { QuantityStepper } from "./QuantityStepper";
 
-export function ProductDetail({ product }: Readonly<{ product: PublicProduct }>) {
+export function ProductDetail({
+  product,
+  creditsEnabled = true,
+}: Readonly<{ product: PublicProduct; creditsEnabled?: boolean }>) {
   const router = useRouter();
   const { mode, addLine } = useCart();
   const [selection, setSelection] = useState<ProductSelection>({});
@@ -124,7 +127,7 @@ export function ProductDetail({ product }: Readonly<{ product: PublicProduct }>)
               .join(", ")}
           </p>
         ) : null}
-        {product.credits_awarded_per_unit > 0 && !creditsMode ? (
+        {creditsEnabled && product.credits_awarded_per_unit > 0 && !creditsMode ? (
           <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--sf-brand)" }}>
             Gana {product.credits_awarded_per_unit} créditos por unidad
           </p>

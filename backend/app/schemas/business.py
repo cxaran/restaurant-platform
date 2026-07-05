@@ -81,6 +81,7 @@ class BusinessSettingsRead(ApiReadSchema):
     allow_delivery: bool
     allow_pickup: bool
     allow_counter_sales: bool
+    credits_enabled: bool
     allow_customer_registration: bool
     require_registered_user_for_checkout: bool
     order_approval_required: bool
@@ -96,6 +97,7 @@ class BusinessSettingsUpdate(ApiPatchSchema):
     allow_delivery: Optional[bool] = None
     allow_pickup: Optional[bool] = None
     allow_counter_sales: Optional[bool] = None
+    credits_enabled: Optional[bool] = None
     allow_customer_registration: Optional[bool] = None
     require_registered_user_for_checkout: Optional[bool] = None
     order_approval_required: Optional[bool] = None
@@ -242,6 +244,9 @@ class PublicBusinessRead(ApiReadSchema):
     allow_online_orders: bool
     allow_delivery: bool
     allow_pickup: bool
+    # Programa de créditos/puntos: apagado, el sitio no muestra créditos ni
+    # ofrece pagar con ellos (el backend además rechaza el canje).
+    credits_enabled: bool
     minimum_delivery_order_amount: Optional[Decimal] = None
     free_shipping_global_from_amount: Optional[Decimal] = None
 
@@ -272,6 +277,13 @@ class PublicLegalTermsRead(ApiReadSchema):
     currency_code: str
     phones: list[PublicBusinessPhone] = Field(default_factory=list)
     coupons: list[PublicLegalCoupon] = Field(default_factory=list)
+    # Política operativa vigente, para autogenerar cláusulas fieles de entrega,
+    # mínimos y del programa de créditos.
+    allow_delivery: bool = True
+    allow_pickup: bool = True
+    minimum_delivery_order_amount: Optional[Decimal] = None
+    free_shipping_global_from_amount: Optional[Decimal] = None
+    credits_enabled: bool = True
     # Cláusulas opcionales que el administrador edita en el perfil del negocio.
     terms_extra: Optional[str] = None
     privacy_extra: Optional[str] = None

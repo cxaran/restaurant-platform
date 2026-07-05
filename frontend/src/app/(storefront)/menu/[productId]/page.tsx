@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ProductDetail } from "@/components/storefront/ProductDetail";
-import { getPublicMenu } from "@/core/restaurant-api/business";
+import { getPublicBusiness, getPublicMenu } from "@/core/restaurant-api/business";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +12,10 @@ export default async function StorefrontProductPage({
   params,
 }: Readonly<{ params: Promise<{ productId: string }> }>) {
   const { productId } = await params;
-  const categories = await getPublicMenu();
+  const [categories, business] = await Promise.all([getPublicMenu(), getPublicBusiness()]);
   const product = categories
     .flatMap((category) => category.products)
     .find((item) => item.id === productId);
   if (!product) notFound();
-  return <ProductDetail product={product} />;
+  return <ProductDetail product={product} creditsEnabled={business?.credits_enabled ?? true} />;
 }

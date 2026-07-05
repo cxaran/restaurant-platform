@@ -9,17 +9,21 @@ import Link from "next/link";
 import type { PublicMenuCategory, PublicProduct } from "@/core/restaurant-api/contracts";
 import { formatMoney, publicFileUrl } from "@/core/restaurant-api/theme";
 
-function priceLabel(product: PublicProduct): string {
+function priceLabel(product: PublicProduct, creditsEnabled: boolean): string {
   if (product.is_money_purchase_available && product.money_price_amount != null) {
     return formatMoney(product.money_price_amount);
   }
-  if (product.credit_redemption_price != null) {
+  // Con el programa de créditos apagado no se muestra el precio de canje.
+  if (creditsEnabled && product.credit_redemption_price != null) {
     return `${product.credit_redemption_price} créditos`;
   }
   return "—";
 }
 
-function ShowcaseTile({ product }: Readonly<{ product: PublicProduct }>) {
+function ShowcaseTile({
+  product,
+  creditsEnabled,
+}: Readonly<{ product: PublicProduct; creditsEnabled: boolean }>) {
   const imageUrl = publicFileUrl(product.image_file_ids[0] ?? null);
   return (
     <Link
@@ -45,7 +49,7 @@ function ShowcaseTile({ product }: Readonly<{ product: PublicProduct }>) {
       <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 5 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
           <b style={{ fontSize: 14 }}>{product.name}</b>
-          <b style={{ fontSize: 14, whiteSpace: "nowrap" }}>{priceLabel(product)}</b>
+          <b style={{ fontSize: 14, whiteSpace: "nowrap" }}>{priceLabel(product, creditsEnabled)}</b>
         </div>
         {product.description ? (
           <span
@@ -65,7 +69,10 @@ function ShowcaseTile({ product }: Readonly<{ product: PublicProduct }>) {
   );
 }
 
-export function MenuShowcase({ categories }: Readonly<{ categories: PublicMenuCategory[] }>) {
+export function MenuShowcase({
+  categories,
+  creditsEnabled = true,
+}: Readonly<{ categories: PublicMenuCategory[]; creditsEnabled?: boolean }>) {
   const products = categories.flatMap((category) => category.products);
 
   return (
@@ -108,7 +115,7 @@ export function MenuShowcase({ categories }: Readonly<{ categories: PublicMenuCa
           }}
         >
           {products.map((product) => (
-            <ShowcaseTile key={product.id} product={product} />
+            <ShowcaseTile key={product.id} product={product} creditsEnabled={creditsEnabled} />
           ))}
         </div>
       )}

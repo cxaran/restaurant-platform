@@ -86,6 +86,7 @@ def read_public_business(session: SessionDep, response: Response) -> PublicBusin
         allow_online_orders=settings_row.allow_online_orders,
         allow_delivery=settings_row.allow_delivery,
         allow_pickup=settings_row.allow_pickup,
+        credits_enabled=settings_row.credits_enabled,
         minimum_delivery_order_amount=settings_row.minimum_delivery_order_amount,
         free_shipping_global_from_amount=settings_row.free_shipping_global_from_amount,
     )
@@ -103,6 +104,7 @@ def read_public_legal_terms(
     exponen aquí.
     """
     profile = get_business_profile(session)
+    settings_row = get_business_settings(session)
 
     phones = session.exec(
         select(BusinessPhone)
@@ -137,6 +139,11 @@ def read_public_legal_terms(
         currency_code=profile.currency_code,
         phones=serialize_many(PublicBusinessPhone, phones),
         coupons=coupons,
+        allow_delivery=settings_row.allow_delivery,
+        allow_pickup=settings_row.allow_pickup,
+        minimum_delivery_order_amount=settings_row.minimum_delivery_order_amount,
+        free_shipping_global_from_amount=settings_row.free_shipping_global_from_amount,
+        credits_enabled=settings_row.credits_enabled,
         terms_extra=profile.terms_extra,
         privacy_extra=profile.privacy_extra,
         generated_at=utc_now(),

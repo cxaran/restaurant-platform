@@ -45,11 +45,13 @@ async function fallbackHero(): Promise<HeroVM> {
 }
 
 export default async function StorefrontHomePage() {
-  const [site, homeHighlights, categories] = await Promise.all([
+  const [site, homeHighlights, categories, business] = await Promise.all([
     getPublicStorefrontSite(),
     getPublicHighlights("home"),
     getPublicMenu(),
+    getPublicBusiness(),
   ]);
+  const creditsEnabled = business?.credits_enabled ?? true;
 
   if (site && !site.enabled) {
     return (
@@ -75,7 +77,7 @@ export default async function StorefrontHomePage() {
 
   return (
     <>
-      <HeroCarousel heros={heros} carousel={carousel} />
+      <HeroCarousel heros={heros} carousel={carousel} creditsEnabled={creditsEnabled} />
 
       {/* Franja destacada (highlight `home`): un slot fijo bajo el hero. */}
       {homeHighlights.length > 0 ? (
@@ -86,7 +88,7 @@ export default async function StorefrontHomePage() {
 
       {/* Menú directo: vitrina compacta del catálogo real (Turno 11a). El menú
           interactivo completo vive en /menu. */}
-      <MenuShowcase categories={categories} />
+      <MenuShowcase categories={categories} creditsEnabled={creditsEnabled} />
     </>
   );
 }

@@ -26,6 +26,7 @@ export function RegisterCompleteForm() {
   const [pending, setPending] = useState(false);
   const [general, setGeneral] = useState<string | null>(null);
   const [fields, setFields] = useState<AuthFieldErrors>({});
+  const [accepted, setAccepted] = useState(false);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,7 +82,27 @@ export function RegisterCompleteForm() {
       <Text id="rc-token" name="token" label="Token de registro" error={fieldError("token")} />
       <Text id="rc-password" name="password" type="password" label="Contraseña" error={fieldError("password")} />
       <Text id="rc-confirm" name="confirm_password" type="password" label="Confirmar contraseña" error={fieldError("confirm_password")} />
-      <Button type="submit" className="w-full" disabled={pending}>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={accepted}
+          onChange={(event) => setAccepted(event.target.checked)}
+        />
+        <span>
+          Acepto los{" "}
+          <a
+            href="/terminos"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold underline"
+          >
+            Términos y Condiciones y el Aviso de Privacidad
+          </a>
+          .
+        </span>
+      </label>
+      <Button type="submit" className="w-full" disabled={pending || !accepted}>
         {pending ? "Creando cuenta..." : "Crear cuenta"}
       </Button>
     </form>

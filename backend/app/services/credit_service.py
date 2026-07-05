@@ -136,7 +136,12 @@ def on_order_completed(session: Session, order: Order, *, actor_id: Optional[uui
         redemption.updated_at = now
         session.add(redemption)
 
-    if order.customer_user_id is not None:
+    # Emisión gateada por el interruptor del negocio: apagado no se acreditan
+    # créditos nuevos. El CONSUMO de reservas ya hechas (arriba) sí procede,
+    # para honrar canjes en vuelo. Import tardío para evitar ciclo de servicios.
+    from backend.app.services.business_service import get_business_settings
+
+    if order.customer_user_id is not None and get_business_settings(session).credits_enabled:
         for line in order.lines:
             if line.purchase_mode == "money" and line.credits_earned_total_snapshot > 0:
                 session.add(

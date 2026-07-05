@@ -152,7 +152,9 @@ export function StorefrontFooter({
               <div className="sf-ft-col">
                 <span className="sf-ft-h">Menú</span>
                 <Link href="/menu">Ver el menú</Link>
-                <Link href="/creditos">Créditos</Link>
+                {business?.credits_enabled !== false ? (
+                  <Link href="/creditos">Créditos</Link>
+                ) : null}
                 <Link href="/carrito">Mi carrito</Link>
               </div>
               <div className="sf-ft-col">

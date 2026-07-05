@@ -503,6 +503,14 @@ def checkout(
             "Un pedido pagado con créditos no permite envío a domicilio; "
             "elige recoger en tienda.",
         )
+    # Interruptor del negocio: con el programa de créditos apagado, el canje
+    # queda bloqueado en el único punto de entrada web (los saldos se conservan).
+    if payload.purchase_mode == "credits" and not settings_row.credits_enabled:
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "creditos_deshabilitados",
+            "El pago con créditos no está disponible en este momento.",
+        )
 
     priced = _priced_or_422(session, payload.lines)
     if (

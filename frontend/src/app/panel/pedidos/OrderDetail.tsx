@@ -21,6 +21,7 @@ import type { OrderRead } from "@/core/restaurant-api/panel-contracts";
 import { formatMoney } from "@/core/restaurant-api/theme";
 import type { components } from "@/generated/openapi";
 
+import { CollectionNote } from "../reparto/courier-shared";
 import { TicketPrintButton } from "../TicketPrintButton";
 import { OrderPayments } from "./OrderPayments";
 import {
@@ -766,6 +767,24 @@ export function OrderDetail({
           </div>
         ) : null}
       </div>
+
+      {/* Recordatorio de cobro ANTES de completar: mismo texto que ve el
+          repartidor (collection_instruction del backend). Solo cuando «Entregado»
+          está habilitado y queda efectivo contra entrega por cobrar, para que
+          completar desde el panel sea tan explícito como en la app de reparto. */}
+      {allowedTargets.has("completed") && detail.collection_label?.startsWith("Cobrar") ? (
+        <div
+          role="note"
+          style={{
+            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+            padding: "10px 14px", borderRadius: 12, marginBottom: 10,
+            border: "1px solid var(--accent)", fontSize: 13,
+          }}
+        >
+          <span className="tt-label">Al marcar «Entregado» se registra el cobro:</span>
+          <CollectionNote label={detail.collection_label} />
+        </div>
+      ) : null}
 
       <footer style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {STAGE_BUTTONS.map((stage) => {

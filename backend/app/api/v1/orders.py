@@ -315,9 +315,11 @@ def _status_history(session: SessionDep, order: Order) -> list[OrderStatusHistor
 
 
 def _order_read(session: SessionDep, order: Order) -> OrderRead:
+    from backend.app.services.payment_service import collection_instruction
+
     names = _resolve_user_names(session, [order.approved_by])
     computed = {"approved_by_name", "status_history", "lines", "adjustments",
-                "shipping", "delivery", "visible_notes"}
+                "shipping", "delivery", "visible_notes", "collection_label"}
     data = {
         field: getattr(order, field)
         for field in OrderRead.model_fields
@@ -325,6 +327,7 @@ def _order_read(session: SessionDep, order: Order) -> OrderRead:
     }
     return OrderRead(
         **data,
+        collection_label=collection_instruction(session, order).label,
         approved_by_name=names.get(order.approved_by),
         lines=[_line_read(line) for line in sorted(order.lines, key=lambda l: l.sort_order)],
         adjustments=[

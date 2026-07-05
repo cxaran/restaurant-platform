@@ -223,6 +223,11 @@ class OrderRead(ApiReadSchema):
     purchase_mode: str
     status: str
     payment_status: str
+    # Instrucción de cobro derivada (payment_service.collection_instruction): el
+    # panel la muestra antes de «Entregado» — «Cobrar $X…» cuando hay efectivo
+    # contra entrega, o una variante de «no cobrar». Mismo texto que ve el
+    # repartidor, para que completar desde el panel sea igual de explícito.
+    collection_label: Optional[str] = None
     customer_name_snapshot: Optional[str] = None
     customer_phone_snapshot: Optional[str] = None
     items_subtotal_amount: Decimal

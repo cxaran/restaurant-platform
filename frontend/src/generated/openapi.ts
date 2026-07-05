@@ -5733,6 +5733,8 @@ export interface components {
             status: string;
             /** Payment Status */
             payment_status: string;
+            /** Collection Label */
+            collection_label?: string | null;
             /** Customer Name Snapshot */
             customer_name_snapshot?: string | null;
             /** Customer Phone Snapshot */

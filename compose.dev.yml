@@ -128,6 +128,20 @@ services:
       - ./backend:/app/backend
     restart: unless-stopped
 
+  # Documentación (mismo servicio que en prod, pero con puerto publicado porque
+  # el stack de dev no tiene nginx). Preview: http://localhost:8030/docs/
+  docs:
+    image: squidfunk/mkdocs-material:9
+    # --livereload EXPLÍCITO: con click >= 8.2 el default del flag en mkdocs 1.6
+    # queda falsy y `serve` deja de vigilar archivos (sin él no hay rebuild).
+    command: [ "serve", "--livereload", "--dev-addr=0.0.0.0:8000" ]
+    volumes:
+      - ./mkdocs.yml:/docs/mkdocs.yml:ro
+      - ./docs:/docs/docs:ro
+    ports:
+      - "${DOCS_PORT:-8030}:8000"
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend

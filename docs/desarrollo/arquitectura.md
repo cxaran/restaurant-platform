@@ -1,7 +1,7 @@
 # Arquitectura
 
 Mapa técnico de referencia. Convenciones de trabajo y comandos exactos para
-agentes: [`CLAUDE.md`](../../CLAUDE.md).
+agentes: `CLAUDE.md` en la raíz del repositorio.
 
 ## Vista general
 

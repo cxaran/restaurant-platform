@@ -34,5 +34,5 @@ La documentación está organizada **por audiencia**: encuentra tu carpeta y ah�
 - [Tareas en segundo plano](desarrollo/tareas-en-segundo-plano.md) — Taskiq sobre PostgreSQL: ticks, worker y cómo añadir tareas.
 - [Pruebas](desarrollo/pruebas.md) — suites canónicas, OpenAPI sin drift y validación de migraciones.
 
-> Convenciones para agentes de IA (comandos exactos, gotchas): [`CLAUDE.md`](../CLAUDE.md) en la raíz.
-> Qué es el producto y arranque rápido: [`README.md`](../README.md) de la raíz.
+> Convenciones para agentes de IA (comandos exactos, gotchas): `CLAUDE.md` en la raíz del repositorio.
+> Qué es el producto y arranque rápido: `README.md` de la raíz del repositorio.

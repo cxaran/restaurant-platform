@@ -45,6 +45,21 @@ services:
       - backend
     restart: unless-stopped
 
+  # Documentación en /docs (mismo origen que el sitio, vía nginx). `mkdocs serve`
+  # vigila docs/ y mkdocs.yml montados desde el host: al editar un .md el sitio
+  # se reconstruye en automático, sin rebuild de imagen.
+  docs:
+    image: squidfunk/mkdocs-material:9
+    # --livereload EXPLÍCITO: con click >= 8.2 el default del flag en mkdocs 1.6
+    # queda falsy y `serve` deja de vigilar archivos (sin él no hay rebuild).
+    command: [ "serve", "--livereload", "--dev-addr=0.0.0.0:8000" ]
+    volumes:
+      - ./mkdocs.yml:/docs/mkdocs.yml:ro
+      - ./docs:/docs/docs:ro
+    expose:
+      - "8000"
+    restart: unless-stopped
+
   nginx:
     image: nginx:1.27-alpine
     ports:
@@ -54,6 +69,7 @@ services:
     depends_on:
       - frontend
       - backend
+      - docs
     restart: unless-stopped
 
   migrate:

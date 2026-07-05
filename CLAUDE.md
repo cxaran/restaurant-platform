@@ -8,7 +8,8 @@ Monorepo with a Docker Compose stack: `nginx` (reverse proxy) → `frontend` + `
 
 - `backend/` — FastAPI application.
 - `frontend/` — Next.js application.
-- `nginx/nginx.conf` — routes `/api/` to backend:8000 and everything else to frontend:3000.
+- `nginx/nginx.conf` — routes `/api/` to backend:8000, `/docs/` (plus `/livereload/`) to docs:8000, and everything else to frontend:3000.
+- `mkdocs.yml` + `docs/` — MkDocs Material site served at `/docs` by the `docs` compose service (`mkdocs serve --livereload`: rebuilds automatically on edit; dev preview at http://localhost:8030/docs/). `docs/assets/branding.js` fetches the business name/logo at runtime from `/api/v1/public/business` (same origin via nginx) — no backend code involved.
 - `compose.yml` (prod) / `compose.dev.yml` (dev) — both read env from `${APP_ENV_FILE:-.env}`; dev also injects inline env vars and runs Postgres + Mailpit.
 
 ## Critical convention: imports are absolute from `backend.`

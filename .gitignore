@@ -16,4 +16,7 @@ __pycache__/
 # Evidencia local de validación en navegador (no versionada)
 .artifacts/
 
+# Salida de `mkdocs build` (el sitio /docs se sirve con `mkdocs serve`, nunca desde aquí)
+/site/
+
 .env

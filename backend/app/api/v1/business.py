@@ -277,6 +277,11 @@ def replace_weekly_hours(
     existing = session.exec(select(BusinessWeeklyHours)).all()
     for row in existing:
         session.delete(row)
+    # Emitir los DELETE antes de los INSERT: sin este flush, el unit of work de
+    # SQLAlchemy puede ordenar el INSERT de una (day_of_week, slot_number) que
+    # reutiliza una clave aún pendiente de borrar y viola el UniqueConstraint
+    # (por eso solo fallaba al REEMPLAZAR un horario existente, no al crearlo).
+    session.flush()
     for slot in payload.slots:
         session.add(
             BusinessWeeklyHours(

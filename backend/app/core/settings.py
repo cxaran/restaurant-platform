@@ -114,19 +114,9 @@ class Settings(BaseSettings):
     # hasta que un administrador le asigne uno) y SIN sesión automática.
     # (registration_enabled/password_reset_enabled se retiraron de Settings: la
     # política vive en system_settings —editable por administradores— y la migración
-    # de siembra importó el valor del entorno una única vez.)
-    # Gate de DESPLIEGUE del registro público: si es False, la política persistida en
-    # system_settings no puede activarse (candado de infraestructura que la UI no
-    # salta). Sin valor explícito: permitido sólo en entorno local. La política
-    # efectiva es (gate AND system_settings.public_registration_enabled).
-    registration_allowed: bool | None = None
-
-    @computed_field
-    @property
-    def registration_allowed_effective(self) -> bool:
-        if self.registration_allowed is not None:
-            return self.registration_allowed
-        return self.environment == "local"
+    # de siembra importó el valor del entorno una única vez. El antiguo gate
+    # REGISTRATION_ALLOWED del entorno se retiró: system_settings es la única
+    # fuente de verdad del registro público.)
 
     # Respaldos cifrados hacia Google Drive (una sola cuenta, scope drive.file). El
     # horario/retención EDITABLES viven en la tabla backup_settings (no aquí); estos
@@ -142,12 +132,10 @@ class Settings(BaseSettings):
     backup_temp_dir: str = "/tmp/restaurant-platform-backups"
     backup_run_lease_minutes: int = 120
     backup_max_attempts: int = 3
-    # OAuth de la app de Google (web application). El client secret NUNCA se persiste
-    # en PostgreSQL ni se loguea; sólo vive en el .env del despliegue (la alternativa
-    # es capturarlo en la UI: se guarda cifrado en backup_settings).
-    google_drive_client_id: str | None = None
-    google_drive_client_secret: SecretStr | None = None
-    google_drive_redirect_uri: str | None = None
+    # (Las credenciales OAuth de Google Drive se retiraron del entorno: viven
+    # únicamente en backup_settings — client ID en claro, client secret cifrado
+    # write-only, capturados en la UI — y el redirect URI se deriva del dominio
+    # base verificado, igual que el login con Google en system_settings.)
 
     # Clave Fernet que cifra en reposo secretos guardados en la base (p. ej. el
     # refresh token de Google Drive). Legada: la CLAVE MAESTRA nueva es
@@ -198,15 +186,20 @@ class Settings(BaseSettings):
             )
         )
 
-    smtp_host: str
-    smtp_port: int
-    smtp_user: str
-    smtp_password: SecretStr
-    smtp_from_email: str
-    smtp_from_name: str
-    smtp_tls: bool
-    smtp_ssl: bool
-    smtp_use_credentials: bool
+    # Transporte de correo del modo "entorno" (el modo real se elige en la UI:
+    # entorno/SMTP/Resend, con secretos cifrados en system_settings). OPCIONALES
+    # con defaults vacíos: una instalación 100% automática arranca sin proveedor
+    # de correo y lo configura después desde la UI; en producción el modo
+    # "entorno" exige un SMTP real al usarse, no al importar.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_from_email: str = ""
+    smtp_from_name: str = "Restaurant Platform"
+    smtp_tls: bool = True
+    smtp_ssl: bool = False
+    smtp_use_credentials: bool = True
 
     bootstrap_admin_email: str | None = None
     bootstrap_admin_password: SecretStr | None = None

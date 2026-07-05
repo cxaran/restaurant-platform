@@ -132,8 +132,8 @@ class BackupSettingsRead(ApiReadSchema):
     explorer_enabled: bool
     google_drive_client_id: Optional[str] = None
     google_drive_client_secret_configured: bool
-    # Redirect URI calculado (env override o derivado del dominio verificado): la UI
-    # lo muestra para copiarlo al crear el cliente en Google Cloud.
+    # Redirect URI calculado (derivado del dominio base verificado): la UI lo
+    # muestra para copiarlo al crear el cliente en Google Cloud.
     google_drive_redirect_uri: Optional[str] = None
     drive_status: BackupDriveStatus
     drive_folder_id: Optional[str] = None

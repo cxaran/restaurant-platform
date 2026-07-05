@@ -39,11 +39,16 @@ con acceso a la cuenta de Drive puede leer la base completa. Recomendado: cifrar
 
 ## Puesta en marcha
 
-1. En el `.env`: `BACKUPS_ENABLED=true` + credenciales OAuth de Google Cloud
-   (`GOOGLE_DRIVE_CLIENT_ID/SECRET/REDIRECT_URI` — app tipo "web"; el redirect
-   es `…/api/v1/backups/google-drive/callback`).
-2. Workers Taskiq arriba (`--profile taskiq`).
+1. En el `.env`: `BACKUPS_ENABLED=true` (kill-switch del tick) y la clave
+   maestra `APP_ENCRYPTION_KEY`. Las credenciales OAuth **no** van en el
+   entorno: se capturan en la UI (paso 3).
+2. Workers Taskiq arriba (`--profile taskiq`) y dominio de la instalación
+   **verificado** (`/admin/sistema`): el redirect URI del OAuth se deriva de él
+   (`…/api/v1/backups/google-drive/callback` — la UI lo muestra para copiarlo
+   al crear el cliente en Google Cloud).
 3. En la UI (recurso **backup_settings**, permiso `backups:configure`):
+   capturar **client ID + client secret** del cliente OAuth de Google Cloud
+   (app tipo "web"; el secret se guarda cifrado y nunca vuelve a mostrarse) →
    **Conectar Google Drive** → consentimiento → ajustar hora diaria, zona IANA,
    prefijo y retenciones → **activar**. Opcional: **Generar clave de cifrado**
    (o pegar un recipient age propio — en ese caso la privada la conservas tú).

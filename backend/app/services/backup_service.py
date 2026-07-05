@@ -293,15 +293,12 @@ def missing_configuration(settings_row: BackupSettings) -> list[str]:
         missing.append("drive_connection")
     if not settings_row.drive_folder_id:
         missing.append("drive_folder_id")
-    if settings.backup_token_encryption_key is None:
-        missing.append("backup_token_encryption_key")
-    has_client_id = bool(
-        settings_row.google_drive_client_id or settings.google_drive_client_id
-    )
-    has_client_secret = bool(
-        settings_row.google_drive_client_secret_ciphertext
-        or settings.google_drive_client_secret is not None
-    )
+    from backend.app.services.secret_cipher import has_encryption_key
+
+    if not has_encryption_key():
+        missing.append("app_encryption_key")
+    has_client_id = bool(settings_row.google_drive_client_id)
+    has_client_secret = bool(settings_row.google_drive_client_secret_ciphertext)
     if not has_client_id or not has_client_secret:
         missing.append("google_oauth_client")
     return missing
@@ -344,10 +341,8 @@ DRIVE_CALLBACK_PATH = "/api/v1/backups/google-drive/callback"
 
 
 def resolve_drive_redirect_uri(session: Session) -> Optional[str]:
-    """Redirect URI del OAuth de Drive: el env (override de despliegue) o DERIVADO
-    del dominio base verificado; ``None`` si no hay ninguno."""
-    if settings.google_drive_redirect_uri:
-        return settings.google_drive_redirect_uri
+    """Redirect URI del OAuth de Drive: DERIVADO del dominio base verificado
+    (``system_settings.app_base_url``); ``None`` mientras no haya dominio."""
     from backend.app.services.system_settings_service import get_system_settings
 
     system = get_system_settings(session)
@@ -359,19 +354,17 @@ def resolve_drive_redirect_uri(session: Session) -> Optional[str]:
 def resolve_drive_oauth(session: Session) -> tuple[str, str, str]:
     """(client_id, client_secret, redirect_uri) del OAuth de Drive.
 
-    Las credenciales guardadas en la fila (UI) tienen prioridad; las variables de
-    entorno actúan como fallback/override de despliegue (IaC). Lanza
-    ``BackupPermanentError`` con la causa exacta si falta algo.
+    Las credenciales viven ÚNICAMENTE en la fila (capturadas en la UI; el secret
+    cifrado con la clave maestra) y el redirect se deriva del dominio verificado.
+    Lanza ``BackupPermanentError`` con la causa exacta si falta algo.
     """
     config = get_backup_settings(session)
-    client_id = config.google_drive_client_id or settings.google_drive_client_id
+    client_id = config.google_drive_client_id
     client_secret: Optional[str] = None
     if config.google_drive_client_secret_ciphertext:
         from backend.app.services.secret_cipher import decrypt_secret
 
         client_secret = decrypt_secret(config.google_drive_client_secret_ciphertext)
-    if client_secret is None and settings.google_drive_client_secret is not None:
-        client_secret = settings.google_drive_client_secret.get_secret_value()
     redirect_uri = resolve_drive_redirect_uri(session)
 
     missing = []

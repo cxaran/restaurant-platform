@@ -38,6 +38,7 @@ cat > .env <<ENV
 # El dominio público se declara en el asistente de /setup (detectado desde el
 # navegador) y vive en la configuración del sistema — no aquí.
 ENVIRONMENT=production
+PROJECT_NAME=Restaurant Platform
 
 # Override OPCIONAL de emergencia (CSV de orígenes https): añade orígenes
 # confiables por entorno si un dominio mal guardado te dejó fuera.

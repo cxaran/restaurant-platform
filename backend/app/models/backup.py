@@ -127,7 +127,7 @@ class BackupSettings(Base):
     google_drive_client_id: Mapped[Optional[str]] = mapped_column(
         String(255),
         nullable=True,
-        comment="Client ID del OAuth de Google (editable en la UI; el entorno actúa como fallback).",
+        comment="Client ID del OAuth de Google (capturado en la UI; única fuente: esta fila).",
     )
     google_drive_client_secret_ciphertext: Mapped[Optional[str]] = mapped_column(
         Text,

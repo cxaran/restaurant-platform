@@ -29,9 +29,8 @@ secretos: la app **no arranca** sin el entorno completo.
 | `APP_ENCRYPTION_KEY` | **Maestra Fernet** para secretos en reposo (SMTP/Resend/backups). Perderla = perder los secretos cifrados. Respáldala fuera del servidor |
 | `BOOTSTRAP_SETUP_TOKEN` | Autoriza el asistente `/setup` (obligatoria en producción) |
 | `POSTGRES_*` / `REDIS_*` | Conexiones a PostGIS y Redis |
-| `SMTP_*` | Transporte de correo del modo `environment` (Mailpit solo en dev) |
+| `SMTP_*` | Transporte de correo del modo `environment` (opcionales: sin ellas el correo se configura después desde la UI; Mailpit solo en dev) |
 | `ENVIRONMENT=production` | Activa cookies Secure, rate limit fail-closed y guardas de correo |
-| `REGISTRATION_ALLOWED` | Gate de despliegue del registro público que la UI no puede saltar |
 | `BACKUPS_ENABLED` | Kill-switch global de respaldos (ver [respaldos](respaldos.md)) |
 | `TRUSTED_BROWSER_ORIGINS` | Override OPCIONAL de la allowlist CSRF — el dominio normal se declara en `/setup` |
 | `RATE_LIMIT_*` | Buckets de login/registro/forgot/cotización/checkout |

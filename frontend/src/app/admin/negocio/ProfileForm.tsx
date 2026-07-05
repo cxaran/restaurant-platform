@@ -12,7 +12,9 @@ import { Card } from "@/components/ui/Card";
 import { FieldError } from "@/components/ui/FieldError";
 import { Input } from "@/components/ui/Input";
 import { LoadingState } from "@/components/ui/LoadingState";
+import { Select } from "@/components/ui/Select";
 import type { BusinessProfileRead, BusinessProfileUpdate } from "@/core/restaurant-api/contracts";
+import { COMMON_CURRENCIES, COMMON_TIMEZONES, withCurrent } from "@/core/config/locale-options";
 
 import { getBusinessProfile, updateBusinessProfile, uploadBusinessLogo } from "./api";
 import { SecondaryButton, Toggle, apiErrorMessage, apiFieldErrors, labelClass } from "./ui";
@@ -305,29 +307,39 @@ export function ProfileForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label className={labelClass} htmlFor="bp-currency">Moneda (ISO 4217)</label>
-              <Input
+              <label className={labelClass} htmlFor="bp-currency">Moneda</label>
+              <Select
                 id="bp-currency"
                 required
-                maxLength={3}
                 disabled={!canEdit}
                 value={currencyCode}
-                onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())}
+                onChange={(event) => setCurrencyCode(event.target.value)}
                 aria-describedby={fieldErrors.currency_code ? "bp-currency-error" : undefined}
-              />
+              >
+                {withCurrent(COMMON_CURRENCIES, currencyCode).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
               <FieldError id="bp-currency-error" message={fieldErrors.currency_code} />
             </div>
             <div>
-              <label className={labelClass} htmlFor="bp-timezone">Zona horaria (IANA)</label>
-              <Input
+              <label className={labelClass} htmlFor="bp-timezone">Zona horaria</label>
+              <Select
                 id="bp-timezone"
                 required
                 disabled={!canEdit}
                 value={timezone}
                 onChange={(event) => setTimezone(event.target.value)}
-                placeholder="America/Mexico_City"
                 aria-describedby={fieldErrors.timezone ? "bp-timezone-error" : undefined}
-              />
+              >
+                {withCurrent(COMMON_TIMEZONES, timezone).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
               <FieldError id="bp-timezone-error" message={fieldErrors.timezone} />
             </div>
             <div>

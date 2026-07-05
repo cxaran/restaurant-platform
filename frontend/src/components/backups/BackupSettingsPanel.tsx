@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { ApiRequestError } from "@/core/api/api-error";
+import { COMMON_TIMEZONES, withCurrent } from "@/core/config/locale-options";
 import {
   buildSettingsPatch,
   toTimeInputValue,
@@ -229,13 +230,18 @@ export function BackupSettingsPanel({
             />
           </label>
           <label className={labelClass}>
-            Zona horaria (IANA)
-            <input
-              type="text"
+            Zona horaria
+            <select
               value={form.timezone}
               onChange={(event) => setForm({ ...form, timezone: event.target.value })}
               className={inputClass}
-            />
+            >
+              {withCurrent(COMMON_TIMEZONES, form.timezone).map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className={labelClass}>
             Copias diarias

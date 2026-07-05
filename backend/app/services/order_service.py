@@ -148,6 +148,19 @@ def transition_order(
         from backend.app.services.discount_service import consume_order_redemption
 
         consume_order_redemption(session, order, actor_id=actor_id)
+        # Invariante H9 CENTRALIZADA: completar COBRA el efectivo contra entrega
+        # de forma atómica. Antes solo lo hacía la ruta del repartidor; ahora
+        # TODA ruta que complete (courier, caja, transición genérica de staff)
+        # salda aquí los pagos cash pendientes, de modo que «completado ⇒
+        # cobrado». Una transferencia sin verificar NUNCA se marca pagada al
+        # completar (pending_cash_payments solo trae efectivo pendiente).
+        from backend.app.services.payment_service import (
+            mark_paid,
+            pending_cash_payments,
+        )
+
+        for payment in pending_cash_payments(session, order):
+            mark_paid(session, order, payment, actor_id=actor_id)
     elif new_status == "cancelled":
         # H5 (§1.6): cancelar NO reembolsa. Con dinero cobrado, quien cancela
         # elige una resolución explícita: reembolso ahora, reembolso pendiente

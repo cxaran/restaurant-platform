@@ -192,15 +192,15 @@ def complete_delivery(
     la completion — los pagos cash pendientes (guardia H9) quedan pagados aquí
     mismo; una transferencia sin verificar NUNCA se marca pagada al entregar.
     """
-    from backend.app.services.payment_service import mark_paid, pending_cash_payments
-
     order = _order_of(session, assignment)
     delivery = session.get(OrderDelivery, assignment.order_delivery_id)
     now = utc_now()
 
+    # El cobro atómico del efectivo contra entrega vive ahora DENTRO de
+    # transition_order(«completed»), aplicándose a toda ruta que complete y no
+    # solo a la del repartidor (evita el hueco «entregado sin cobrar» de la
+    # transición genérica de staff).
     transition_order(session, order, "completed", actor_id=actor_id)
-    for payment in pending_cash_payments(session, order):
-        mark_paid(session, order, payment, actor_id=actor_id)
     if delivery is not None:
         delivery.delivered_at = now
         delivery.delivered_to_name = delivered_to_name

@@ -7,7 +7,13 @@ import { getSession } from "@/core/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function RegisterCompletePage() {
+/**
+ * Acepta ``?token=`` (el enlace del correo lo trae) para prellenar el campo;
+ * pegar el token a mano sigue funcionando igual.
+ */
+export default async function RegisterCompletePage({
+  searchParams,
+}: Readonly<{ searchParams: Promise<{ token?: string }> }>) {
   if (await getSession()) {
     redirect("/");
   }
@@ -15,6 +21,7 @@ export default async function RegisterCompletePage() {
   if (!policy.registration_enabled) {
     redirect("/login");
   }
+  const { token } = await searchParams;
 
   return (
     <PublicAuthShell
@@ -22,7 +29,7 @@ export default async function RegisterCompletePage() {
       description="Ingresa el token que recibiste por correo y crea tu contraseña."
       footer={<AuthLink href="/login">Volver a iniciar sesión</AuthLink>}
     >
-      <RegisterCompleteForm />
+      <RegisterCompleteForm initialToken={token ?? ""} />
     </PublicAuthShell>
   );
 }

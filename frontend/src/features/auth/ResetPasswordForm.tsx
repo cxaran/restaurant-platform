@@ -13,7 +13,7 @@ import { resetPassword } from "@/core/auth/public-auth-client";
 
 const FIELDS = new Set(["email", "token", "password", "confirm_password"]);
 
-export function ResetPasswordForm() {
+export function ResetPasswordForm({ initialToken = "" }: Readonly<{ initialToken?: string }>) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [general, setGeneral] = useState<string | null>(null);
@@ -63,7 +63,13 @@ export function ResetPasswordForm() {
         </AuthAlert>
       ) : null}
       <Text id="rp-email" name="email" type="email" label="Email" error={fieldError("email")} />
-      <Text id="rp-token" name="token" label="Token de recuperación" error={fieldError("token")} />
+      <Text
+        id="rp-token"
+        name="token"
+        label="Token de recuperación"
+        error={fieldError("token")}
+        defaultValue={initialToken}
+      />
       <Text id="rp-password" name="password" type="password" label="Nueva contraseña" error={fieldError("password")} />
       <Text id="rp-confirm" name="confirm_password" type="password" label="Confirmar contraseña" error={fieldError("confirm_password")} />
       <Button type="submit" className="w-full" disabled={pending}>
@@ -79,7 +85,15 @@ function Text({
   label,
   type = "text",
   error,
-}: Readonly<{ id: string; name: string; label: string; type?: "text" | "email" | "password"; error?: string }>) {
+  defaultValue,
+}: Readonly<{
+  id: string;
+  name: string;
+  label: string;
+  type?: "text" | "email" | "password";
+  error?: string;
+  defaultValue?: string;
+}>) {
   return (
     <div className="space-y-1.5">
       <AuthLabel htmlFor={id}>{label}</AuthLabel>
@@ -89,6 +103,7 @@ function Text({
         type={type}
         required
         autoComplete={type === "password" ? "new-password" : "off"}
+        defaultValue={defaultValue}
       />
       <FieldError message={error} />
     </div>

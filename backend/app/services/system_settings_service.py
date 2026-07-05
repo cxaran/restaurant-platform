@@ -235,6 +235,27 @@ def apply_bootstrap_choices(
     session.add(row)
 
 
+def installation_base_url(session: Session) -> Optional[str]:
+    """Origen público de la instalación para construir enlaces absolutos (correos).
+
+    Prefiere el dominio declarado en el bootstrap / verificado por reto
+    (``app_base_url``); cae al primer origen confiable del entorno. ``None`` si
+    no hay ninguno: el correo degrada a token en texto (sin enlace).
+    """
+    row = get_system_settings(session)
+    if row.app_base_url:
+        return row.app_base_url.rstrip("/")
+    for origin in sorted(settings.trusted_origins):
+        # trusted_origins normaliza con puerto efectivo explícito; para un enlace
+        # legible se retira el puerto por defecto del esquema.
+        if origin.startswith("https://") and origin.endswith(":443"):
+            return origin[: -len(":443")]
+        if origin.startswith("http://") and origin.endswith(":80"):
+            return origin[: -len(":80")]
+        return origin
+    return None
+
+
 def customer_session_days_effective(session: Session) -> int:
     """Días de sesión del cliente: política en BD o default del despliegue."""
     return (

@@ -93,5 +93,99 @@ class ForgotPasswordTest(unittest.TestCase):
             )
 
 
+class ResetEmailActionLinkTest(unittest.TestCase):
+    """El correo de recuperación lleva botón/enlace con el token prellenado cuando la
+    instalación tiene dominio declarado, y degrada a token en texto cuando no."""
+
+    def _engine(self):
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        return engine
+
+    def _user(self, session: Session) -> User:
+        user = User(
+            name="Admin",
+            last_name="Platform",
+            email="admin@example.com",
+            is_active=True,
+            hashed_password=get_password_hash(SecretStr("old-password-123")),
+            token="v1",
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+
+    def test_email_includes_action_link_when_domain_declared(self) -> None:
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from backend.app.models.system_settings import SystemSettings
+
+        engine = self._engine()
+        with Session(engine) as session:
+            self._user(session)
+            session.add(SystemSettings(app_base_url="https://tienda.example.com"))
+            session.commit()
+
+            with (
+                patch.object(forgot_password, "set_token_pair"),
+                patch.object(forgot_password, "generate_token", return_value="tok-123"),
+                patch.object(
+                    forgot_password, "send_system_email", new_callable=AsyncMock
+                ) as send,
+            ):
+                asyncio.run(
+                    forgot_password.send_password_reset_token(session, "admin@example.com")
+                )
+
+            kwargs = send.call_args.kwargs
+            link = "https://tienda.example.com/reset-password?token=tok-123"
+            self.assertIn(link, kwargs["message"])  # texto plano con URL
+            self.assertIn("tok-123", kwargs["message"])  # token pegable a mano
+            self.assertIn(link, kwargs["html"])  # botón HTML
+            self.assertIn("Restablecer contraseña", kwargs["html"])
+
+    def test_email_degrades_to_plain_token_without_domain(self) -> None:
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        engine = self._engine()
+        with Session(engine) as session:
+            self._user(session)
+            # Se fuerza una instalación sin dominio ni orígenes del entorno.
+            with (
+                patch.object(forgot_password, "set_token_pair"),
+                patch.object(forgot_password, "generate_token", return_value="tok-123"),
+                patch.object(forgot_password, "installation_base_url", return_value=None),
+                patch.object(
+                    forgot_password, "send_system_email", new_callable=AsyncMock
+                ) as send,
+            ):
+                asyncio.run(
+                    forgot_password.send_password_reset_token(session, "admin@example.com")
+                )
+
+            kwargs = send.call_args.kwargs
+            self.assertIn("tok-123", kwargs["message"])
+            self.assertNotIn("http", kwargs["message"])
+            self.assertIsNone(kwargs["html"])
+
+
+class ActionEmailHtmlTest(unittest.TestCase):
+    def test_escapes_message_and_url(self) -> None:
+        from backend.app.services.email_service import action_email_html
+
+        html = action_email_html(
+            message="Hola <script>alert(1)</script>",
+            action_url='https://x.example.com/reset?token=a"b<c>',
+            action_label="Restablecer",
+        )
+        self.assertNotIn("<script>", html)
+        self.assertIn("&lt;script&gt;", html)
+        self.assertNotIn('a"b<c>', html)
+        self.assertIn("&quot;", html)
+
+
 if __name__ == "__main__":
     unittest.main()

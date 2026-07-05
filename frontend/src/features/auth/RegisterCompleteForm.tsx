@@ -22,7 +22,7 @@ const FIELDS = new Set([
   "confirm_password",
 ]);
 
-export function RegisterCompleteForm() {
+export function RegisterCompleteForm({ initialToken = "" }: Readonly<{ initialToken?: string }>) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [general, setGeneral] = useState<string | null>(null);
@@ -82,7 +82,13 @@ export function RegisterCompleteForm() {
       <Text id="rc-first-name" name="first_name" label="Nombre" error={fieldError("first_name", "name")} />
       <Text id="rc-last-name" name="last_name" label="Apellido" error={fieldError("last_name")} />
       <Text id="rc-email" name="email" type="email" label="Email" error={fieldError("email")} />
-      <Text id="rc-token" name="token" label="Token de registro" error={fieldError("token")} />
+      <Text
+        id="rc-token"
+        name="token"
+        label="Token de registro"
+        error={fieldError("token")}
+        defaultValue={initialToken}
+      />
       <Text id="rc-password" name="password" type="password" label="Contraseña" error={fieldError("password")} />
       <Text id="rc-confirm" name="confirm_password" type="password" label="Confirmar contraseña" error={fieldError("confirm_password")} />
       <label className="flex items-start gap-2 text-sm">
@@ -118,7 +124,15 @@ function Text({
   label,
   type = "text",
   error,
-}: Readonly<{ id: string; name: string; label: string; type?: "text" | "email" | "password"; error?: string }>) {
+  defaultValue,
+}: Readonly<{
+  id: string;
+  name: string;
+  label: string;
+  type?: "text" | "email" | "password";
+  error?: string;
+  defaultValue?: string;
+}>) {
   return (
     <div className="space-y-1.5">
       <AuthLabel htmlFor={id}>{label}</AuthLabel>
@@ -128,6 +142,7 @@ function Text({
         type={type}
         required
         autoComplete={type === "password" ? "new-password" : "off"}
+        defaultValue={defaultValue}
       />
       <FieldError message={error} />
     </div>

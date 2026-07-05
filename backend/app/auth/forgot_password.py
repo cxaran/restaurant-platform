@@ -3,10 +3,13 @@ from uuid import UUID
 from pydantic import EmailStr, SecretStr
 from sqlalchemy.exc import IntegrityError
 
+from urllib.parse import quote
+
 from backend.app.core.database import SessionDep
 from backend.app.core.settings import settings
 from backend.app.models.user import User
-from backend.app.services.email_service import send_system_email
+from backend.app.services.email_service import action_email_html, send_system_email
+from backend.app.services.system_settings_service import installation_base_url
 
 from .security import generate_token, get_password_hash, get_user_by_email, save_user, verify_password
 from .token_store import delete_token_pair, get_subject, set_token_pair
@@ -27,11 +30,26 @@ async def send_password_reset_token(
     ttl = settings.email_token_expire_minutes * 60
     set_token_pair(PASSWORD_RESET_TOKEN_KEY, user_id, token, ttl)
 
+    # Con dominio de instalación: botón/enlace que prellena el token en la página
+    # de restablecimiento. Sin él: token en texto, como antes.
+    base = installation_base_url(session)
+    message = f"Hola {user.name}, tu token para recuperar la contraseña es: {token}"
+    html = None
+    if base:
+        link = f"{base}/reset-password?token={quote(token)}"
+        message = f"{message}\n\nRestablece tu contraseña aquí: {link}"
+        html = action_email_html(
+            message=f"Hola {user.name}, tu token para recuperar la contraseña es: {token}",
+            action_url=link,
+            action_label="Restablecer contraseña",
+        )
+
     await send_system_email(
         session,
         subject="Recuperar contraseña",
         email_to=email,
-        message=f"Hola {user.name}, tu token para recuperar la contraseña es: {token}",
+        message=message,
+        html=html,
     )
 
     return token

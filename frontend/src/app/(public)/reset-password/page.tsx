@@ -7,7 +7,13 @@ import { getSession } from "@/core/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function ResetPasswordPage() {
+/**
+ * Acepta ``?token=`` (el enlace del correo lo trae) para prellenar el campo;
+ * pegar el token a mano sigue funcionando igual.
+ */
+export default async function ResetPasswordPage({
+  searchParams,
+}: Readonly<{ searchParams: Promise<{ token?: string }> }>) {
   if (await getSession()) {
     redirect("/");
   }
@@ -15,6 +21,7 @@ export default async function ResetPasswordPage() {
   if (!policy.password_reset_enabled) {
     redirect("/login");
   }
+  const { token } = await searchParams;
 
   return (
     <PublicAuthShell
@@ -22,7 +29,7 @@ export default async function ResetPasswordPage() {
       description="Ingresa el token que recibiste por correo y tu nueva contraseña."
       footer={<AuthLink href="/login">Volver a iniciar sesión</AuthLink>}
     >
-      <ResetPasswordForm />
+      <ResetPasswordForm initialToken={token ?? ""} />
     </PublicAuthShell>
   );
 }

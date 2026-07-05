@@ -1,6 +1,6 @@
 "use client";
 
-// Despacho de envíos con el lenguaje visual Tony-Tony (tt-card / tt-badge /
+// Despacho de envíos con el lenguaje visual interno (tt-card / tt-badge /
 // tt-btn): cola global (GET /deliveries/queue) + asignación manual
 // (POST /deliveries/{id}/assign). El selector de repartidor sale de
 // GET /profiles/staff (permiso profiles:read); sin ese permiso se muestra la

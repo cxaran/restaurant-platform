@@ -21,7 +21,7 @@ export type TTShellNavSection = {
 };
 
 /**
- * Cromo compartido de los paneles internos (1g/1i/7b del handoff Tony-Tony):
+ * Cromo compartido de los paneles internos (1g/1i/7b del handoff de diseño):
  * sidebar café oscuro SIEMPRE (tokens --side-*) con marca arriba y usuario al
  * pie, header crema con el título en la fuente display, y contenido con scroll
  * propio sobre --bg. En móvil la sidebar es un drawer (clases .mc-sidebar).

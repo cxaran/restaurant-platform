@@ -1,5 +1,5 @@
 /* Sitio público: TODO el color/forma sale de tokens --sf-* del tema publicado.
-   Prohibido hardcodear paleta de marca aquí (Tony-Tony es configuración). */
+   Prohibido hardcodear paleta de marca aquí (la marca es configuración). */
 
 .sf-root {
   background: var(--sf-surface);
@@ -1516,8 +1516,8 @@
 }
 
 .sf-hl[data-variant="strip"] { border-radius: 14px; padding: 12px 16px; }
-/* En la franja del home el eyebrow es un badge sólido (Turno 11a: «CRÉDITOS
-   TONY»), no texto en versales: contrasta con la banda según el esquema. */
+/* En la franja del home el eyebrow es un badge sólido (Turno 11a: «CRÉDITOS»),
+   no texto en versales: contrasta con la banda según el esquema. */
 .sf-hl[data-variant="strip"] .sf-hl-eyebrow {
   border-radius: 8px;
   padding: 4px 9px;

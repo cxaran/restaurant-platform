@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Design tokens — paleta Tony-Tony (Tony-Tony-Etapa-1.dc.html): crema #F6EEDD,
+ * Design tokens — paleta de marca base: crema #F6EEDD,
  * café #1C1512, rojo #C1272D. Fundacion de presentacion: define las CSS custom
  * properties de tema (light/dark) que consumen /admin y /panel. Los paneles
  * internos comparten el lenguaje visual del storefront (Alfa Slab One + Archivo).
@@ -158,8 +158,8 @@ body {
 
 /*
  * ====================================================================
- * Sistema de componentes Tony-Tony (tt-*) para los paneles internos.
- * Portado del handoff Tony-Tony-Etapa-1.dc.html (pantallas 1g/1h/1i/4a/5a/6a/7b):
+ * Sistema de componentes (tt-*) para los paneles internos.
+ * Portado del handoff de diseño (pantallas 1g/1h/1i/4a/5a/6a/7b):
  * botones, chips, control segmentado, badges de estado, tarjetas e inputs.
  * ====================================================================
  */

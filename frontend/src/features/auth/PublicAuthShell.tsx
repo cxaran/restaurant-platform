@@ -2,7 +2,7 @@ import Link from "next/link";
 
 /**
  * Marco visual común a las páginas públicas de auth — re-skin del LOGIN del
- * handoff Tony-Tony (Turno 8, escenas 8a/8b): la MARCA vive en el layout del
+ * handoff de diseño (Turno 8, escenas 8a/8b): la MARCA vive en el layout del
  * grupo (public) (panel oscuro con identidad dinámica del negocio); aquí solo
  * queda la columna del formulario sobre la superficie del tema — título en
  * tipografía display y contenido directo, sin tarjeta ni orbes. SÓLO

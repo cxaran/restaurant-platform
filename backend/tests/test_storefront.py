@@ -153,7 +153,7 @@ class ContractValidationTest(unittest.TestCase):
             validate_footer({"social_links": [{"network": "myspace", "url": "https://x"}]})
 
     def test_presets_are_brand_neutral(self) -> None:
-        self.assertNotIn("tony", " ".join(THEME_PRESETS).lower())
+        self.assertNotIn("restaurante", " ".join(THEME_PRESETS).lower())
         tokens = build_tokens("calido", accent="#123ABC")
         self.assertEqual(tokens["colors"]["accent"], "#123ABC")
 
@@ -164,7 +164,7 @@ class PublicSitePayloadTest(unittest.TestCase):
         with Session(self.engine) as session:
             session.add(
                 BusinessProfile(
-                    id=1, trade_name="Tony Tony", slogan="El sabor que enamora",
+                    id=1, trade_name="Mi Restaurante", slogan="El sabor que enamora",
                     timezone="America/Mexico_City",
                     main_address="Blvd. V. Carranza 1200, Saltillo",
                 )
@@ -181,7 +181,7 @@ class PublicSitePayloadTest(unittest.TestCase):
             self.product_id = uuid.uuid4()
             session.add(
                 Product(
-                    id=self.product_id, category_id=category.id, name="Hamburguesa Tony",
+                    id=self.product_id, category_id=category.id, name="Hamburguesa de la Casa",
                     money_price_amount=Decimal("129"), is_featured=True,
                     credits_awarded_per_unit=10,
                 )
@@ -226,7 +226,7 @@ class PublicSitePayloadTest(unittest.TestCase):
                 ["La favorita", "Sabor que enamora"],
             )
             showcase = payload["heros"][0]
-            self.assertEqual(showcase["product"]["name"], "Hamburguesa Tony")
+            self.assertEqual(showcase["product"]["name"], "Hamburguesa de la Casa")
             self.assertEqual(showcase["product"]["money_price_amount"], "129.00")
             # Footer con datos reales del negocio (Turno 11: dirección incluida).
             footer = payload["footer"]
@@ -243,7 +243,7 @@ class PublicSitePayloadTest(unittest.TestCase):
             footer.show_phones = False
             footer.show_schedule = False
             footer.social_links = [
-                {"network": "instagram", "url": "https://instagram.com/tony"}
+                {"network": "instagram", "url": "https://instagram.com/mirestaurante"}
             ]
             session.add(footer)
             session.commit()
@@ -308,7 +308,7 @@ class EditorRoutesTest(unittest.TestCase):
         self.client = TestClient(app)
 
         with Session(self.engine) as session:
-            session.add(BusinessProfile(id=1, trade_name="Tony Tony"))
+            session.add(BusinessProfile(id=1, trade_name="Mi Restaurante"))
             session.commit()
 
     def tearDown(self) -> None:
@@ -445,7 +445,7 @@ class EditorRoutesTest(unittest.TestCase):
                 "color_scheme": "brand",
                 "show_links": False,
                 "social_links": [
-                    {"network": "instagram", "url": "https://instagram.com/tony"}
+                    {"network": "instagram", "url": "https://instagram.com/mirestaurante"}
                 ],
             },
         )
@@ -475,14 +475,14 @@ class EditorRoutesTest(unittest.TestCase):
 
         settings_patch = self.client.patch(
             "/api/v1/storefront/settings",
-            json={"hero_autoplay": False, "hero_interval_seconds": 9, "site_title": "Tony"},
+            json={"hero_autoplay": False, "hero_interval_seconds": 9, "site_title": "Mi Restaurante"},
         )
         self.assertEqual(settings_patch.status_code, 200, settings_patch.text)
 
         site = self.client.get("/api/v1/public/storefront/site").json()
         self.assertEqual(site["carousel"]["autoplay"], False)
         self.assertEqual(site["carousel"]["interval_seconds"], 9)
-        self.assertEqual(site["meta"]["title"], "Tony")
+        self.assertEqual(site["meta"]["title"], "Mi Restaurante")
         self.assertEqual(site["footer"]["social_links"][0]["network"], "instagram")
 
         # Auditoría con NOMBRES de campos (nunca valores).

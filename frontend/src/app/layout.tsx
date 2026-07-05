@@ -3,7 +3,7 @@ import { Alfa_Slab_One, Archivo } from "next/font/google";
 
 import "./globals.css";
 
-// Fuentes de la identidad Tony-Tony (mismas del storefront): Archivo para el
+// Fuentes de la identidad visual (mismas del storefront): Archivo para el
 // cuerpo y Alfa Slab One como display. Alimentan --font-tt-* que globals.css
 // mapea a --font-sans / --font-display para admin, panel y auth.
 const sans = Archivo({ subsets: ["latin"], variable: "--font-tt-sans" });

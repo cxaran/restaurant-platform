@@ -1,6 +1,6 @@
 "use client";
 
-// Detalle de una entrega propia con el lenguaje visual Tony-Tony (tt-card /
+// Detalle de una entrega propia con el lenguaje visual interno (tt-card /
 // tt-btn / tt-badge): se busca dentro de /courier/deliveries/mine (el backend
 // ya filtra por el usuario autenticado). Si no aparece ahí, se responde un
 // mensaje 404-like sin revelar si la entrega existe para otro.

@@ -15,7 +15,7 @@ import { getPublicHighlights } from "@/core/restaurant-api/storefront";
 export const dynamic = "force-dynamic";
 
 /**
- * Registro de cliente según el handoff Tony-Tony (Turno 10, escenas 10a móvil /
+ * Registro de cliente según el handoff de diseño (Turno 10, escenas 10a móvil /
  * 10b web): título display, insignia de créditos, «Continuar con Google» primero
  * (solo si la política lo publica) y el formulario debajo. El flujo real sigue
  * siendo el de la plataforma (token por correo, dos pasos) — la escena es

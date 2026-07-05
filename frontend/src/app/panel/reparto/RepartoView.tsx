@@ -1,6 +1,6 @@
 "use client";
 
-// Vista del repartidor (§19) con el lenguaje visual Tony-Tony (7a móvil /
+// Vista del repartidor (§19) con el lenguaje visual interno (7a móvil /
 // 7b web, dos columnas en desktop). Solo consume la cola que el backend YA
 // filtró para este usuario; la privacidad y las reglas de asignación única
 // viven en el servidor. La entrega vigente se recarga desde

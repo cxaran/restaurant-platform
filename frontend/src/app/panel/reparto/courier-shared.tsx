@@ -1,7 +1,7 @@
 "use client";
 
 // Piezas compartidas del flujo del repartidor (§19): helpers de API y la
-// tarjeta de entrega activa con el lenguaje visual Tony-Tony (pantallas 7a/7b).
+// tarjeta de entrega activa con el lenguaje visual interno (pantallas 7a/7b).
 // Las usan RepartoView (cola + resumen), el detalle /panel/reparto/[delivery_id]
 // y EntregasView (aviso de cobro); la autoridad sigue siendo el backend.
 

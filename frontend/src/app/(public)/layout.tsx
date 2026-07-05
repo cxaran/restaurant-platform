@@ -51,7 +51,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * Layout de las páginas públicas de auth (login/registro/reset/unlock) según el
- * handoff Tony-Tony (Turno 8, escenas 8a móvil / 8b web): panel de marca oscuro
+ * handoff de diseño (Turno 8, escenas 8a móvil / 8b web): panel de marca oscuro
  * (banda superior redondeada en móvil, columna izquierda en escritorio) con la
  * identidad DINÁMICA del negocio, y el formulario sobre la superficie del tema.
  * Todo el color/forma sale de tokens `--sf-*`; nada de paleta fija aquí.

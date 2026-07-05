@@ -3,6 +3,10 @@ name: restaurant-platform-dev
 x-backend-environment: &backend-environment
   ENVIRONMENT: local
   SECRET_KEY: dev-secret-key-change-me
+  # Clave maestra Fernet para secretos cifrados en reposo (login con Google, credenciales
+  # de Google Drive de respaldos). Fija SOLO para dev: sin ella no se puede guardar ningún
+  # secreto. En producción la genera scripts/install.sh con un valor único.
+  APP_ENCRYPTION_KEY: vD3D5DpXUv07mKDdpJq8YTOI0_zgWbUB2Frv9ZTtQzk=
   # Orígenes de navegador confiables para CSRF. Por defecto solo localhost; para probar
   # desde otro dispositivo en la LAN, exporta TRUSTED_BROWSER_ORIGINS incluyendo el
   # origen LAN (p. ej. "http://localhost:3000,http://192.168.0.213:3000").

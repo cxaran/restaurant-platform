@@ -53,6 +53,15 @@ export type SpecialDateRead = components["schemas"]["SpecialDateRead"];
 export type SpecialDateCreate = components["schemas"]["SpecialDateCreate"];
 export type SpecialDateSlotInput = components["schemas"]["SpecialDateSlotInput"];
 
+// Configuración del sistema (/admin/sistema): singleton con registro/acceso,
+// sesiones, transporte de correo, GA4, login con Google y dominio. Las acciones
+// verify-domain y send-test-email tienen su propio contrato de request.
+export type SystemSettingsRead = components["schemas"]["SystemSettingsRead"];
+export type SystemSettingsUpdate = components["schemas"]["SystemSettingsUpdate"];
+export type SystemSettingsListItem = components["schemas"]["SystemSettingsListItem"];
+export type VerifyDomainRequest = components["schemas"]["VerifyDomainRequest"];
+export type SendTestEmailRequest = components["schemas"]["SendTestEmailRequest"];
+
 export type CreditTotalsRead = components["schemas"]["CreditTotalsRead"];
 export type CreditMovementRead = components["schemas"]["CreditMovementRead"];
 export type CustomerProfileSelfRead = components["schemas"]["CustomerProfileSelfRead"];

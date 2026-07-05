@@ -27,6 +27,7 @@ from backend.app.security.groups.orders import OrderPermissions
 from backend.app.security.groups.profiles import ProfilePermissions
 from backend.app.security.groups.shipping import ShippingPermissions
 from backend.app.security.groups.storefront import StorefrontPermissions
+from backend.app.security.groups.system_settings import SystemSettingsPermissions
 from backend.app.security.security_group import SecurityGroup
 
 
@@ -120,6 +121,13 @@ NAVIGATION_REGISTRY: tuple[NavigationModuleDef, ...] = (
         href="/admin/notificaciones",
         section="admin",
         permissions=(NotificationPermissions.SEND,),
+    ),
+    NavigationModuleDef(
+        name="sistema",
+        label="Sistema",
+        href="/admin/sistema",
+        section="admin",
+        permissions=(SystemSettingsPermissions.READ,),
     ),
     NavigationModuleDef(
         name="pedidos",

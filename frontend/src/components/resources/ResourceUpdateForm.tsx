@@ -44,8 +44,14 @@ function formErrors(
   }
 
   if (error.status === 409) {
+    // Un 409 puede ser un duplicado real O una validación de negocio con su
+    // propio mensaje (p. ej. system_settings rechaza activar GA4 sin ID de
+    // medición): se muestra el mensaje del backend, con un respaldo si viniera
+    // vacío. Sin esto, todos los 409 se veían como "ya existe un dato equivalente".
     return {
-      general: "No se pudo guardar porque ya existe un dato equivalente.",
+      general:
+        error.body.message ||
+        "No se pudo guardar porque ya existe un dato equivalente.",
       fields: {},
     };
   }

@@ -48,7 +48,15 @@ function formErrors(
   }
 
   if (error.status === 409) {
-    return { general: "No se pudo crear el recurso porque ya existe un dato equivalente.", fields: {} };
+    // Un 409 puede ser un duplicado real O una validación de negocio con su
+    // propio mensaje (p. ej. un singleton o una regla de estado): se muestra el
+    // mensaje del backend cuando lo trae, con un respaldo si llegara vacío.
+    return {
+      general:
+        error.body.message ||
+        "No se pudo crear el recurso porque ya existe un dato equivalente.",
+      fields: {},
+    };
   }
 
   return { general: "No se pudo crear el recurso. Inténtalo nuevamente.", fields: {} };

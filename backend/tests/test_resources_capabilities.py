@@ -472,6 +472,7 @@ class NavigationModulesTest(unittest.TestCase):
                 "finanzas",
                 "reportes",
                 "notificaciones",
+                "sistema",
                 "pedidos",
                 "pos",
                 "entregas",

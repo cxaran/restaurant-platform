@@ -33,6 +33,12 @@ services:
       context: ./frontend
       target: prod
     image: restaurant-platform-frontend:prod
+    # URL INTERNA del backend para el render server-side (SSR): en el navegador las
+    # llamadas van a /api vía nginx (mismo origen), pero el SSR corre dentro del
+    # contenedor y necesita alcanzar al backend por la red de compose. Sin esto cae
+    # al default http://localhost:8000 (el propio contenedor) y el home da 500.
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8000
     expose:
       - "3000"
     depends_on:

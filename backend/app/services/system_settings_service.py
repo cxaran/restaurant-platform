@@ -207,6 +207,7 @@ def apply_bootstrap_choices(
     password_reset_enabled: bool = True,
     customer_session_days: Optional[int] = None,
     staff_session_minutes: Optional[int] = None,
+    app_base_url: Optional[str] = None,
 ) -> None:
     """Aplica al singleton las decisiones tomadas en el asistente de bootstrap."""
     row = get_system_settings(session, for_update=True)
@@ -218,6 +219,19 @@ def apply_bootstrap_choices(
         row.customer_session_days = customer_session_days
     if staff_session_minutes is not None:
         row.staff_session_minutes = staff_session_minutes
+    if app_base_url:
+        # Dominio declarado por el operador en el asistente (confianza del token de
+        # setup). Se persiste SIN verified_at: el reto HMAC (verify-domain) sigue
+        # siendo la verificación real que pide el checklist y habilita los redirect
+        # URIs derivados. Aun sin verificar, el guard CSRF lo acepta desde ya —
+        # sin esto, ninguna mutación por cookie (incluida la propia verificación)
+        # funcionaría en una instalación sin TRUSTED_BROWSER_ORIGINS.
+        from backend.app.core.runtime_origins import add_verified_origin, normalize_base_url
+
+        normalized = normalize_base_url(app_base_url)
+        if normalized is not None:
+            row.app_base_url = normalized
+            add_verified_origin(normalized)
     session.add(row)
 
 

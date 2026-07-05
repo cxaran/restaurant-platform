@@ -84,6 +84,21 @@ test("buildBootstrapPayload includes every required field of the request contrac
   assert.equal("token" in payload.user!, false);
 });
 
+test("buildBootstrapPayload serializes app_base_url trimmed or null", () => {
+  const draft = emptyBootstrapDraft();
+  draft.user.name = "Admin";
+  draft.user.last_name = "Platform";
+  draft.user.email = "admin@example.com";
+  draft.user.password = "admin-password-123";
+  draft.user.confirm_password = "admin-password-123";
+
+  // Vacío (SSR o borrado por el usuario) → null, el backend no persiste dominio.
+  assert.equal(buildBootstrapPayload(draft).app_base_url, null);
+
+  draft.app_base_url = "  https://tienda.example.com  ";
+  assert.equal(buildBootstrapPayload(draft).app_base_url, "https://tienda.example.com");
+});
+
 test("buildBootstrapPayload ignores injected DOM-like fields", () => {
   const draft = emptyBootstrapDraft() as never as ReturnType<typeof emptyBootstrapDraft> & {
     is_admin: boolean;

@@ -198,6 +198,40 @@ class PlatformSetupServiceTest(unittest.TestCase):
             self.assertEqual(row.customer_session_days, 60)
             self.assertEqual(row.staff_session_minutes, 480)
 
+    def test_initialize_persists_app_base_url_and_enables_csrf_origin(self) -> None:
+        from dataclasses import replace
+
+        from backend.app.core.runtime_origins import _VERIFIED_ORIGINS, verified_origins
+        from backend.app.models.system_settings import SystemSettings
+
+        engine = self._engine()
+        with Session(engine) as session:
+            payload = replace(self._payload(), app_base_url="https://Tienda.Example.com/")
+            initialize_platform(session, payload)
+            session.commit()
+
+            row = session.exec(select(SystemSettings)).one()
+            # Normalizado (host en minúsculas, sin barra final) y SIN verified_at:
+            # la verificación real sigue siendo el reto HMAC del checklist.
+            self.assertEqual(row.app_base_url, "https://tienda.example.com")
+            self.assertIsNone(row.app_base_url_verified_at)
+            # Disponible de inmediato para el guard CSRF en la forma comparable
+            # (puerto efectivo explícito).
+            try:
+                self.assertIn("https://tienda.example.com:443", verified_origins())
+            finally:
+                _VERIFIED_ORIGINS.discard("https://tienda.example.com:443")
+
+    def test_initialize_rejects_invalid_app_base_url(self) -> None:
+        from dataclasses import replace
+
+        engine = self._engine()
+        with Session(engine) as session:
+            payload = replace(self._payload(), app_base_url="tienda.example.com/menu")
+            with self.assertRaises(BootstrapError) as ctx:
+                initialize_platform(session, payload)
+            self.assertEqual(ctx.exception.code, "invalid_field")
+
     def test_sync_system_admin_role_adds_permissions_declared_after_setup(self) -> None:
         engine = self._engine()
         with Session(engine) as session:

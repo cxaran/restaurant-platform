@@ -5,9 +5,12 @@
 # dominio y seguir el asistente. Genera el .env de producción con TODOS los secretos
 # aleatorios (nunca sobreescribe uno existente) e imprime el token de Bootstrap UNA
 # sola vez. Todo lo demás (correo, dominio, Google Drive/respaldos) se configura
-# DESDE LA UI, autenticado y auditado — sin editar archivos.
+# DESDE LA UI, autenticado y auditado — sin editar archivos. El despliegue es
+# AGNÓSTICO del dominio: el asistente de /setup lo detecta desde el navegador
+# (el origen público real, no el interno del servidor) y lo persiste en la
+# configuración del sistema.
 #
-# Uso:   ./scripts/install.sh [https://tu-dominio.com]
+# Uso:   ./scripts/install.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -19,13 +22,6 @@ fi
 
 command -v docker >/dev/null || { echo "Docker no está instalado."; exit 1; }
 command -v openssl >/dev/null || { echo "openssl no está disponible."; exit 1; }
-
-DOMAIN="${1:-}"
-if [ -z "$DOMAIN" ]; then
-  read -r -p "Dominio público (https://tu-dominio.com) [http://localhost]: " DOMAIN
-  DOMAIN="${DOMAIN:-http://localhost}"
-fi
-DOMAIN="${DOMAIN%/}"
 
 rand_hex()    { openssl rand -hex 32; }
 rand_token()  { openssl rand -base64 24 | tr '+/' '-_' | tr -d '=' ; }
@@ -39,8 +35,13 @@ umask 077
 cat > .env <<ENV
 # Generado por scripts/install.sh — secretos ÚNICOS de esta instalación.
 # La política (registro, correo, respaldos) se administra desde la UI.
+# El dominio público se declara en el asistente de /setup (detectado desde el
+# navegador) y vive en la configuración del sistema — no aquí.
 ENVIRONMENT=production
-TRUSTED_BROWSER_ORIGINS=${DOMAIN}
+
+# Override OPCIONAL de emergencia (CSV de orígenes https): añade orígenes
+# confiables por entorno si un dominio mal guardado te dejó fuera.
+# TRUSTED_BROWSER_ORIGINS=
 
 SECRET_KEY=$(rand_hex)
 APP_ENCRYPTION_KEY=$(rand_fernet)
@@ -86,7 +87,8 @@ echo "   1. docker compose build"
 echo "   2. docker compose --profile migrate run --rm migrate"
 echo "   3. docker compose up -d"
 echo "   4. (respaldos) docker compose --profile taskiq up -d taskiq-worker taskiq-scheduler"
-echo "   5. Abre ${DOMAIN}/setup y usa el token de arriba."
+echo "   5. Abre https://tu-dominio/setup y usa el token de arriba: el asistente"
+echo "      detecta y captura el dominio público desde tu navegador."
 echo
 echo " Tras el asistente: el checklist de la app te guía para configurar"
 echo " correo, dominio verificado y Google Drive/respaldos — todo desde"

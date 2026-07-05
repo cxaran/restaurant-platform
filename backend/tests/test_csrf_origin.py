@@ -111,9 +111,31 @@ class NormalizeOriginTest(unittest.TestCase):
 
 
 class SettingsOriginsValidationTest(unittest.TestCase):
-    def test_production_empty_origins_fails(self) -> None:
-        with self.assertRaises(ValidationError):
-            Settings(environment="production", trusted_browser_origins="", **BASE_SETTINGS)
+    def test_production_empty_origins_is_allowed(self) -> None:
+        # El dominio de la instalación se declara en el bootstrap y vive en
+        # system_settings; la variable de entorno es un override opcional.
+        settings = Settings(
+            environment="production",
+            trusted_browser_origins="",
+            bootstrap_setup_token="valid-bootstrap-token-123",
+            app_encryption_key=SecretStr("x" * 44),
+            **BASE_SETTINGS,
+        )
+        self.assertEqual(settings.trusted_origins, frozenset())
+
+    def test_production_unset_origins_defaults_to_empty(self) -> None:
+        settings = Settings(
+            environment="production",
+            trusted_browser_origins=None,
+            bootstrap_setup_token="valid-bootstrap-token-123",
+            app_encryption_key=SecretStr("x" * 44),
+            **BASE_SETTINGS,
+        )
+        self.assertEqual(settings.trusted_origins, frozenset())
+
+    def test_local_unset_origins_defaults_to_localhost(self) -> None:
+        settings = Settings(environment="local", trusted_browser_origins=None, **BASE_SETTINGS)
+        self.assertIn("http://localhost:3000", settings.trusted_origins)
 
     def test_production_http_origin_fails(self) -> None:
         with self.assertRaises(ValidationError):
@@ -239,6 +261,48 @@ class GuardEndpointTest(unittest.TestCase):
         # Pasó el guard y la auth/permiso; el endpoint valida el cuerpo vacío.
         self.assertEqual(response.status_code, 422)
         self.assertEqual(self._code(response), "validation_error")
+
+
+class RuntimeVerifiedOriginGuardTest(unittest.TestCase):
+    """El dominio declarado/verificado en runtime debe pasar el guard.
+
+    Cubre la normalización de puertos: el set guarda la forma comparable del guard
+    (``https://dominio:443``); si guardara ``https://dominio`` a secas, el Origin
+    normalizado del navegador jamás igualaría y el dominio verificado sería inútil.
+    """
+
+    ORIGIN = "https://empresa-guard.example.com"
+
+    def _code(self, response) -> str:
+        try:
+            return response.json().get("code", "")
+        except ValueError:
+            return ""
+
+    def test_runtime_declared_origin_passes_guard(self) -> None:
+        from backend.app.core.runtime_origins import (
+            _VERIFIED_ORIGINS,
+            add_verified_origin,
+            verified_origins,
+        )
+
+        add_verified_origin(self.ORIGIN)
+        try:
+            self.assertIn(f"{self.ORIGIN}:443", verified_origins())
+            response = client.post(
+                "/api/v1/users", headers=headers(origin=self.ORIGIN), json={}
+            )
+            self.assertNotEqual(self._code(response), "csrf_origin_invalid")
+        finally:
+            _VERIFIED_ORIGINS.discard(f"{self.ORIGIN}:443")
+
+    def test_unknown_origin_still_blocked(self) -> None:
+        response = client.post(
+            "/api/v1/users",
+            headers=headers(origin="https://no-declarado.example.com"),
+            json={},
+        )
+        self.assertEqual(self._code(response), "csrf_origin_invalid")
 
 
 if __name__ == "__main__":

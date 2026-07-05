@@ -61,6 +61,9 @@ class BootstrapInitializeInput:
     system_admin_role: BootstrapRoleInput = field(default_factory=BootstrapRoleInput)
     additional_roles: list[BootstrapAdditionalRoleInput] = field(default_factory=list)
     # Política inicial de plataforma (sin secretos de terceros).
+    # Dominio público (origen) de la instalación: se persiste en system_settings y
+    # habilita las mutaciones autenticadas por cookie desde ese origen (guard CSRF).
+    app_base_url: str | None = None
     public_registration_enabled: bool = False
     password_reset_enabled: bool = True
     institution_name: str | None = None
@@ -167,6 +170,7 @@ def initialize_platform(session: Session, payload: BootstrapInitializeInput) -> 
         password_reset_enabled=payload.password_reset_enabled,
         customer_session_days=payload.customer_session_days,
         staff_session_minutes=payload.staff_session_minutes,
+        app_base_url=payload.app_base_url,
     )
     session.flush()
 
@@ -246,6 +250,15 @@ def _users_exist(session: Session) -> bool:
 def _validate_payload(payload: BootstrapInitializeInput, permissions: set[str]) -> None:
     if len(payload.additional_roles) > MAX_ADDITIONAL_ROLES:
         raise BootstrapError("too_many_roles", "Demasiados roles iniciales.")
+
+    if payload.app_base_url is not None and payload.app_base_url.strip():
+        from backend.app.core.runtime_origins import normalize_base_url
+
+        if normalize_base_url(payload.app_base_url) is None:
+            raise BootstrapError(
+                "invalid_field",
+                "app_base_url debe ser un origen http(s) sin ruta ni credenciales.",
+            )
 
     names = {_normalize_name(payload.system_admin_role.label)}
     if "" in names:

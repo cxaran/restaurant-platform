@@ -61,7 +61,7 @@ Editable runtime policy lives in the DB, not in env vars: the `system_settings` 
 
 Secrets at rest are encrypted with `app/services/secret_cipher.py`: `APP_ENCRYPTION_KEY` (Fernet) is the single master key (required in production); legacy `BACKUP_TOKEN_ENCRYPTION_KEY` stays in the decrypt chain (lazy re-encryption on rewrite).
 
-Domain verification: `POST /system-settings/{id}/verify-domain` fetches `GET /domain-challenge/{nonce}` THROUGH the candidate domain and compares an HMAC of the nonce; on success the origin is persisted and ADDED to the CSRF allowlist at runtime (`app/core/runtime_origins.py` — it only adds, never replaces env origins).
+Install domain: the deploy is domain-agnostic. The `/setup` wizard captures the public origin from the browser (`window.location.origin`), persists it as `system_settings.app_base_url` (unverified) and feeds the CSRF allowlist at runtime — `TRUSTED_BROWSER_ORIGINS` is an OPTIONAL additive override, no longer required in production. Domain verification: `POST /system-settings/{id}/verify-domain` fetches `GET /domain-challenge/{nonce}` THROUGH the candidate domain and compares an HMAC of the nonce; on success the origin is persisted with `verified_at` and ADDED to the CSRF allowlist at runtime (`app/core/runtime_origins.py` — it only adds, never replaces env origins; stores the guard-comparable form with effective port, and lazily reloads from DB before rejecting so gunicorn multi-worker sees fresh domains).
 
 Config changes are audited via `app/services/config_audit.py` into the append-only `audit_events` table with FIELD NAMES ONLY (never values), and `audit_events` is exposed as a read-only queryable resource under the dedicated `audit_events:read` permission.
 

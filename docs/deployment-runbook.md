@@ -26,7 +26,7 @@ sobreescribe** uno existente. Variables críticas:
 | `POSTGRES_USER/PASSWORD/SERVER/PORT/DB` | conexión a PostGIS |
 | `REDIS_HOST/PORT/DB` | Redis |
 | `SMTP_*` | transporte de correo modo `environment` |
-| `TRUSTED_BROWSER_ORIGINS` | allowlist CSRF (obligatoria en producción) |
+| `TRUSTED_BROWSER_ORIGINS` | override OPCIONAL de la allowlist CSRF (el dominio se declara en `/setup` y vive en `system_settings`) |
 | `BOOTSTRAP_SETUP_TOKEN` | autoriza el wizard `/setup` (obligatoria en producción) |
 | `ENVIRONMENT` | `production` activa cookies Secure, fail-closed de rate limit, guardas de correo |
 | `REGISTRATION_ALLOWED` | gate de despliegue que la UI no puede saltar |
@@ -111,7 +111,7 @@ No hay defaults para secretos: la app **no importa** sin el entorno completo.
 
 ```text
 ☐ HTTPS real terminado en el proxy; cookies Secure activas (ENVIRONMENT=production)
-☐ TRUSTED_BROWSER_ORIGINS con los orígenes reales
+☐ Dominio público declarado en /setup (o TRUSTED_BROWSER_ORIGINS como override)
 ☐ BOOTSTRAP_SETUP_TOKEN definido (y retirado del historial de shell)
 ☐ APP_ENCRYPTION_KEY única y respaldada fuera del servidor
 ☐ Migraciones aplicadas y verificadas en staging con datos representativos

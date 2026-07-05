@@ -3576,6 +3576,11 @@ export interface components {
             /** Additional Roles */
             additional_roles?: components["schemas"]["BootstrapAdditionalRole"][];
             /**
+             * App Base Url
+             * @description Dominio público (origen) de la instalación, p. ej. https://mi-dominio.com. Se persiste en la configuración del sistema y habilita las mutaciones autenticadas por cookie desde ese origen (guard CSRF). El asistente lo propone desde la URL actual; verifícalo antes de enviar.
+             */
+            app_base_url?: string | null;
+            /**
              * Public Registration Enabled
              * @description Permitir el auto-registro público desde el primer momento.
              * @default false

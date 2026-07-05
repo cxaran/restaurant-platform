@@ -35,6 +35,11 @@ export type BootstrapWizardDraft = {
   public_registration_enabled: boolean;
   password_reset_enabled: boolean;
   institution_name: string;
+  // Dominio público (origen) de la instalación. El wizard lo propone desde
+  // window.location.origin — el navegador conoce el dominio REAL que atravesó el
+  // proxy/túnel, no el interno del servidor — y el usuario lo valida antes de
+  // enviar. Habilita las mutaciones por cookie (guard CSRF) sin tocar el .env.
+  app_base_url: string;
   // Duración de sesión (texto para inputs numéricos; "" = default del despliegue).
   customer_session_days: string;
   staff_session_minutes: string;
@@ -54,6 +59,7 @@ const RELIABLE_WIZARD_FIELDS = new Set([
   "user.confirm_password",
   "system_admin_role.label",
   "system_admin_role.description",
+  "app_base_url",
 ]);
 
 // Códigos de error de dominio del Bootstrap cuyo ``message`` es texto seguro y útil
@@ -87,6 +93,9 @@ export function emptyBootstrapDraft(): BootstrapWizardDraft {
     public_registration_enabled: false,
     password_reset_enabled: true,
     institution_name: "",
+    // Se rellena tras el montaje con window.location.origin (el initializer de
+    // useState también corre en SSR, donde window no existe).
+    app_base_url: "",
     customer_session_days: "",
     staff_session_minutes: "",
   };
@@ -122,6 +131,7 @@ export function buildBootstrapPayload(draft: BootstrapWizardDraft): BootstrapIni
     public_registration_enabled: draft.public_registration_enabled,
     password_reset_enabled: draft.password_reset_enabled,
     institution_name: draft.institution_name.trim() || null,
+    app_base_url: draft.app_base_url.trim() || null,
     customer_session_days: parseOptionalInt(draft.customer_session_days),
     staff_session_minutes: parseOptionalInt(draft.staff_session_minutes),
   };

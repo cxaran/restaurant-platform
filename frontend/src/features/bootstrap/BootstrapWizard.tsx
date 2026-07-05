@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
 import { ApiRequestError } from "@/core/api/api-error";
@@ -31,6 +31,19 @@ import { Input } from "@/components/ui/Input";
 
 type Step = "admin" | "roles";
 
+// Dominio público detectado desde el navegador: el cliente conoce el origen REAL
+// de la instalación (el que atravesó el proxy/túnel), no el interno del servidor.
+// useSyncExternalStore lo lee compatible con SSR/hidratación (mismo patrón que
+// ThemeToggle), sin setState dentro de un efecto. window.location.origin no
+// cambia durante la vida de la página: subscribe es un no-op.
+const subscribeNoop = () => () => {};
+const getDetectedOrigin = () => window.location.origin;
+const getServerOrigin = () => "";
+
+function useDetectedOrigin(): string {
+  return useSyncExternalStore(subscribeNoop, getDetectedOrigin, getServerOrigin);
+}
+
 export function BootstrapWizard({ status }: Readonly<{ status: BootstrapStatusRead }>) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("admin");
@@ -40,6 +53,12 @@ export function BootstrapWizard({ status }: Readonly<{ status: BootstrapStatusRe
   const [pending, setPending] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<WizardFieldErrors>({});
+  const detectedOrigin = useDetectedOrigin();
+  // Mientras el usuario no escriba un dominio propio, aplica el detectado; el
+  // campo del formulario muestra siempre el valor efectivo para que lo valide.
+  const effectiveDraft: BootstrapWizardDraft = draft.app_base_url
+    ? draft
+    : { ...draft, app_base_url: detectedOrigin };
 
   async function continueToRoles(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,7 +86,7 @@ export function BootstrapWizard({ status }: Readonly<{ status: BootstrapStatusRe
     setGeneralError(null);
     setFieldErrors({});
     try {
-      await initializeBootstrap(buildBootstrapPayload(draft), token);
+      await initializeBootstrap(buildBootstrapPayload(effectiveDraft), token);
       clearWizardState();
       router.replace("/login");
     } catch (error) {
@@ -145,7 +164,7 @@ export function BootstrapWizard({ status }: Readonly<{ status: BootstrapStatusRe
         ) : null}
         {step === "admin" ? (
           <AdminStep
-            draft={draft}
+            draft={effectiveDraft}
             fieldErrors={fieldErrors}
             pending={pending}
             status={status}
@@ -157,7 +176,7 @@ export function BootstrapWizard({ status }: Readonly<{ status: BootstrapStatusRe
         ) : (
           <RolesStep
             catalog={catalog}
-            draft={draft}
+            draft={effectiveDraft}
             fieldErrors={fieldErrors}
             pending={pending}
             setDraft={setDraft}
@@ -312,6 +331,20 @@ function RolesStep({
           Decisiones editables después en Configuración del sistema. Las integraciones
           (correo, respaldos, IA) se configuran tras iniciar sesión, de forma guiada.
         </p>
+        <div className="mt-4">
+          <TextField
+            id="app-base-url"
+            label="Dominio público de la instalación"
+            value={draft.app_base_url}
+            error={fieldErrors["app_base_url"]?.join(" ")}
+            onChange={(value) => setDraft({ ...draft, app_base_url: value })}
+          />
+          <p className="mt-1 text-xs text-[var(--tx3)]">
+            Detectado desde tu navegador. Verifica que sea la dirección pública real
+            (p. ej. https://mi-dominio.com): habilita las sesiones desde ese origen y
+            puedes ajustarla después en Configuración del sistema.
+          </p>
+        </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-[1.3fr_1fr]">
           <TextField
             id="institution-name"

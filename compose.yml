@@ -17,8 +17,9 @@ services:
       context: ./backend
       target: prod
     image: restaurant-platform-backend:prod
-    # El archivo de entorno debe definir TRUSTED_BROWSER_ORIGINS con los orígenes
-    # HTTPS públicos confiables; en producción la app falla al iniciar si está vacío.
+    # El dominio público se declara en el asistente de /setup y vive en la
+    # configuración del sistema; TRUSTED_BROWSER_ORIGINS es un override OPCIONAL
+    # (CSV de orígenes https) para añadir orígenes confiables por entorno.
     env_file: ${APP_ENV_FILE:-.env}
     expose:
       - "8000"

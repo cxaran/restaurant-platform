@@ -26,29 +26,34 @@ class Settings(BaseSettings):
     # rotar User.token (contraseña/correo/forzar logout) las mata al instante.
     customer_session_expire_days: int = 90
 
-    # Allowlist explícita de orígenes de navegador confiables (CSV) para mutaciones
-    # autenticadas por cookie. Dev: localhost. Producción: debe definirse por env.
-    trusted_browser_origins: str = "http://localhost:3000"
+    # Allowlist de orígenes de navegador confiables (CSV) para mutaciones
+    # autenticadas por cookie. OPCIONAL: el dominio de la instalación se captura en
+    # el asistente de bootstrap (token-gated) y se persiste en system_settings —
+    # el guard lo carga de la base en runtime. Esta variable queda como override
+    # ADITIVO de despliegue/emergencia (p. ej. recuperar una instalación con un
+    # dominio mal guardado). Sin definir: localhost en dev, vacío en producción.
+    trusted_browser_origins: str | None = None
 
     @computed_field
     @property
     def trusted_origins(self) -> frozenset[str]:
+        raw_csv = self.trusted_browser_origins
+        if raw_csv is None:
+            raw_csv = "" if self.environment == "production" else "http://localhost:3000"
         normalized: set[str] = set()
-        for raw in self.trusted_browser_origins.split(","):
+        for raw in raw_csv.split(","):
             origin = normalize_browser_origin(raw.strip())
             if origin is not None:
                 normalized.add(origin)
         return frozenset(normalized)
 
     @model_validator(mode="after")
-    def _require_trusted_origins_in_production(self) -> Self:
+    def _require_https_trusted_origins_in_production(self) -> Self:
+        # Producción ya no EXIGE la variable (el dominio vive en system_settings,
+        # declarado en el bootstrap); pero si se define, solo se aceptan orígenes
+        # HTTPS — un origen http confiable anularía la protección del guard.
         if self.environment == "production":
-            origins = self.trusted_origins
-            if not origins:
-                raise ValueError(
-                    "trusted_browser_origins debe definirse con orígenes HTTPS válidos en producción."
-                )
-            if any(not origin.startswith("https://") for origin in origins):
+            if any(not origin.startswith("https://") for origin in self.trusted_origins):
                 raise ValueError(
                     "trusted_browser_origins debe contener únicamente orígenes HTTPS en producción."
                 )

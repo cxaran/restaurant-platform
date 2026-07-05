@@ -127,6 +127,18 @@ class CreditLedgerEntry(Base):
             postgresql_where=text("entry_type = 'earn_reversal'"),
             sqlite_where=text("entry_type = 'earn_reversal'"),
         ),
+        # Idempotencia del EARN: una línea de pedido acredita créditos ganados una
+        # sola vez. Hoy lo garantiza la máquina de estados (completed es terminal),
+        # pero este índice lo blinda a nivel BASE ante cualquier cambio futuro en
+        # ORDER_TRANSITIONS o reintento concurrente (el earn siempre lleva
+        # order_line_id, nunca NULL).
+        Index(
+            "uq_credit_ledger_earn_per_line",
+            "order_line_id",
+            unique=True,
+            postgresql_where=text("entry_type = 'earn'"),
+            sqlite_where=text("entry_type = 'earn'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

@@ -12,7 +12,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Request, status
 from sqlmodel import select
 
 from backend.app.api.resource_actions import (
@@ -24,6 +24,7 @@ from backend.app.api.resource_actions import (
 )
 from backend.app.auth.auth_dependencies import CurrentUser
 from backend.app.core.database import SessionDep
+from backend.app.security.rate_limit import limit_discount_quote
 from backend.app.models.discounts import DiscountCode, DiscountCodeRedemption
 from backend.app.models.orders import Order
 from backend.app.schemas.discount import (
@@ -94,6 +95,7 @@ def _require_unique_code(
 
 @router.post("/quote", response_model=DiscountQuoteResult)
 def quote_discount_code(
+    request: Request,
     payload: DiscountQuoteRequest,
     session: SessionDep,
     current_user: CurrentUser,
@@ -103,6 +105,11 @@ def quote_discount_code(
     El backend valúa las líneas con ``price_cart``: el subtotal elegible es la
     suma monetaria de productos y modificadores — el envío NUNCA cuenta.
     """
+    # §1.14: la cotización de códigos se limita por IP + usuario. Sin esto, un
+    # cliente autenticado podía enumerar códigos por fuerza bruta (los mensajes
+    # distinguen «no existe» de «existe pero…») y martillar el pricing del carrito.
+    limit_discount_quote(request, str(current_user.id))
+
     from backend.app.api.v1.orders import _priced_or_422
 
     priced = _priced_or_422(session, payload.lines)

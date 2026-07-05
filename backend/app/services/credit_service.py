@@ -307,10 +307,15 @@ def manual_adjustment(
     """Ajuste manual auditado; negativo no puede dejar saldo bajo cero."""
     if delta == 0:
         raise CreditRuleError("delta_invalido", "El ajuste no puede ser cero.")
-    if delta < 0 and balance(session, user_id) + delta < 0:
-        raise CreditRuleError(
-            "saldo_insuficiente", "El ajuste dejaría el saldo en negativo."
-        )
+    if delta < 0:
+        # Mismo lock del usuario que usa la reserva de canje: sin él, un ajuste
+        # negativo concurrente con un checkout que reserva créditos leería un
+        # saldo obsoleto y ambos podrían dejar el saldo en negativo (TOCTOU).
+        session.exec(select(User).where(User.id == user_id).with_for_update()).first()
+        if balance(session, user_id) + delta < 0:
+            raise CreditRuleError(
+                "saldo_insuficiente", "El ajuste dejaría el saldo en negativo."
+            )
     entry = CreditLedgerEntry(
         user_id=user_id,
         entry_type="manual_adjustment",

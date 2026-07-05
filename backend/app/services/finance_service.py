@@ -309,6 +309,16 @@ def create_refund(
     if amount <= 0:
         raise FinanceRuleError("monto_invalido", "El monto debe ser mayor a cero.")
 
+    # Lock del PAGO: serializa reembolsos concurrentes del mismo pago para que el
+    # tope agregado (already + amount <= received) no pueda saltarse con dos
+    # reembolsos simultáneos sobre líneas distintas o sin asignaciones (bajo READ
+    # COMMITTED ambos leerían already=0 y superarían lo cobrado). El lock de línea
+    # de más abajo NO cubre este caso: solo serializa por línea repetida.
+    session.exec(
+        select(Payment).where(Payment.id == payment.id).with_for_update()
+    ).first()
+    session.refresh(payment)
+
     already = sum(
         (refund.amount for refund in payment.refunds if refund.status == "processed"),
         Decimal("0"),

@@ -159,7 +159,7 @@ class SystemSettingsUpdate(ApiPatchSchema):
         description=(
             "Medir visitas y acciones del sitio público con Google Analytics 4. "
             "Requiere el ID de medición. El panel y el admin nunca se miden. "
-            "Guía completa: docs/analytics-ga4.md."
+            "Guía completa: docs/producto/puesta-en-marcha.md."
         ),
         json_schema_extra={"ui": {"form": True, "widget": "switch"}},
     )

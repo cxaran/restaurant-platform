@@ -20,9 +20,6 @@
     "test:credits-cart": "node --no-warnings --import ./scripts/test-register.mjs --test src/core/storefront/credits-cart.test.ts",
     "test:discount-ui": "node --no-warnings --import ./scripts/test-register.mjs --test src/core/storefront/discount-quote.test.ts",
     "test:shipping-quote": "node --no-warnings --import ./scripts/test-register.mjs --test src/core/shipping/shipping-quote.test.ts src/core/geo/geojson.test.ts src/core/storefront/delivery-address.test.ts",
-    "test:e2e:bootstrap": "node scripts/run-e2e-bootstrap.mjs",
-    "test:e2e:rc": "playwright test --project=chromium e2e/restaurant.rc.spec.ts",
-    "test:e2e:shipping": "playwright test --project=chromium e2e/shipping.rc.spec.ts",
     "check:canonical": "npm run check:api && npm run lint && npm run typecheck && npm run test:bootstrap && npm run test:actions && npm run test:public-auth && npm run test:filters && npm run test:configurator && npm run test:credits-cart && npm run test:discount-ui && npm run test:shipping-quote && npm run test:list-query && npm run test:detail-view && npm run test:resource-form && npm run test:export-rows && npm run test:checklist && npm run test:backups && npm run test:api-client && npm run test:auth-clients && npm run test:resource-clients && npm run build",
     "generate:api": "node scripts/generate-openapi.mjs",
     "check:api": "node scripts/generate-openapi.mjs --check",
@@ -50,7 +47,6 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
     "@types/leaflet": "^1.9.21",
     "@types/node": "26.0.1",
     "@types/react": "19.2.17",

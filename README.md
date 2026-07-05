@@ -1,45 +1,56 @@
 # Restaurant Platform
 
-Plataforma de gestión para restaurantes, **derivada de [platform-core](https://github.com/cxaran/platform-core)** — la base administrativa reutilizable y auto-hospedada sobre FastAPI + Next.js. Hereda resuelto todo lo que un producto necesita antes de escribir su dominio: autenticación, roles y permisos, listados filtrables gobernados por contrato, configuración editable en runtime, auditoría, tareas en segundo plano y respaldos cifrados — para que este producto solo añada sus recursos de dominio (restaurante).
+Plataforma completa para restaurantes — sitio público con pedidos en línea, panel de operación diaria y administración — **derivada de [platform-core](https://github.com/cxaran/platform-core)**, la base administrativa reutilizable y auto-hospedada sobre FastAPI + Next.js. Hereda resuelto lo que un producto necesita antes de escribir su dominio: autenticación, roles y permisos, listados gobernados por contrato, configuración editable en runtime, auditoría, tareas en segundo plano y respaldos cifrados.
 
-Diseñada como **instalación única / organización única** (ver `docs/architecture/decisions.md`). La base upstream (`platform-core`) queda configurada como remoto `upstream` para traer mejoras futuras con `git merge`.
+Diseñada como **instalación única / organización única**. La base upstream (`platform-core`) queda configurada como remoto `upstream` para traer mejoras futuras con `git merge`.
 
-## Qué incluye
+## Las tres experiencias
 
-**Identidad y seguridad**
-- Login por cookie httponly o Bearer; el `jti` del JWT es una *versión de token*: cambiar contraseña/correo o revocar sesiones invalida todas las sesiones al instante.
-- Registro en dos pasos por correo, recuperación de contraseña y desbloqueo de cuenta por token, con rate limiting en Redis (HMAC, fail-closed en producción) y protección CSRF por Origin/Referer.
-- **RBAC declarado en código**: los permisos son enums (`SecurityGroup`) agrupados en un catálogo único; se almacenan como strings y se exigen como dependencias de FastAPI. La *supervivencia administrativa* impide dejar la instalación sin un administrador con cobertura completa.
-- Bitácora `audit_events` append-only, consultable como recurso bajo permiso dedicado. Los cambios de configuración se auditan con **solo nombres de campos, nunca valores**.
+```text
+/        → sitio público: portada fija (heros en carrusel → destacado → menú),
+           /menu, /carrito, /checkout, /pedidos, /cuenta, /creditos
+/panel   → operación diaria: pedidos, POS, entregas, reparto, tickets —
+           módulos proyectados por permisos reales, nunca por nombre de rol
+/admin   → administración: recursos genéricos por contrato, catálogo, zonas de
+           entrega, storefront, notificaciones, finanzas, respaldos, …
+```
 
-**Contrato de recursos (capability-driven)**
-- Cada recurso se declara una vez en `RESOURCE_REGISTRY` (query, schemas por operación, permisos, acciones con confirmación/formulario y condiciones de estado, editores relacionales, listas relacionadas, detalle, subida/descarga de archivos) y se proyecta a `/api/v1/resources` **filtrado por los permisos de la sesión**.
-- Motor de query **allowlist-only**: solo lo declarado es filtrable/ordenable/buscable ("lo no declarado permanece prohibido"). Operadores de texto y de fecha de calendario (DST-safe), orden estable con desempate interno por PK y paginación offset.
-- El frontend es 100 % genérico: tipos generados del OpenAPI (jamás interfaces a mano), tabla con filtros estilo hoja de cálculo, chips, búsqueda, columnas persistentes, vistas guardadas, atajos de teclado, modo tarjetas, exportación Excel/PDF con vista previa en vivo, vista de detalle, formularios de alta/edición y editor relacional con pestañas. Tema claro/oscuro sin parpadeo.
+## Dominio restaurante
 
-**Operación**
-- **Configuración del sistema en la base de datos** (singleton editable y auditado): registro público con candado de despliegue, dominio base verificado por reto HMAC (se suma a los orígenes confiables en runtime), nombre institucional y correo saliente configurable (entorno/SMTP/Resend, secretos cifrados write-only, correo de prueba). Un checklist de puesta en marcha **derivado del estado real** guía al administrador desde el dashboard.
-- Asistente de instalación (`/setup`) protegido por token: administrador inicial, roles adicionales con permisos y política inicial de la plataforma.
-- **Tareas en segundo plano con Taskiq sobre PostgreSQL** (sin Redis/Celery): worker y scheduler son servicios Docker opt-in, nunca hijos de FastAPI.
-- **Respaldos a Google Drive**: `pg_dump` con snapshot verificado, cifrado `age` opcional, subida resumible e idempotente, retención GFS, artefacto de exploración (SQLite legible) y visor en el navegador (`/backups`) con descifrado local — la clave privada nunca sale del dispositivo.
-- Secretos en reposo cifrados con una **clave maestra Fernet** (`APP_ENCRYPTION_KEY`) con cadena de descifrado legada y re-cifrado perezoso.
+- **Catálogo**: productos con modificadores (grupos/opciones), destacados y canje por créditos.
+- **Pedidos**: máquina de estados declarativa, snapshots inmutables, totales congelados al aprobar; expiración automática de pedidos web abandonados. Un pedido es **100 % dinero o 100 % créditos** (invariante de backend + BD).
+- **Pagos**: métodos configurables (verificación manual, cambio en efectivo); *pago confirmado ≠ pedido completado*; contra-entrega se cobra atómicamente al completar; cancelar con cobro exige resolución explícita (cola de conciliación de reembolsos).
+- **Envíos**: zonas PostGIS con tarifas, cotización pública, envío gratis por umbral.
+- **Créditos**: libro mayor inmutable (saldo = SUM(delta)), reserva→consumo/liberación.
+- **Códigos de descuento**: monto fijo, solo web autenticado, un uso por usuario.
+- **Storefront configurable** (sin CMS): heros por plantilla (split/background/card/showcase/minimal) en carrusel, textos destacados por superficie con animaciones GPU-safe, footer con 3 plantillas, tema por presets + acento. Guardar publica al instante; contratos Pydantic `extra="forbid"`, CTAs con tipos de enlace controlados, jamás HTML/CSS libre.
+- **Notificaciones**: cada evento llega por **campana in-app y correo** (misma fila, cola `email_status` con hilo post-commit + tick Taskiq). Cliente: estado de su pedido; personal con `notifications:order_alerts`: pedido web nuevo; admin: difusión de promociones desde `/admin/notificaciones`.
+
+## Base heredada (platform-core)
+
+- Login por cookie httponly o Bearer con *versión de token* (revocación instantánea), registro en dos pasos, recuperación y desbloqueo por token, rate limiting en Redis, CSRF por Origin.
+- **RBAC declarado en código** (`SecurityGroup`), exigido como dependencias FastAPI; supervivencia administrativa garantizada.
+- Contrato de recursos capability-driven (`RESOURCE_REGISTRY` → `/api/v1/resources` filtrado por sesión) y motor de query **allowlist-only**.
+- Configuración del sistema en BD (singleton auditado): registro público, dominio verificado por reto HMAC, correo saliente (entorno/SMTP/Resend con secretos cifrados), checklist de puesta en marcha.
+- Taskiq sobre PostgreSQL (worker/scheduler como servicios Docker opt-in) y **respaldos cifrados a Google Drive** con visor en el navegador.
+- Auditoría `audit_events` append-only: cambios de configuración con **solo nombres de campos, nunca valores**.
 
 ## Stack
 
-FastAPI (SQLAlchemy 2.0 + Alembic sobre PostgreSQL, Redis) · Next.js 16 / React 19 / Tailwind 4 · nginx · Docker Compose · Taskiq.
+FastAPI (SQLAlchemy 2.0 + Alembic sobre PostgreSQL/PostGIS, Redis) · Next.js 16 / React 19 / Tailwind 4 · nginx · Docker Compose · Taskiq.
 
 ## Instalación (producción self-hosted)
 
 ```bash
-./scripts/install.sh https://tu-dominio.com   # genera el .env con secretos únicos
+./scripts/install.sh                          # genera el .env con secretos únicos
 docker compose build
 docker compose --profile migrate run --rm migrate
 docker compose up -d
-docker compose --profile taskiq up -d taskiq-worker taskiq-scheduler   # respaldos
+docker compose --profile taskiq up -d taskiq-worker taskiq-scheduler   # respaldos, correos, ticks
 # Abre https://tu-dominio.com/setup con el token que imprimió el instalador.
 ```
 
-Después del asistente, el checklist de la aplicación guía la configuración de correo, dominio verificado y Google Drive — todo desde la interfaz, sin volver a editar archivos.
+Después del asistente, el checklist de la aplicación guía la configuración de correo, dominio verificado y Google Drive — todo desde la interfaz. Guía completa: `docs/operacion/instalacion.md`.
 
 ## Desarrollo
 
@@ -49,32 +60,37 @@ docker compose -f compose.dev.yml --profile migrate up migrate   # migraciones
 ```
 
 - Frontend: http://localhost:3000 · API docs: `/api/docs` · Mailpit: http://localhost:8025
-- Los comandos se ejecutan **desde la raíz del repo** (el paquete raíz es `backend`); detalles y convenciones en `CLAUDE.md` / `AGENTS.md`.
+- Los comandos se ejecutan **desde la raíz del repo** (el paquete raíz es `backend`); convenciones detalladas para agentes en `CLAUDE.md`.
 
 ### Pruebas
 
 ```bash
 python -m backend.tests.canonical_suite   # suite backend (con TEST_POSTGRES_URL cubre también las de Postgres)
 cd frontend && npm run check:canonical    # api + lint + typecheck + tests + build
-cd frontend && npm run test:e2e:bootstrap # E2E: stack Docker aislado + Playwright
 ```
 
 ## Estructura
 
 ```
 backend/    FastAPI: auth, security (RBAC), query (motor allowlist), resources (contrato),
-            services (config, correo, respaldos), jobs (Taskiq), alembic
-frontend/   Next.js App Router: componentes genéricos dirigidos por el contrato de recursos
+            models/services/api del dominio restaurante, jobs (Taskiq), alembic
+frontend/   Next.js App Router: storefront público, panel de operación y admin por contrato
 nginx/      Proxy: /api → backend, resto → frontend
-docs/       Decisiones de arquitectura, Taskiq y respaldos
+docs/       Documentación por audiencia: operacion/ · producto/ · usuario/ · desarrollo/
 scripts/    install.sh (instalador de producción)
 ```
 
 ## Documentación
 
-- `CLAUDE.md` / `AGENTS.md` — arquitectura detallada, convenciones y gotchas.
-- `docs/architecture/` — decisiones y roadmap de la plataforma.
-- `docs/background-tasks-taskiq.md` y `docs/backups-google-drive.md` — diseño de los verticales operativos.
-- `backend/docs/phase-2-query-policy-design.md` — diseño del motor de query (Fase 2).
+Organizada **por audiencia** en [`docs/`](docs/README.md):
+
+| Audiencia | Carpeta | Contenido |
+|---|---|---|
+| 🔧 Operador (self-hosting) | [`docs/operacion/`](docs/operacion/instalacion.md) | Instalación, actualización, respaldos, solución de problemas |
+| 🧑‍💼 Administrador del negocio | [`docs/producto/`](docs/producto/puesta-en-marcha.md) | Puesta en marcha, catálogo y pedidos, sitio público, envíos/créditos, notificaciones y roles |
+| 🛒 Cliente del sitio | [`docs/usuario/`](docs/usuario/como-pedir.md) | Cómo pedir, mi cuenta, créditos y descuentos |
+| 👩‍💻 Desarrollo | [`docs/desarrollo/`](docs/desarrollo/arquitectura.md) | Arquitectura, tareas en segundo plano, pruebas |
+
+Convenciones para agentes de IA (comandos exactos, gotchas): `CLAUDE.md`.
 
 Los comentarios, docstrings y mensajes de la API se escriben en **español**.

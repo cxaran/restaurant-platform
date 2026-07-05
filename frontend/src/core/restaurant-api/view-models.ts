@@ -128,9 +128,9 @@ function toFooterVM(footer: PublicFooter | undefined): FooterVM {
     phones: footer?.phones ?? [],
     schedule: footer?.schedule
       ? {
-          is_open_now: footer.schedule.is_open_now ?? false,
-          today_slots: footer.schedule.today_slots ?? [],
-        }
+        is_open_now: footer.schedule.is_open_now ?? false,
+        today_slots: footer.schedule.today_slots ?? [],
+      }
       : null,
     show_links: footer?.show_links ?? true,
     address: footer?.address ?? null,
@@ -163,7 +163,6 @@ export function toSiteVM(site: PublicStorefrontSite): SiteVM {
 }
 
 // Espejo del preset neutro `calido` del backend (app/storefront/presets.py):
-// fallback de arranque cuando el sitio aún no responde. NO es Tony-Tony.
 export const FALLBACK_TOKENS: ThemeTokens = {
   colors: {
     brand_primary: "#C2410C",

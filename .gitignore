@@ -15,3 +15,5 @@ __pycache__/
 
 # Evidencia local de validación en navegador (no versionada)
 .artifacts/
+
+.env

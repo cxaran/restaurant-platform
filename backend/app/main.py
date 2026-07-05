@@ -39,8 +39,37 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
         pass
 
 
+# Versión pública de la API expuesta en OpenAPI (independiente del despliegue).
+# Súbela al introducir cambios incompatibles en los contratos de la API.
+API_VERSION = "1.0.0"
+
+# Descripción en Markdown que ReDoc y Swagger UI renderizan en la portada de la
+# documentación. Redactada en español, como el resto de los mensajes de la API.
+API_DESCRIPTION = """\
+Plataforma para restaurantes — sitio público con pedidos en línea, panel de
+operación diaria y administración por contrato — construida sobre
+**platform-core** (FastAPI + Next.js, self-hosted, instalación única).
+
+Todas las rutas se montan bajo `/api/v1`. La autenticación acepta una **cookie
+`session_token` httponly** o un **Bearer token**; los permisos se exigen por
+recurso (RBAC declarado en código).
+
+### Experiencias
+- **Sitio público** — catálogo, carrito, checkout, pedidos, cuenta y créditos.
+- **Panel** — operación diaria: pedidos, POS, entregas, reparto y tickets.
+- **Administración** — recursos genéricos por contrato, storefront, finanzas,
+  notificaciones y respaldos.
+
+### Invariantes de dominio
+Un pedido es **100 % dinero o 100 % créditos**; *pago confirmado ≠ pedido
+completado*; las cantidades son enteros positivos estrictos en cada capa.
+"""
+
 app = FastAPI(
     title=settings.project_name,
+    summary="API de la plataforma para restaurantes (sitio público, panel y administración).",
+    description=API_DESCRIPTION,
+    version=API_VERSION,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",

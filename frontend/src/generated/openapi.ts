@@ -8042,7 +8042,7 @@ export interface components {
             email_smtp_ssl?: boolean | null;
             /**
              * Analítica del sitio (GA4)
-             * @description Medir visitas y acciones del sitio público con Google Analytics 4. Requiere el ID de medición. El panel y el admin nunca se miden. Guía completa: docs/analytics-ga4.md.
+             * @description Medir visitas y acciones del sitio público con Google Analytics 4. Requiere el ID de medición. El panel y el admin nunca se miden. Guía completa: docs/producto/puesta-en-marcha.md.
              */
             analytics_enabled?: boolean | null;
             /**

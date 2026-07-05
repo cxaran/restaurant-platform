@@ -240,9 +240,7 @@ class SystemSettingsRead(ApiReadSchema):
 
     id: uuid.UUID
     public_registration_enabled: bool
-    # Política efectiva y candado del despliegue (solo lectura, para que la UI
-    # explique por qué el switch puede no tener efecto).
-    registration_allowed_by_deployment: bool
+    # Política efectiva (solo lectura; hoy coincide con la persistida).
     public_registration_effective: bool
     app_base_url: Optional[str] = None
     app_base_url_verified_at: Optional[datetime] = None

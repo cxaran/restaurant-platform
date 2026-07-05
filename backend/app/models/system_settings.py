@@ -71,8 +71,8 @@ class SystemSettings(Base):
         nullable=False,
         default=False,
         comment=(
-            "Política de registro público (auto-registro por correo). Efectiva sólo "
-            "si el despliegue lo permite (gate REGISTRATION_ALLOWED del entorno)."
+            "Política de registro público (auto-registro por correo). Única fuente "
+            "de verdad: no existe gate de entorno."
         ),
     )
 

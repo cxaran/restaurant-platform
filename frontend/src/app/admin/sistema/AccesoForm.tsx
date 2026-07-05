@@ -1,8 +1,8 @@
 "use client";
 
-// Registro y acceso: nombre de la institución, registro público (con el candado
-// del despliegue explicado), recuperación de contraseña, verificación de inicio
-// de sesión y duración de las sesiones. PATCH del subconjunto editable.
+// Registro y acceso: nombre de la institución, registro público, recuperación
+// de contraseña, verificación de inicio de sesión y duración de las sesiones.
+// PATCH del subconjunto editable.
 
 import { useState, type FormEvent } from "react";
 
@@ -112,16 +112,11 @@ export function AccesoForm({ settings, canEdit, onSaved }: SectionProps) {
           <Toggle
             checked={publicRegistration}
             onChange={setPublicRegistration}
-            disabled={!canEdit || !settings.registration_allowed_by_deployment}
+            disabled={!canEdit}
             label="Registro público"
             description="Permite que cualquiera cree una cuenta por correo desde el sitio."
           />
-          {!settings.registration_allowed_by_deployment ? (
-            <HelpText>
-              El despliegue tiene cerrado el registro (candado REGISTRATION_ALLOWED del
-              entorno): mientras siga cerrado este interruptor no surte efecto.
-            </HelpText>
-          ) : !settings.public_registration_effective && publicRegistration ? (
+          {!settings.public_registration_effective && publicRegistration ? (
             <HelpText>Efectivo tras guardar.</HelpText>
           ) : null}
         </div>

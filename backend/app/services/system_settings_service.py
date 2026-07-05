@@ -1,8 +1,8 @@
 """Servicio del singleton de configuración del sistema.
 
 La política vive en la base de datos (fuente de verdad, editable y auditada); las
-variables de entorno conservan sólo los GATES de despliegue que la UI no puede
-saltar (``registration_allowed_effective``). El checklist de puesta en marcha es
+variables de entorno conservan sólo defaults de despliegue (duración de sesiones,
+transporte de correo del entorno). El checklist de puesta en marcha es
 DERIVADO del estado real — nunca persiste progreso propio, así no puede
 desincronizarse de la configuración.
 """
@@ -32,11 +32,8 @@ def get_system_settings(session: Session, *, for_update: bool = False) -> System
 
 
 def is_public_registration_enabled(session: Session) -> bool:
-    """Política EFECTIVA de registro público: gate de despliegue AND política
-    persistida. Producción con el gate cerrado nunca abre registro, diga lo que
-    diga la base de datos."""
-    if not settings.registration_allowed_effective:
-        return False
+    """Política de registro público: manda únicamente lo persistido en
+    ``system_settings`` (editable y auditado desde la UI)."""
     return get_system_settings(session).public_registration_enabled
 
 

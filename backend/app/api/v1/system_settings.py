@@ -44,7 +44,6 @@ def _serialize_read(session: SessionDep, row: SystemSettings) -> SystemSettingsR
     return SystemSettingsRead(
         id=row.id,
         public_registration_enabled=row.public_registration_enabled,
-        registration_allowed_by_deployment=settings.registration_allowed_effective,
         public_registration_effective=system.is_public_registration_enabled(session),
         app_base_url=row.app_base_url,
         app_base_url_verified_at=row.app_base_url_verified_at,
@@ -289,16 +288,6 @@ def update_system_settings(
     changed_field_names = list(data.keys())
     if not data:
         return _serialize_read(session, row)
-
-    # Candado de despliegue: activar el registro con el gate cerrado sería un switch
-    # sin efecto — se rechaza con la causa en lugar de fingir que quedó activo.
-    if data.get("public_registration_enabled") is True and not settings.registration_allowed_effective:
-        api_error(
-            status.HTTP_409_CONFLICT,
-            "registration_locked_by_deployment",
-            "El despliegue no permite registro público (REGISTRATION_ALLOWED). "
-            "Actívalo en el entorno antes de habilitarlo aquí.",
-        )
 
     # Activar la verificación de login exige un transporte de correo UTILIZABLE:
     # sin correo no llegan los códigos y los usuarios sin cobertura administrativa

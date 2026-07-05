@@ -23,7 +23,7 @@ sistema: cada punto pendiente enlaza a su pantalla. Orden recomendado:
 2. **Dominio verificado** — la plataforma verifica tu dominio con un reto
    criptográfico y lo suma a los orígenes confiables.
 3. **Registro público** — decide si los clientes pueden crear cuenta
-   (el interruptor de despliegue `REGISTRATION_ALLOWED` tiene la última palabra).
+   (se controla únicamente desde la configuración del sistema).
 4. **Respaldos** — conectar Google Drive (guía del operador:
    [`operacion/respaldos.md`](../operacion/respaldos.md)).
 

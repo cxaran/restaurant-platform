@@ -7926,8 +7926,6 @@ export interface components {
             id: string;
             /** Public Registration Enabled */
             public_registration_enabled: boolean;
-            /** Registration Allowed By Deployment */
-            registration_allowed_by_deployment: boolean;
             /** Public Registration Effective */
             public_registration_effective: boolean;
             /** App Base Url */

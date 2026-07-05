@@ -67,7 +67,6 @@ export default async function StorefrontLayout({
   return (
     <PublicSessionProvider initialSession={session}>
       <CartProvider>
-        <AnalyticsProvider config={analytics} />
         <CreditsModeGuard />
         <StorefrontThemeProvider tokens={site?.theme_tokens ?? FALLBACK_TOKENS} fontVars={fontVars}>
           {/* Cinta global (highlight `global`): SIEMPRE sobre el header. */}
@@ -75,6 +74,9 @@ export default async function StorefrontLayout({
           <StorefrontHeader business={business} logoUrl={safeLogoUrl} />
           <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>{children}</main>
           <StorefrontFooter business={business} footer={site?.footer ?? null} logoUrl={safeLogoUrl} />
+          {/* Dentro del provider: el banner de cookies (sf-card) necesita las
+              variables --sf-* del tema para tener fondo y sombra. */}
+          <AnalyticsProvider config={analytics} />
         </StorefrontThemeProvider>
       </CartProvider>
     </PublicSessionProvider>

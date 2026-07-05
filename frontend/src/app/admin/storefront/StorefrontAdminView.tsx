@@ -1234,7 +1234,7 @@ function ThemeTab({
             maxLength={120}
             rows={2}
             onChange={(next) => setAuthHeadline(next ?? "")}
-            placeholder="Tu punto de venta, en un solo lugar."
+            placeholder="Tu antojo, a un par de toques."
           />
         </Field>
         <Field label="Texto de apoyo">
@@ -1243,7 +1243,7 @@ function ThemeTab({
             maxLength={300}
             rows={3}
             onChange={(next) => setAuthSubcopy(next ?? "")}
-            placeholder="Pedidos, cocina, envíos y caja del día. Entra con tu cuenta del equipo."
+            placeholder="Explora el menú, pide en minutos y recíbelo en tu puerta. Entra con tu cuenta."
           />
         </Field>
 

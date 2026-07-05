@@ -32,9 +32,9 @@ const rounded = Baloo_2({ subsets: ["latin"], variable: "--font-sf-rounded" });
 // Texto por defecto del panel lateral de acceso cuando el admin no lo ha
 // personalizado en el editor del sitio (storefront_settings.auth_*). El titular
 // admite un salto de línea (\n → dos líneas vía white-space: pre-line).
-const AUTH_HEADLINE_FALLBACK = "Tu punto de venta,\nen un solo lugar.";
+const AUTH_HEADLINE_FALLBACK = "Tu antojo,\na un par de toques.";
 const AUTH_SUBCOPY_FALLBACK =
-  "Pedidos, cocina, envíos y caja del día. Entra con tu cuenta del equipo.";
+  "Explora el menú, pide en minutos y recíbelo en tu puerta. Entra con tu cuenta.";
 
 export async function generateMetadata(): Promise<Metadata> {
   // La metadata jamás rompe las páginas de acceso: fallo → mínimos seguros.

@@ -153,6 +153,20 @@ function highlightToWrite(row: HighlightRead): HighlightWrite {
   };
 }
 
+// Texto de error de una mutación. Un 422 de validación trae el motivo concreto
+// en ``errors[]`` (p. ej. "La plantilla «showcase» requiere elegir un producto")
+// mientras que ``message`` es genérico ("Parámetros inválidos"): se muestran los
+// detalles cuando existen para que el usuario sepa QUÉ corregir.
+function mutationErrorText(err: unknown): string {
+  if (err instanceof ApiRequestError) {
+    const details = (err.body.errors ?? [])
+      .map((item) => item.message)
+      .filter((message): message is string => Boolean(message));
+    return details.length > 0 ? details.join(" · ") : err.body.message;
+  }
+  return "No fue posible.";
+}
+
 const EMPTY_HERO: HeroWrite = {
   template: "split",
   is_active: true,
@@ -447,7 +461,7 @@ export function StorefrontAdminView({
       if (success) setMessage(success);
       refresh();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.body.message : "No fue posible.");
+      setError(mutationErrorText(err));
     } finally {
       setBusy(false);
     }

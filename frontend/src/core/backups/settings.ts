@@ -16,6 +16,12 @@ export interface BackupSettings {
   ageRecipient: string | null;
   ageFingerprint: string | null;
   driveStatus: DriveStatus;
+  // Credenciales OAuth del proyecto de Google Cloud (viven en backup_settings, no en
+  // system_settings). El secret es write-only: solo se sabe si está configurado.
+  driveClientId: string | null;
+  driveClientSecretConfigured: boolean;
+  // URI de redirección DERIVADO del dominio verificado; read-only para copiarlo en Google.
+  driveRedirectUri: string | null;
   driveConnectedAt: string | null;
   lastErrorCode: string | null;
   lastErrorSummary: string | null;
@@ -49,6 +55,9 @@ export function parseBackupSettings(payload: unknown): BackupSettings | null {
     ageFingerprint: optionalString(payload.age_recipient_fingerprint),
     driveStatus:
       status === "active" || status === "needs_reauth" ? status : "disconnected",
+    driveClientId: optionalString(payload.google_drive_client_id),
+    driveClientSecretConfigured: payload.google_drive_client_secret_configured === true,
+    driveRedirectUri: optionalString(payload.google_drive_redirect_uri),
     driveConnectedAt: optionalString(payload.drive_connected_at),
     lastErrorCode: optionalString(payload.last_error_code),
     lastErrorSummary: optionalString(payload.last_error_summary),
@@ -76,6 +85,8 @@ export function buildSettingsPatch(
     retentionMonthly: number;
     retentionYearly: number;
     ageRecipient: string;
+    clientId: string;
+    clientSecret: string;
   },
 ): Record<string, unknown> {
   const patch: Record<string, unknown> = {
@@ -94,6 +105,19 @@ export function buildSettingsPatch(
     }
   } else if (current.ageRecipient !== null) {
     patch.age_recipient = null;
+  }
+  // Client ID en claro: vacío borra (null) SOLO si antes había; el secret write-only
+  // solo se envía si el usuario escribió uno nuevo (vacío = conservar el actual).
+  const clientId = form.clientId.trim();
+  if (clientId !== "") {
+    if (clientId !== (current.driveClientId ?? "")) {
+      patch.google_drive_client_id = clientId;
+    }
+  } else if (current.driveClientId !== null) {
+    patch.google_drive_client_id = null;
+  }
+  if (form.clientSecret !== "") {
+    patch.google_drive_client_secret = form.clientSecret;
   }
   return patch;
 }

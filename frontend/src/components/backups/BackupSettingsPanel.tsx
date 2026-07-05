@@ -64,7 +64,27 @@ export function BackupSettingsPanel({
     retentionMonthly: initial.retentionMonthly,
     retentionYearly: initial.retentionYearly,
     ageRecipient: initial.ageRecipient ?? "",
+    clientId: initial.driveClientId ?? "",
+    clientSecret: "",
   }));
+  const [copied, setCopied] = useState(false);
+
+  // Conectar Drive lanza el OAuth con las credenciales GUARDADAS; sin ellas el backend
+  // responde 409. Se exige que estén persistidas (no basta con tenerlas en el form).
+  const credentialsReady = Boolean(
+    settings.driveClientId && settings.driveClientSecretConfigured,
+  );
+
+  async function copyRedirectUri(): Promise<void> {
+    if (!settings.driveRedirectUri) return;
+    try {
+      await navigator.clipboard.writeText(settings.driveRedirectUri);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Sin permiso de portapapeles: el texto queda seleccionable a mano.
+    }
+  }
 
   const driveText = DRIVE_STATUS_TEXT[settings.driveStatus];
   const driveTone = useMemo(() => {
@@ -93,7 +113,12 @@ export function BackupSettingsPanel({
         buildSettingsPatch(settings, form),
       );
       setSettings(updated);
-      setForm((current) => ({ ...current, ageRecipient: updated.ageRecipient ?? "" }));
+      setForm((current) => ({
+        ...current,
+        ageRecipient: updated.ageRecipient ?? "",
+        clientId: updated.driveClientId ?? "",
+        clientSecret: "",
+      }));
       return {
         tone: "ok",
         text: "Configuración guardada. Te enviamos un correo con el resumen.",
@@ -164,7 +189,17 @@ export function BackupSettingsPanel({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {settings.driveStatus !== "active" ? (
-            <button type="button" onClick={connect} disabled={busy !== null} className={primaryButton}>
+            <button
+              type="button"
+              onClick={connect}
+              disabled={busy !== null || !credentialsReady}
+              title={
+                credentialsReady
+                  ? undefined
+                  : "Guarda primero el Client ID y el secret de Google Drive (abajo)."
+              }
+              className={primaryButton}
+            >
               {settings.driveStatus === "needs_reauth" ? "Reconectar Google Drive" : "Conectar Google Drive"}
             </button>
           ) : (
@@ -208,6 +243,65 @@ export function BackupSettingsPanel({
         }}
         className="flex flex-col gap-3"
       >
+        <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--border2)] bg-[var(--panel2)] p-3">
+          <div className="flex flex-col gap-1">
+            <p className="m-0 text-sm font-semibold text-[var(--tx)]">
+              Credenciales de Google Drive (OAuth)
+            </p>
+            <p className="m-0 text-xs text-[var(--tx2)]">
+              Crea un ID de cliente OAuth tipo «Aplicación web» en Google Cloud → APIs y
+              servicios → Credenciales, y pega aquí el ID y el secreto. Sin credenciales
+              guardadas, «Conectar Google Drive» no funciona.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-[var(--tx2)]">URI de redirección autorizado</span>
+            {settings.driveRedirectUri ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="rounded-[7px] border border-[var(--border2)] bg-[var(--panel)] px-2 py-1 text-[12.5px] break-all text-[var(--tx)]">
+                  {settings.driveRedirectUri}
+                </code>
+                <button type="button" onClick={() => void copyRedirectUri()} className={secondaryButton}>
+                  {copied ? "Copiado ✓" : "Copiar"}
+                </button>
+              </div>
+            ) : (
+              <span className="text-xs text-[var(--tx3)]">
+                Se calcula solo a partir del dominio verificado. Declara y verifica el
+                dominio en Sistema → Dominio para obtenerlo.
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <label className={labelClass}>
+              Client ID
+              <input
+                type="text"
+                value={form.clientId}
+                onChange={(event) => setForm({ ...form, clientId: event.target.value })}
+                placeholder="xxxxx.apps.googleusercontent.com"
+                autoComplete="off"
+                spellCheck={false}
+                className={`${inputClass} font-mono text-xs`}
+              />
+            </label>
+            <label className={labelClass}>
+              Client secret
+              {settings.driveClientSecretConfigured ? " (configurado — deja vacío para conservarlo)" : ""}
+              <input
+                type="password"
+                value={form.clientSecret}
+                onChange={(event) => setForm({ ...form, clientSecret: event.target.value })}
+                placeholder={settings.driveClientSecretConfigured ? "••••••••" : "Pega el secreto de Google"}
+                autoComplete="off"
+                className={`${inputClass} font-mono text-xs`}
+              />
+            </label>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <label className={`${labelClass} justify-end`}>
             <span className="flex items-center gap-2 pb-1.5 text-sm text-[var(--tx)]">

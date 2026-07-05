@@ -1,8 +1,16 @@
+# Red intermitente en el despliegue: reintentos y timeouts amplios, y una caché de
+# npm PERSISTENTE entre reintentos (BuildKit cache mount, no queda en la imagen)
+# para reanudar la descarga en vez de empezar de cero si la conexión se corta.
 FROM node:24-alpine AS deps
+
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=600000
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 FROM deps AS dev
 
@@ -13,9 +21,14 @@ CMD ["npm", "run", "dev"]
 
 FROM node:24-alpine AS builder
 
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=600000
+
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 COPY . .
 RUN npm run build
 

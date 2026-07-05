@@ -13,12 +13,16 @@ WORKDIR /app
 #   del stack (pg_dump debe ser >= a la versión del servidor). Sin repos externos.
 # - age: cifrado del archivo de respaldo con la clave PÚBLICA del administrador (la
 #   privada nunca entra a la imagen ni al repositorio).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends postgresql-client age \
+# Red intermitente en el despliegue: apt y pip reintentan varias veces, y la caché
+# de pip persiste entre reintentos (BuildKit cache mount, no queda en la imagen)
+# para reanudar la descarga en vez de re-bajar todo si la conexión se corta.
+RUN apt-get update -o Acquire::Retries=5 \
+    && apt-get install -y --no-install-recommends -o Acquire::Retries=5 postgresql-client age \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PIP_RETRIES=10 PIP_DEFAULT_TIMEOUT=120
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 
 FROM deps AS dev
 COPY . backend/

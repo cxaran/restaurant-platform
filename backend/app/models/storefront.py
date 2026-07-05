@@ -79,6 +79,14 @@ class StorefrontSettings(Base):
         comment="Título del sitio; si falta se usa business_profile.trade_name.",
     )
     site_description: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    # Texto del panel lateral de las páginas de acceso (login/registro/…); si falta
+    # el frontend usa su copy por defecto. Texto libre, sin CHECK.
+    auth_headline: Mapped[Optional[str]] = mapped_column(
+        String(120),
+        nullable=True,
+        comment="Titular del panel lateral de acceso; admite un salto de línea (\\n).",
+    )
+    auth_subcopy: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     favicon_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("stored_files.id", ondelete="RESTRICT"), nullable=True
     )

@@ -50,6 +50,11 @@ export type SiteVM = {
     favicon_file_id: string | null;
     social_image_file_id: string | null;
   };
+  // Texto del panel lateral de las páginas de acceso; null = el front usa su default.
+  auth: {
+    headline: string | null;
+    subcopy: string | null;
+  };
   theme_tokens: ThemeTokens | null;
   carousel: CarouselVM;
   heros: HeroVM[];
@@ -148,6 +153,10 @@ export function toSiteVM(site: PublicStorefrontSite): SiteVM {
       description: site.meta?.description ?? null,
       favicon_file_id: site.meta?.favicon_file_id ?? null,
       social_image_file_id: site.meta?.social_image_file_id ?? null,
+    },
+    auth: {
+      headline: site.auth?.headline ?? null,
+      subcopy: site.auth?.subcopy ?? null,
     },
     theme_tokens: parseThemeTokens(site.theme_tokens),
     carousel: {

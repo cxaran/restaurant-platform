@@ -99,10 +99,18 @@ class PublicSiteMeta(ApiSchema):
     social_image_file_id: Optional[str] = None
 
 
+class PublicSiteAuth(ApiSchema):
+    """Texto del panel lateral de las páginas de acceso; None = usar el default del front."""
+
+    headline: Optional[str] = None
+    subcopy: Optional[str] = None
+
+
 class PublicStorefrontSite(ApiSchema):
     enabled: bool = True
     maintenance_message: Optional[str] = None
     meta: PublicSiteMeta = Field(default_factory=PublicSiteMeta)
+    auth: PublicSiteAuth = Field(default_factory=PublicSiteAuth)
     theme_tokens: dict[str, Any] = Field(default_factory=dict)
     carousel: PublicCarousel = Field(default_factory=PublicCarousel)
     heros: list[PublicHero] = Field(default_factory=list)

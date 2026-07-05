@@ -122,6 +122,8 @@ class SettingsRead(ApiReadSchema):
     maintenance_message: Optional[str] = None
     site_title: Optional[str] = None
     site_description: Optional[str] = None
+    auth_headline: Optional[str] = None
+    auth_subcopy: Optional[str] = None
     favicon_file_id: Optional[uuid.UUID] = None
     social_image_file_id: Optional[uuid.UUID] = None
     theme_preset: str
@@ -471,6 +473,9 @@ def update_theme(
 class SettingsPatch(ApiPatchSchema):
     site_title: Optional[str] = Field(default=None, max_length=120)
     site_description: Optional[str] = Field(default=None, max_length=300)
+    # Panel lateral de las páginas de acceso; el titular admite un salto de línea (\n).
+    auth_headline: Optional[str] = Field(default=None, max_length=120)
+    auth_subcopy: Optional[str] = Field(default=None, max_length=300)
     favicon_file_id: Optional[uuid.UUID] = None
     social_image_file_id: Optional[uuid.UUID] = None
     storefront_enabled: Optional[bool] = None

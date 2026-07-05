@@ -29,12 +29,12 @@ const sans = Archivo({ subsets: ["latin"], variable: "--font-sf-sans" });
 const serif = Lora({ subsets: ["latin"], variable: "--font-sf-serif" });
 const rounded = Baloo_2({ subsets: ["latin"], variable: "--font-sf-rounded" });
 
-// Mismo criterio que (storefront)/layout.tsx — tokens del tema activo del
-// sitio y, si el backend no responde, el fallback neutro (jamás marca fija).
-async function resolveThemeTokens() {
-  const site = await getPublicStorefrontSite();
-  return site?.theme_tokens ?? FALLBACK_TOKENS;
-}
+// Texto por defecto del panel lateral de acceso cuando el admin no lo ha
+// personalizado en el editor del sitio (storefront_settings.auth_*). El titular
+// admite un salto de línea (\n → dos líneas vía white-space: pre-line).
+const AUTH_HEADLINE_FALLBACK = "Tu punto de venta,\nen un solo lugar.";
+const AUTH_SUBCOPY_FALLBACK =
+  "Pedidos, cocina, envíos y caja del día. Entra con tu cuenta del equipo.";
 
 export async function generateMetadata(): Promise<Metadata> {
   // La metadata jamás rompe las páginas de acceso: fallo → mínimos seguros.
@@ -59,11 +59,16 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PublicAuthLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const [business, tokens, analytics] = await Promise.all([
+  const [business, site, analytics] = await Promise.all([
     getPublicBusiness(),
-    resolveThemeTokens(),
+    getPublicStorefrontSite(),
     getPublicAnalyticsConfig(),
   ]);
+  // Tokens del tema activo; fallback neutro si el backend no responde (jamás marca fija).
+  const tokens = site?.theme_tokens ?? FALLBACK_TOKENS;
+  // Texto del panel lateral, editable en el storefront; vacío → copy por defecto.
+  const authHeadline = site?.auth.headline?.trim() || AUTH_HEADLINE_FALLBACK;
+  const authSubcopy = site?.auth.subcopy?.trim() || AUTH_SUBCOPY_FALLBACK;
   // Logo dinámico SOLO si es raster verificado (§D): SVG/otros → monograma.
   const safeLogoUrl = await resolveSafeImagePath(business?.logo_file_id);
   const fontVars = `${slab.variable} ${sans.variable} ${serif.variable} ${rounded.variable}`;
@@ -102,15 +107,13 @@ export default async function PublicAuthLayout({
             <BrandLockup business={business} logoUrl={safeLogoUrl} compact />
           </div>
           <div className="sf-auth-brand-hero">
-            <p className="sf-display sf-auth-brand-headline">
-              Tu punto de venta,
-              <br />
-              en un solo lugar.
+            <p
+              className="sf-display sf-auth-brand-headline"
+              style={{ whiteSpace: "pre-line" }}
+            >
+              {authHeadline}
             </p>
-            <p className="sf-auth-brand-copy">
-              Pedidos, cocina, envíos y caja del día. Entra con tu cuenta del
-              equipo.
-            </p>
+            <p className="sf-auth-brand-copy">{authSubcopy}</p>
           </div>
           <p className="sf-auth-brand-foot">
             © {year} {name}

@@ -6957,6 +6957,16 @@ export interface components {
             /** Estimated Minutes */
             estimated_minutes?: number | null;
         };
+        /**
+         * PublicSiteAuth
+         * @description Texto del panel lateral de las páginas de acceso; None = usar el default del front.
+         */
+        PublicSiteAuth: {
+            /** Headline */
+            headline?: string | null;
+            /** Subcopy */
+            subcopy?: string | null;
+        };
         /** PublicSiteMeta */
         PublicSiteMeta: {
             /** Title */
@@ -6985,6 +6995,7 @@ export interface components {
             /** Maintenance Message */
             maintenance_message?: string | null;
             meta?: components["schemas"]["PublicSiteMeta"];
+            auth?: components["schemas"]["PublicSiteAuth"];
             /** Theme Tokens */
             theme_tokens?: {
                 [key: string]: unknown;
@@ -7533,6 +7544,10 @@ export interface components {
             site_title?: string | null;
             /** Site Description */
             site_description?: string | null;
+            /** Auth Headline */
+            auth_headline?: string | null;
+            /** Auth Subcopy */
+            auth_subcopy?: string | null;
             /** Favicon File Id */
             favicon_file_id?: string | null;
             /** Social Image File Id */
@@ -7562,6 +7577,10 @@ export interface components {
             site_title?: string | null;
             /** Site Description */
             site_description?: string | null;
+            /** Auth Headline */
+            auth_headline?: string | null;
+            /** Auth Subcopy */
+            auth_subcopy?: string | null;
             /** Favicon File Id */
             favicon_file_id?: string | null;
             /** Social Image File Id */

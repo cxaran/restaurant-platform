@@ -227,6 +227,32 @@ function TextInput({
   );
 }
 
+function TextArea({
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+  rows = 3,
+}: Readonly<{
+  value: string | null | undefined;
+  onChange: (next: string | null) => void;
+  placeholder?: string;
+  maxLength?: number;
+  rows?: number;
+}>) {
+  return (
+    <textarea
+      className="tt-input"
+      value={value ?? ""}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      rows={rows}
+      style={{ resize: "vertical" }}
+      onChange={(event) => onChange(event.target.value || null)}
+    />
+  );
+}
+
 function SelectInput<T extends string>({
   value,
   options,
@@ -1093,6 +1119,8 @@ function ThemeTab({
   const [accent, setAccent] = useState(settings.theme_accent ?? "");
   const [siteTitle, setSiteTitle] = useState(settings.site_title ?? "");
   const [siteDescription, setSiteDescription] = useState(settings.site_description ?? "");
+  const [authHeadline, setAuthHeadline] = useState(settings.auth_headline ?? "");
+  const [authSubcopy, setAuthSubcopy] = useState(settings.auth_subcopy ?? "");
   const [enabled, setEnabled] = useState(settings.storefront_enabled);
   const [maintenance, setMaintenance] = useState(settings.maintenance_message ?? "");
   const [autoplay, setAutoplay] = useState(settings.hero_autoplay);
@@ -1185,6 +1213,30 @@ function ThemeTab({
           <TextInput value={siteDescription} maxLength={300} onChange={(next) => setSiteDescription(next ?? "")} />
         </Field>
 
+        <span className="tt-label" style={{ marginTop: 8 }}>Páginas de acceso</span>
+        <span style={{ fontSize: 11, color: "var(--tx3)" }}>
+          Texto del panel lateral de login, registro y recuperación de contraseña.
+          Vacío = se usa el texto por defecto.
+        </span>
+        <Field label="Titular (una o dos líneas)">
+          <TextArea
+            value={authHeadline}
+            maxLength={120}
+            rows={2}
+            onChange={(next) => setAuthHeadline(next ?? "")}
+            placeholder="Tu punto de venta, en un solo lugar."
+          />
+        </Field>
+        <Field label="Texto de apoyo">
+          <TextArea
+            value={authSubcopy}
+            maxLength={300}
+            rows={3}
+            onChange={(next) => setAuthSubcopy(next ?? "")}
+            placeholder="Pedidos, cocina, envíos y caja del día. Entra con tu cuenta del equipo."
+          />
+        </Field>
+
         <span className="tt-label" style={{ marginTop: 8 }}>Carrusel de heros</span>
         <Toggle label="Autoplay (se pausa al pasar el cursor)" checked={autoplay} onChange={setAutoplay} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1224,6 +1276,8 @@ function ThemeTab({
                 patchSettings({
                   site_title: siteTitle || null,
                   site_description: siteDescription || null,
+                  auth_headline: authHeadline || null,
+                  auth_subcopy: authSubcopy || null,
                   storefront_enabled: enabled,
                   maintenance_message: maintenance || null,
                   hero_autoplay: autoplay,

@@ -243,6 +243,10 @@ def site_public_payload(session: Session) -> dict:
                 else None
             ),
         },
+        "auth": {
+            "headline": settings_row.auth_headline,
+            "subcopy": settings_row.auth_subcopy,
+        },
         "theme_tokens": theme_tokens(settings_row),
         "carousel": {
             "autoplay": settings_row.hero_autoplay,

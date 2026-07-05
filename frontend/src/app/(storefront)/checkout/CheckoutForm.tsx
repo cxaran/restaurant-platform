@@ -95,6 +95,9 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
   const [appliedDiscount, setAppliedDiscount] = useState<AppliedDiscount | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
   const [quoting, setQuoting] = useState(false);
+  // Aceptación de términos: DEBE declararse con el resto de hooks, antes del
+  // early return de carrito vacío (regla de hooks de React).
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // INVARIANTE (el backend la revalida): canje con créditos = pedido completo
   // en créditos, SIN envío (solo pickup), sin códigos de descuento.
@@ -314,8 +317,6 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
     setAppliedDiscount(null);
     setDiscountError(null);
   }
-
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();

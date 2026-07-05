@@ -11,6 +11,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { trackEvent } from "@/core/analytics/analytics";
 import { ctaHref, ctaLabel } from "@/core/restaurant-api/cta";
 import { formatMoney, publicFileUrl, sectionScheme } from "@/core/restaurant-api/theme";
 import type { CarouselVM, HeroVM } from "@/core/restaurant-api/view-models";
@@ -23,16 +24,42 @@ function HeroCta({
   const label = ctaLabel(cta);
   const href = ctaHref(cta);
   if (!label || !href) return null;
+  const linkType =
+    typeof cta === "object" && cta !== null
+      ? ((cta as { link_type?: string }).link_type ?? "unknown")
+      : "unknown";
+  // Analítica del CTA configurable: whatsapp/teléfono tienen evento propio;
+  // el resto es cta_click. Solo el label configurado por el admin, jamás PII.
+  const handleClick = () => {
+    if (linkType === "whatsapp") {
+      trackEvent("whatsapp_click", { link_location: "hero" });
+    } else if (linkType === "phone") {
+      trackEvent("phone_click", { link_location: "hero" });
+    } else {
+      trackEvent("cta_click", {
+        cta_name: label,
+        cta_location: "hero",
+        destination_type: linkType,
+      });
+    }
+  };
   const external = href.startsWith("http") || href.startsWith("tel:");
   const className = variant === "solid" ? "sf-btn" : "sf-btn-outline";
   // En esquemas oscuros el outline hereda el color del texto de la sección.
   const style = variant === "outline" && inverse ? { borderColor: "currentColor", color: "inherit" } : undefined;
   return external ? (
-    <a className={className} style={style} href={href} rel="noopener noreferrer" target="_blank">
+    <a
+      className={className}
+      style={style}
+      href={href}
+      rel="noopener noreferrer"
+      target="_blank"
+      onClick={handleClick}
+    >
       {label}
     </a>
   ) : (
-    <Link className={className} style={style} href={href}>
+    <Link className={className} style={style} href={href} onClick={handleClick}>
       {label}
     </Link>
   );

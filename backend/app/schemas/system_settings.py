@@ -153,6 +153,46 @@ class SystemSettingsUpdate(ApiPatchSchema):
         title="SSL directo",
         json_schema_extra={"ui": {"form": True, "widget": "switch"}},
     )
+    analytics_enabled: Optional[bool] = Field(
+        default=None,
+        title="Analítica del sitio (GA4)",
+        description=(
+            "Medir visitas y acciones del sitio público con Google Analytics 4. "
+            "Requiere el ID de medición. El panel y el admin nunca se miden. "
+            "Guía completa: docs/analytics-ga4.md."
+        ),
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
+    analytics_ga4_measurement_id: Optional[str] = Field(
+        default=None,
+        min_length=6,
+        max_length=30,
+        pattern=r"^G-[A-Z0-9]{4,26}$",
+        title="ID de medición de GA4",
+        description=(
+            "Formato G-XXXXXXXXXX. En Google Analytics: Administración → Flujos de "
+            "datos → tu flujo web → ID de medición. Es un identificador público."
+        ),
+        json_schema_extra={"ui": {"form": True, "widget": "text"}},
+    )
+    analytics_require_consent: Optional[bool] = Field(
+        default=None,
+        title="Exigir consentimiento de cookies",
+        description=(
+            "Mostrar un aviso de cookies analíticas: hasta que el visitante acepte "
+            "no se carga Google Analytics ni se envía ningún evento."
+        ),
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
+    analytics_debug_mode: Optional[bool] = Field(
+        default=None,
+        title="Modo de depuración (DebugView)",
+        description=(
+            "Enviar los eventos marcados para GA4 DebugView y así validar la "
+            "medición. Apagar en operación normal."
+        ),
+        json_schema_extra={"ui": {"form": True, "widget": "switch"}},
+    )
     google_login_enabled: Optional[bool] = Field(
         default=None,
         title="Inicio de sesión con Google",
@@ -233,6 +273,11 @@ class SystemSettingsRead(ApiReadSchema):
     email_last_test_error: Optional[str] = None
     # Derivado con la MISMA regla que usa el envío (None = transporte utilizable).
     email_transport_reason: Optional[str] = None
+    # Analítica del sitio público (GA4; sin secretos involucrados).
+    analytics_enabled: bool
+    analytics_ga4_measurement_id: Optional[str] = None
+    analytics_require_consent: bool
+    analytics_debug_mode: bool
     environment: str
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -283,6 +328,21 @@ class VerifyDomainRequest(ApiPatchSchema):
         description="https://tu-dominio; vacío = el dominio por el que navegas ahora.",
         json_schema_extra={"ui": {"form": True, "widget": "text"}},
     )
+
+
+class PublicAnalyticsConfig(ApiReadSchema):
+    """Config PÚBLICA de analítica para el sitio (GET /public/site/analytics).
+
+    Apagada, solo devuelve ``enabled: false`` (sin ID ni opciones). El ID de
+    medición de GA4 es público por diseño de Google; jamás viaja aquí ningún
+    secreto (las claves de Measurement Protocol, si algún día existen, son
+    exclusivas del servidor).
+    """
+
+    enabled: bool
+    measurement_id: Optional[str] = None
+    require_consent: bool = True
+    debug_mode: bool = False
 
 
 class SetupChecklistItemRead(ApiReadSchema):

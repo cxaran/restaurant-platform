@@ -20,6 +20,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { trackEvent } from "@/core/analytics/analytics";
+
 import {
   EMPTY_CART_STATE,
   isValidQuantity,
@@ -117,6 +119,14 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
             )
           : [...current, { ...line, key: signature, quantity }],
       );
+      // Punto ÚNICO de analítica del agregado (cubre menú, detalle y
+      // configurador). Solo referencias públicas del catálogo, nunca notas.
+      trackEvent("add_to_cart", {
+        item_id: line.product_id,
+        item_name: line.name,
+        quantity,
+        purchase_mode: getSnapshot().mode,
+      });
     },
     [],
   );
@@ -140,7 +150,14 @@ export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   }, []);
 
   const removeLine = useCallback((key: string) => {
+    const removed = getSnapshot().lines.find((item) => item.key === key);
     setLines(getSnapshot().lines.filter((item) => item.key !== key));
+    if (removed) {
+      trackEvent("remove_from_cart", {
+        item_id: removed.product_id,
+        item_name: removed.name,
+      });
+    }
   }, []);
 
   // Vaciar el carrito conserva el modo: el modo nunca cambia solo.

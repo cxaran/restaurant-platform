@@ -8,8 +8,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { trackEvent } from "@/core/analytics/analytics";
 import type { PublicProduct } from "@/core/restaurant-api/contracts";
 import { formatMoney, publicFileUrl } from "@/core/restaurant-api/theme";
 import { useCart } from "@/core/storefront/cart";
@@ -34,6 +35,11 @@ export function ProductDetail({
   const [selection, setSelection] = useState<ProductSelection>({});
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
+
+  // Vista del detalle de producto (view_item): una vez por producto montado.
+  useEffect(() => {
+    trackEvent("view_item", { item_id: product.id, item_name: product.name });
+  }, [product.id, product.name]);
 
   const problems = validateSelection(product, selection);
   const unitEstimate = estimatedUnitPrice(product, selection);

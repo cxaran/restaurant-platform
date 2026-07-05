@@ -161,6 +161,44 @@ class SystemSettings(Base):
         comment="Client secret del OAuth de login CIFRADO (Fernet). Nunca se proyecta a la API.",
     )
 
+    # -- Analítica del sitio público (GA4; el ID de medición es público) ------------
+    analytics_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment=(
+            "Google Analytics 4 en el sitio público (storefront + login/registro). "
+            "Apagado no se carga ningún script ni se envía evento alguno. El panel "
+            "y el admin NUNCA se miden."
+        ),
+    )
+    analytics_ga4_measurement_id: Mapped[Optional[str]] = mapped_column(
+        String(30),
+        nullable=True,
+        comment=(
+            "ID de medición de GA4 (G-XXXXXXXXXX). Es un identificador público por "
+            "diseño de Google; aquí no se guarda ningún secreto de analítica."
+        ),
+    )
+    analytics_require_consent: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        comment=(
+            "Exigir consentimiento de cookies analíticas: hasta que el visitante "
+            "acepte, no se carga el script ni se envía ningún evento."
+        ),
+    )
+    analytics_debug_mode: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment=(
+            "Enviar los eventos con debug_mode para validarlos en GA4 DebugView. "
+            "Solo para pruebas; apagar en operación normal."
+        ),
+    )
+
     # -- Correo saliente (política editable; secretos SIEMPRE cifrados) -------------
     email_mode: Mapped[str] = mapped_column(
         String(20),

@@ -24,6 +24,7 @@ from backend.app.schemas.business import (
     PublicLegalTermsRead,
 )
 from backend.app.schemas.catalog import PublicMenuCategory
+from backend.app.schemas.system_settings import PublicAnalyticsConfig
 from backend.app.schemas.shipping import (
     PublicShippingQuoteRequest,
     PublicShippingQuoteResult,
@@ -147,6 +148,31 @@ def read_public_legal_terms(
         terms_extra=profile.terms_extra,
         privacy_extra=profile.privacy_extra,
         generated_at=utc_now(),
+    )
+
+
+@router.get("/site/analytics", response_model=PublicAnalyticsConfig)
+def read_public_analytics_config(
+    session: SessionDep, response: Response
+) -> PublicAnalyticsConfig:
+    """Config pública de analítica (GA4) para el sitio.
+
+    Apagada (o sin ID de medición) devuelve solo ``enabled: false``: el frontend
+    no carga ningún script. El ID de medición de GA4 es un identificador público
+    por diseño de Google; ningún secreto viaja por aquí.
+    """
+    from backend.app.services.system_settings_service import get_system_settings
+
+    row = get_system_settings(session)
+    enabled = row.analytics_enabled and bool(row.analytics_ga4_measurement_id)
+    response.headers["Cache-Control"] = "public, max-age=60"
+    if not enabled:
+        return PublicAnalyticsConfig(enabled=False)
+    return PublicAnalyticsConfig(
+        enabled=True,
+        measurement_id=row.analytics_ga4_measurement_id,
+        require_consent=row.analytics_require_consent,
+        debug_mode=row.analytics_debug_mode,
     )
 
 

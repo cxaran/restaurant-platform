@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { getPublicAnalyticsConfig } from "@/core/restaurant-api/analytics";
 import type { PublicLegalCoupon } from "@/core/restaurant-api/legal";
 import { getPublicLegalTerms } from "@/core/restaurant-api/legal";
 import { formatMoney } from "@/core/restaurant-api/theme";
@@ -44,7 +45,10 @@ function Section({ title, children }: Readonly<{ title: string; children: ReactN
 }
 
 export default async function TerminosPage() {
-  const terms = await getPublicLegalTerms();
+  const [terms, analytics] = await Promise.all([
+    getPublicLegalTerms(),
+    getPublicAnalyticsConfig(),
+  ]);
 
   if (terms === null) {
     return (
@@ -244,6 +248,22 @@ export default async function TerminosPage() {
           <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{terms.privacy_extra}</p>
         ) : null}
       </Section>
+
+      {analytics?.enabled ? (
+        <Section title="Cookies y analítica">
+          <p style={{ margin: 0 }}>
+            Este sitio usa una cookie de sesión <strong>necesaria</strong> para
+            mantener tu cuenta iniciada; no depende de tu consentimiento. Además,
+            usamos <strong>cookies analíticas</strong> (Google Analytics) para
+            entender de forma agregada cómo se usa el sitio y mejorarlo
+            {analytics.require_consent
+              ? "; solo se activan si las aceptas en el aviso de cookies y puedes cambiar tu preferencia en cualquier momento desde el enlace «Cookies» al pie de la página"
+              : ""}
+            . La medición no incluye tu nombre, teléfono, correo, dirección ni el
+            contenido de tus pedidos.
+          </p>
+        </Section>
+      ) : null}
     </div>
   );
 }

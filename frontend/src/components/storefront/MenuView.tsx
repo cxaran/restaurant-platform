@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { trackEvent } from "@/core/analytics/analytics";
 import type { PublicMenuCategory, PublicProduct } from "@/core/restaurant-api/contracts";
 import { formatMoney, publicFileUrl } from "@/core/restaurant-api/theme";
 import { useCart } from "@/core/storefront/cart";
@@ -227,7 +228,10 @@ export function MenuView({
             aria-selected={active === category.id}
             className="sf-chip"
             data-active={active === category.id}
-            onClick={() => setActive(category.id)}
+            onClick={() => {
+              setActive(category.id);
+              trackEvent("view_menu_category", { category_name: category.name });
+            }}
           >
             {category.name}
           </button>

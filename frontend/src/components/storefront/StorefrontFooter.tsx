@@ -6,6 +6,8 @@
 
 import Link from "next/link";
 
+import { CookiePreferencesLink } from "@/components/analytics/CookiePreferencesLink";
+import { FooterPhoneLink } from "@/components/storefront/FooterPhoneLink";
 import type { PublicBusiness } from "@/core/restaurant-api/contracts";
 import type { FooterVM } from "@/core/restaurant-api/view-models";
 
@@ -113,22 +115,21 @@ export function StorefrontFooter({
     ) : null;
 
   const phonesBlock = phones.map((phone) => (
-    <a
+    <FooterPhoneLink
       key={phone.phone_normalized}
       href={phoneHref(phone)}
-      rel="noopener noreferrer"
-      target={phone.is_whatsapp ? "_blank" : undefined}
-      className="sf-ft-phone"
-    >
-      {phone.is_whatsapp ? "💬 WhatsApp " : "📞 "}
-      {phone.phone}
-    </a>
+      isWhatsapp={phone.is_whatsapp}
+      label={phone.phone}
+    />
   ));
 
   const legal = (
     <div className="sf-ft-legal">
       <span>© {year} {name} · Todos los derechos reservados</span>
       <Link href="/terminos">Términos y condiciones</Link>
+      {/* Preferencia de cookies analíticas: solo aparece si la instalación
+          gestiona consentimiento (analítica activa + consentimiento exigido). */}
+      <CookiePreferencesLink />
     </div>
   );
 

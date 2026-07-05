@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { LocationPicker, type PickedPoint } from "@/components/map/LocationPicker";
 import { useShippingQuote } from "@/components/shipping/use-shipping-quote";
+import { trackEvent } from "@/core/analytics/analytics";
 import { ApiRequestError } from "@/core/api/api-error";
 import { browserApi } from "@/core/api/browser-client";
 import {
@@ -99,6 +100,14 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
   // en créditos, SIN envío (solo pickup), sin códigos de descuento.
   const credits = mode === "credits";
   const effectiveFulfillment = credits ? "pickup" : fulfillment;
+
+  // Analítica: inicio del checkout, una sola vez por montaje y con carrito.
+  const beganCheckoutRef = useRef(false);
+  useEffect(() => {
+    if (beganCheckoutRef.current || lines.length === 0) return;
+    beganCheckoutRef.current = true;
+    trackEvent("begin_checkout", { item_count: lines.length, purchase_mode: mode });
+  }, [lines.length, mode]);
 
   // Cotización vigente: se descarta sola si el carrito cambió o el modo pasó a
   // créditos (el código NUNCA viaja en credits). Derivada para que el envío y
@@ -391,6 +400,17 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
           }
         }
       }
+      // CONVERSIÓN PRINCIPAL: solo tras la confirmación real del backend.
+      // Metadatos técnicos únicamente — jamás nombre, teléfono ni dirección.
+      trackEvent("purchase", {
+        transaction_id: order.id,
+        ...(credits
+          ? {}
+          : { value: totalWithShipping ?? estimatedTotal, currency: "MXN" }),
+        item_count: lines.length,
+        fulfillment_type: effectiveFulfillment,
+        purchase_mode: mode,
+      });
       clear();
       router.push(`/pedidos/${order.id}`);
     } catch (err) {

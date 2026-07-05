@@ -4,8 +4,10 @@ import type { Metadata } from "next";
 import { Alfa_Slab_One, Archivo, Baloo_2, Lora } from "next/font/google";
 import type { ReactNode } from "react";
 
+import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { BrandLockup } from "@/components/storefront/BrandLockup";
 import { StorefrontThemeProvider } from "@/components/storefront/StorefrontThemeProvider";
+import { getPublicAnalyticsConfig } from "@/core/restaurant-api/analytics";
 import { getPublicBusiness } from "@/core/restaurant-api/business";
 import {
   businessFaviconMetadata,
@@ -57,9 +59,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PublicAuthLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const [business, tokens] = await Promise.all([
+  const [business, tokens, analytics] = await Promise.all([
     getPublicBusiness(),
     resolveThemeTokens(),
+    getPublicAnalyticsConfig(),
   ]);
   // Logo dinámico SOLO si es raster verificado (§D): SVG/otros → monograma.
   const safeLogoUrl = await resolveSafeImagePath(business?.logo_file_id);
@@ -69,6 +72,7 @@ export default async function PublicAuthLayout({
 
   return (
     <StorefrontThemeProvider tokens={tokens} fontVars={fontVars}>
+      <AnalyticsProvider config={analytics} />
       <div className="sf-auth">
         <aside className="sf-auth-brand">
           {/* Móvil (8a): marca apilada y centrada en la banda oscura. */}

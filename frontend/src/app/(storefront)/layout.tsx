@@ -4,12 +4,14 @@ import type { Metadata } from "next";
 import { Alfa_Slab_One, Archivo, Baloo_2, Lora } from "next/font/google";
 import type { ReactNode } from "react";
 
+import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { CreditsModeGuard } from "@/components/storefront/CreditsModeGuard";
 import { GlobalRibbon } from "@/components/storefront/Highlights";
 import { StorefrontFooter } from "@/components/storefront/StorefrontFooter";
 import { StorefrontHeader } from "@/components/storefront/StorefrontHeader";
 import { StorefrontThemeProvider } from "@/components/storefront/StorefrontThemeProvider";
 import { getSession } from "@/core/auth/session";
+import { getPublicAnalyticsConfig } from "@/core/restaurant-api/analytics";
 import { getPublicBusiness } from "@/core/restaurant-api/business";
 import {
   buildStorefrontMetadata,
@@ -51,11 +53,12 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function StorefrontLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const [business, session, site, globalHighlights] = await Promise.all([
+  const [business, session, site, globalHighlights, analytics] = await Promise.all([
     getPublicBusiness(),
     getSession(),
     getPublicStorefrontSite(),
     getPublicHighlights("global"),
+    getPublicAnalyticsConfig(),
   ]);
   // Logo dinámico SOLO si es raster verificado (§D): SVG → monograma textual.
   const safeLogoUrl = await resolveSafeImagePath(business?.logo_file_id);
@@ -64,6 +67,7 @@ export default async function StorefrontLayout({
   return (
     <PublicSessionProvider initialSession={session}>
       <CartProvider>
+        <AnalyticsProvider config={analytics} />
         <CreditsModeGuard />
         <StorefrontThemeProvider tokens={site?.theme_tokens ?? FALLBACK_TOKENS} fontVars={fontVars}>
           {/* Cinta global (highlight `global`): SIEMPRE sobre el header. */}

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { FieldError } from "@/components/ui/FieldError";
 import { Input } from "@/components/ui/Input";
 import { AuthAlert, AuthLabel } from "@/features/auth/PublicAuthShell";
+import { trackEvent } from "@/core/analytics/analytics";
 import { ApiRequestError } from "@/core/api/api-error";
 import { mapAuthFieldErrors, type AuthFieldErrors } from "@/core/auth/public-auth";
 import { completeRegistration } from "@/core/auth/public-auth-client";
@@ -44,6 +45,8 @@ export function RegisterCompleteForm() {
         password: String(data.get("password") ?? ""),
         confirm_password: String(data.get("confirm_password") ?? ""),
       });
+      // Conversión secundaria: registro completado (solo el método, cero PII).
+      trackEvent("sign_up", { method: "email_token" });
       // Sin sesión automática: el usuario inicia sesión normalmente.
       router.replace("/login");
     } catch (caught) {

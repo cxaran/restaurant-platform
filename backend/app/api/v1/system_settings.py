@@ -76,6 +76,10 @@ def _serialize_read(session: SessionDep, row: SystemSettings) -> SystemSettingsR
         email_last_test_status=row.email_last_test_status,
         email_last_test_error=row.email_last_test_error,
         email_transport_reason=transport_unavailable_reason(row),
+        analytics_enabled=row.analytics_enabled,
+        analytics_ga4_measurement_id=row.analytics_ga4_measurement_id,
+        analytics_require_consent=row.analytics_require_consent,
+        analytics_debug_mode=row.analytics_debug_mode,
         environment=settings.environment,
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -325,6 +329,20 @@ def update_system_settings(
                 "google_login_requires_credentials",
                 "Configura el client ID y el client secret de Google antes de "
                 "habilitar el inicio de sesión con Google.",
+            )
+
+    # Activar la analítica exige un ID de medición (en la fila o en este mismo
+    # PATCH): un switch sin ID sería medición muerta que aparenta funcionar.
+    if data.get("analytics_enabled") is True:
+        has_measurement_id = bool(
+            data.get("analytics_ga4_measurement_id") or row.analytics_ga4_measurement_id
+        )
+        if not has_measurement_id:
+            api_error(
+                status.HTTP_409_CONFLICT,
+                "analytics_requires_measurement_id",
+                "Configura el ID de medición de GA4 (G-XXXXXXXXXX) antes de "
+                "habilitar la analítica del sitio.",
             )
 
     # Secretos WRITE-ONLY: valor -> cifrar y reemplazar; null -> borrar; omitido ->

@@ -3,6 +3,7 @@
 import { FormEvent, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { trackEvent } from "@/core/analytics/analytics";
 import { ApiRequestError } from "@/core/api/api-error";
 import { login, verifyLogin } from "@/core/auth/public-auth-client";
 import { AuthAlert, AuthLabel } from "@/features/auth/PublicAuthShell";
@@ -28,7 +29,9 @@ export function LoginForm() {
     message: string;
   } | null>(null);
 
-  function finishLogin() {
+  function finishLogin(method: "password" | "email_code") {
+    // Analítica: solo el método, jamás el correo ni el destino de redirección.
+    trackEvent("login", { method });
     // Solo rutas internas de un segmento inicial ("/checkout", "/pedidos/…"):
     // nunca URLs absolutas ni "//host" — evita open-redirect.
     const next = searchParams.get("next");
@@ -53,7 +56,7 @@ export function LoginForm() {
         setVerification({ mode: outcome.verification_mode, message: outcome.message });
         return;
       }
-      finishLogin();
+      finishLogin("password");
     } catch (caught) {
       if (caught instanceof ApiRequestError) {
         setError(caught.body.message);
@@ -69,7 +72,7 @@ export function LoginForm() {
     const code = String(new FormData(event.currentTarget).get("code") ?? "");
     try {
       await verifyLogin(code);
-      finishLogin();
+      finishLogin("email_code");
     } catch (caught) {
       if (caught instanceof ApiRequestError) {
         setError(caught.body.message);

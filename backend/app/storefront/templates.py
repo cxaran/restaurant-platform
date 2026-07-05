@@ -149,7 +149,7 @@ HighlightSurface = Literal[
 HighlightAnimation = Literal[
     "none", "fade_in", "slide_down", "rise", "pulse", "shimmer", "marquee"
 ]
-HighlightScheme = Literal["brand", "soft", "accent"]
+HighlightScheme = Literal["brand", "soft", "accent", "success"]
 
 
 class HighlightWrite(_Config):

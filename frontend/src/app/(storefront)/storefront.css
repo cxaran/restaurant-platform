@@ -1479,6 +1479,13 @@
   border: 1px solid color-mix(in srgb, var(--sf-accent) 55%, transparent);
 }
 .sf-hl[data-scheme="accent"] .sf-hl-cta { background: var(--sf-brand); color: var(--sf-text-inverse); }
+/* Tono de confianza/éxito (11c: chips «Pago seguro» del checkout en verde). */
+.sf-hl[data-scheme="success"] {
+  background: color-mix(in srgb, var(--sf-success) 12%, var(--sf-surface));
+  color: color-mix(in srgb, var(--sf-success) 80%, var(--sf-text));
+  border: 1px solid color-mix(in srgb, var(--sf-success) 45%, transparent);
+}
+.sf-hl[data-scheme="success"] .sf-hl-cta { background: var(--sf-success); color: var(--sf-text-inverse); }
 
 /* Variantes de slot (tamaño/posición: SIEMPRE del diseño). */
 .sf-hl[data-variant="ribbon"] {

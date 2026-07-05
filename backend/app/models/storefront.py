@@ -43,7 +43,7 @@ SECTION_COLOR_SCHEMES = ("surface", "surface_muted", "brand", "brand_inverse", "
 
 HIGHLIGHT_SURFACES = ("global", "home", "login", "register", "cart", "checkout", "account")
 HIGHLIGHT_ANIMATIONS = ("none", "fade_in", "slide_down", "rise", "pulse", "shimmer", "marquee")
-HIGHLIGHT_SCHEMES = ("brand", "soft", "accent")
+HIGHLIGHT_SCHEMES = ("brand", "soft", "accent", "success")
 
 FOOTER_TEMPLATES = ("barra", "columnas", "centrado")
 FOOTER_SCHEMES = ("dark", "soft", "brand")

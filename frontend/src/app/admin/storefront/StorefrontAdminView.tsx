@@ -867,7 +867,7 @@ function HighlightsTab({ config, tokens, canEdit, busy, run }: TabProps) {
                 <SelectInput value={form.animation ?? "fade_in"} options={ANIMATIONS} onChange={(next) => set({ animation: next })} />
               </Field>
               <Field label="Tono">
-                <SelectInput value={form.color_scheme ?? "brand"} options={["brand", "soft", "accent"] as const} onChange={(next) => set({ color_scheme: next })} />
+                <SelectInput value={form.color_scheme ?? "brand"} options={["brand", "soft", "accent", "success"] as const} onChange={(next) => set({ color_scheme: next })} />
               </Field>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>

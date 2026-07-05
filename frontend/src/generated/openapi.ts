@@ -2210,6 +2210,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/site/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Public Analytics Config
+         * @description Config pública de analítica (GA4) para el sitio.
+         *
+         *     Apagada (o sin ID de medición) devuelve solo ``enabled: false``: el frontend
+         *     no carga ningún script. El ID de medición de GA4 es un identificador público
+         *     por diseño de Google; ningún secreto viaja por aquí.
+         */
+        get: operations["read_public_analytics_config_api_v1_public_site_analytics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/menu": {
         parameters: {
             query?: never;
@@ -3769,6 +3793,8 @@ export interface components {
             allow_pickup: boolean;
             /** Allow Counter Sales */
             allow_counter_sales: boolean;
+            /** Credits Enabled */
+            credits_enabled: boolean;
             /** Allow Customer Registration */
             allow_customer_registration: boolean;
             /** Require Registered User For Checkout */
@@ -3796,6 +3822,8 @@ export interface components {
             allow_pickup?: boolean | null;
             /** Allow Counter Sales */
             allow_counter_sales?: boolean | null;
+            /** Credits Enabled */
+            credits_enabled?: boolean | null;
             /** Allow Customer Registration */
             allow_customer_registration?: boolean | null;
             /** Require Registered User For Checkout */
@@ -5032,7 +5060,7 @@ export interface components {
              * @default brand
              * @enum {string}
              */
-            color_scheme: "brand" | "soft" | "accent";
+            color_scheme: "brand" | "soft" | "accent" | "success";
             /** Starts At */
             starts_at?: string | null;
             /** Ends At */
@@ -6443,6 +6471,31 @@ export interface components {
             /** Activo */
             is_active?: boolean | null;
         };
+        /**
+         * PublicAnalyticsConfig
+         * @description Config PÚBLICA de analítica para el sitio (GET /public/site/analytics).
+         *
+         *     Apagada, solo devuelve ``enabled: false`` (sin ID ni opciones). El ID de
+         *     medición de GA4 es público por diseño de Google; jamás viaja aquí ningún
+         *     secreto (las claves de Measurement Protocol, si algún día existen, son
+         *     exclusivas del servidor).
+         */
+        PublicAnalyticsConfig: {
+            /** Enabled */
+            enabled: boolean;
+            /** Measurement Id */
+            measurement_id?: string | null;
+            /**
+             * Require Consent
+             * @default true
+             */
+            require_consent: boolean;
+            /**
+             * Debug Mode
+             * @default false
+             */
+            debug_mode: boolean;
+        };
         /** PublicBusinessPhone */
         PublicBusinessPhone: {
             /** Label */
@@ -6485,6 +6538,8 @@ export interface components {
             allow_delivery: boolean;
             /** Allow Pickup */
             allow_pickup: boolean;
+            /** Credits Enabled */
+            credits_enabled: boolean;
             /** Minimum Delivery Order Amount */
             minimum_delivery_order_amount?: string | null;
             /** Free Shipping Global From Amount */
@@ -6766,6 +6821,25 @@ export interface components {
             phones?: components["schemas"]["PublicBusinessPhone"][];
             /** Coupons */
             coupons?: components["schemas"]["PublicLegalCoupon"][];
+            /**
+             * Allow Delivery
+             * @default true
+             */
+            allow_delivery: boolean;
+            /**
+             * Allow Pickup
+             * @default true
+             */
+            allow_pickup: boolean;
+            /** Minimum Delivery Order Amount */
+            minimum_delivery_order_amount?: string | null;
+            /** Free Shipping Global From Amount */
+            free_shipping_global_from_amount?: string | null;
+            /**
+             * Credits Enabled
+             * @default true
+             */
+            credits_enabled: boolean;
             /** Terms Extra */
             terms_extra?: string | null;
             /** Privacy Extra */
@@ -7882,6 +7956,14 @@ export interface components {
             email_last_test_error?: string | null;
             /** Email Transport Reason */
             email_transport_reason?: string | null;
+            /** Analytics Enabled */
+            analytics_enabled: boolean;
+            /** Analytics Ga4 Measurement Id */
+            analytics_ga4_measurement_id?: string | null;
+            /** Analytics Require Consent */
+            analytics_require_consent: boolean;
+            /** Analytics Debug Mode */
+            analytics_debug_mode: boolean;
             /** Environment */
             environment: string;
             /**
@@ -7951,6 +8033,26 @@ export interface components {
             email_smtp_tls?: boolean | null;
             /** SSL directo */
             email_smtp_ssl?: boolean | null;
+            /**
+             * Analítica del sitio (GA4)
+             * @description Medir visitas y acciones del sitio público con Google Analytics 4. Requiere el ID de medición. El panel y el admin nunca se miden. Guía completa: docs/analytics-ga4.md.
+             */
+            analytics_enabled?: boolean | null;
+            /**
+             * ID de medición de GA4
+             * @description Formato G-XXXXXXXXXX. En Google Analytics: Administración → Flujos de datos → tu flujo web → ID de medición. Es un identificador público.
+             */
+            analytics_ga4_measurement_id?: string | null;
+            /**
+             * Exigir consentimiento de cookies
+             * @description Mostrar un aviso de cookies analíticas: hasta que el visitante acepte no se carga Google Analytics ni se envía ningún evento.
+             */
+            analytics_require_consent?: boolean | null;
+            /**
+             * Modo de depuración (DebugView)
+             * @description Enviar los eventos marcados para GA4 DebugView y así validar la medición. Apagar en operación normal.
+             */
+            analytics_debug_mode?: boolean | null;
             /**
              * Inicio de sesión con Google
              * @description Muestra 'Continuar con Google' en el login. Requiere client ID y secret configurados. El alta de cuentas nuevas exige además el registro público habilitado.
@@ -13570,6 +13672,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicLegalTermsRead"];
+                };
+            };
+        };
+    };
+    read_public_analytics_config_api_v1_public_site_analytics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicAnalyticsConfig"];
                 };
             };
         };

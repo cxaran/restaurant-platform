@@ -75,7 +75,14 @@ export function HighlightBanner({
     >
       {anim === "shimmer" ? <span className="sf-hl-shimmer" aria-hidden /> : null}
       {highlight.icon ? (
-        <span className="sf-hl-icon" data-pulse={anim === "pulse" ? "1" : "0"} aria-hidden>
+        // El nudge del carrito (11c) combina shimmer en la banda + pulse en el
+        // badge: con una sola animación elegida, el badge también late cuando la
+        // banda hace shimmer.
+        <span
+          className="sf-hl-icon"
+          data-pulse={anim === "pulse" || (resolved === "nudge" && anim === "shimmer") ? "1" : "0"}
+          aria-hidden
+        >
           {highlight.icon}
         </span>
       ) : null}

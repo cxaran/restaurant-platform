@@ -41,6 +41,10 @@ RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# El output standalone NO incluye public/: hay que copiarlo aparte o los
+# estáticos (service worker /sw.js, íconos PWA, /sql-wasm.wasm del explorador)
+# se sirven 404. El server.js del standalone sí los sirve si están junto a él.
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 USER nextjs
 EXPOSE 3000

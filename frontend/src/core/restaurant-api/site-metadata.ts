@@ -56,7 +56,9 @@ export async function businessFaviconMetadata(): Promise<Metadata> {
   try {
     const business = await getPublicBusiness();
     const icon = await resolveSafeFaviconPath(business?.logo_file_id);
-    return icon ? { icons: { icon } } : {};
+    // `apple` = mismo logo: el apple-touch-icon de la PWA instalada en iOS (los
+    // layouts hijos sobrescriben `icons`, así que se declara en cada sección).
+    return icon ? { icons: { icon, apple: icon } } : {};
   } catch {
     return {};
   }
@@ -70,9 +72,12 @@ export async function buildStorefrontMetadata(
   const title = site?.meta.title ?? business?.trade_name ?? "Restaurante";
   const description = site?.meta.description ?? business?.slogan ?? undefined;
   // Favicon: el del sitio configurado y, en su defecto, el logo del negocio.
+  const logo = await resolveSafeFaviconPath(business?.logo_file_id);
   const favicon =
-    (await resolveSafeFaviconPath(site?.meta.favicon_file_id)) ??
-    (await resolveSafeFaviconPath(business?.logo_file_id));
+    (await resolveSafeFaviconPath(site?.meta.favicon_file_id)) ?? logo;
+  // apple-touch-icon (PWA en iOS): preferimos el LOGO del negocio antes que el
+  // favicon del sitio (que puede ser diminuto); Apple recomienda 180x180.
+  const appleIcon = logo ?? favicon;
   const ogImage = site?.meta.social_image_file_id
     ? `/api/v1/public/files/${site.meta.social_image_file_id}`
     : undefined;
@@ -85,6 +90,6 @@ export async function buildStorefrontMetadata(
       siteName: business?.trade_name ?? undefined,
       images: ogImage ? [{ url: ogImage }] : undefined,
     },
-    icons: favicon ? { icon: favicon } : undefined,
+    icons: favicon ? { icon: favicon, apple: appleIcon ?? favicon } : undefined,
   };
 }

@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Alfa_Slab_One, Archivo } from "next/font/google";
 
+import { getPublicBusiness } from "@/core/restaurant-api/business";
+import { resolveSafeImagePath } from "@/core/restaurant-api/site-metadata";
+
 import "./globals.css";
 
 // Fuentes de la identidad visual (mismas del storefront): Archivo para el
@@ -13,20 +16,31 @@ const slab = Alfa_Slab_One({
   variable: "--font-tt-slab",
 });
 
-export const metadata: Metadata = {
-  title: "Restaurant Platform",
-  description: "Shell base reutilizable para productos Restaurant Platform",
-  // PWA: manifest + metadatos de Apple (iOS solo recibe Web Push desde la app
-  // instalada en la pantalla de inicio; ver docs/producto/notificaciones-y-roles.md).
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-  },
-  icons: {
-    apple: "/icons/icon-192.png",
-  },
-};
+// Metadata DINÁMICA para la marca real de la app instalada: iOS toma el nombre
+// de la pantalla de inicio de `appleWebApp.title` y el ícono del
+// `apple-touch-icon` (NO del manifest). Se derivan del negocio; cualquier fallo
+// degrada al placeholder (getPublicBusiness ya devuelve null en bootstrap).
+export async function generateMetadata(): Promise<Metadata> {
+  const business = await getPublicBusiness();
+  const name = business?.trade_name || "Restaurant Platform";
+  const appleIcon =
+    (await resolveSafeImagePath(business?.logo_file_id)) ?? "/icons/icon-192.png";
+  return {
+    title: name,
+    description: business?.slogan || "Shell base reutilizable para productos Restaurant Platform",
+    // PWA: manifest + metadatos de Apple (iOS solo recibe Web Push desde la app
+    // instalada en la pantalla de inicio; ver docs/producto/notificaciones-y-roles.md).
+    manifest: "/manifest.webmanifest",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: name,
+    },
+    icons: {
+      apple: appleIcon,
+    },
+  };
+}
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

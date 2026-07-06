@@ -65,6 +65,82 @@ THEME_PRESETS: dict[str, dict] = {
         "shape": {"button_radius": "rounded", "card_radius": "large", "image_radius": "large"},
         "effects": {"card_shadow": "none", "button_style": "solid", "page_background_style": "flat"},
     },
+    "menta": {
+        "colors": {
+            "brand_primary": "#059669",
+            "brand_secondary": "#064E3B",
+            "accent": "#F59E0B",
+            "surface": "#F0FDF4",
+            "surface_muted": "#DCFCE7",
+            "text_primary": "#052E23",
+            "text_inverse": "#FFFFFF",
+            "success": "#16A34A",
+        },
+        "typography": {
+            "font_family_key": "friendly_rounded",
+            "heading_weight": "700",
+            "body_weight": "400",
+        },
+        "shape": {"button_radius": "rounded", "card_radius": "medium", "image_radius": "medium"},
+        "effects": {"card_shadow": "soft", "button_style": "solid", "page_background_style": "flat"},
+    },
+    "coral": {
+        "colors": {
+            "brand_primary": "#E11D48",
+            "brand_secondary": "#4C0519",
+            "accent": "#FB923C",
+            "surface": "#FFF1F2",
+            "surface_muted": "#FFE4E6",
+            "text_primary": "#4C0519",
+            "text_inverse": "#FFFFFF",
+            "success": "#16A34A",
+        },
+        "typography": {
+            "font_family_key": "friendly_rounded",
+            "heading_weight": "800",
+            "body_weight": "400",
+        },
+        "shape": {"button_radius": "pill", "card_radius": "large", "image_radius": "large"},
+        "effects": {"card_shadow": "soft", "button_style": "solid", "page_background_style": "flat"},
+    },
+    "clasico": {
+        "colors": {
+            "brand_primary": "#7C2D12",
+            "brand_secondary": "#1C1917",
+            "accent": "#B45309",
+            "surface": "#FAF6EF",
+            "surface_muted": "#F0E9DC",
+            "text_primary": "#292524",
+            "text_inverse": "#FAF6EF",
+            "success": "#15803D",
+        },
+        "typography": {
+            "font_family_key": "classic_serif",
+            "heading_weight": "700",
+            "body_weight": "400",
+        },
+        "shape": {"button_radius": "rounded", "card_radius": "medium", "image_radius": "medium"},
+        "effects": {"card_shadow": "soft", "button_style": "solid", "page_background_style": "flat"},
+    },
+    "marino": {
+        "colors": {
+            "brand_primary": "#1E3A8A",
+            "brand_secondary": "#0F172A",
+            "accent": "#CA8A04",
+            "surface": "#F8FAFC",
+            "surface_muted": "#EEF2F7",
+            "text_primary": "#0F172A",
+            "text_inverse": "#FFFFFF",
+            "success": "#15803D",
+        },
+        "typography": {
+            "font_family_key": "classic_serif",
+            "heading_weight": "700",
+            "body_weight": "400",
+        },
+        "shape": {"button_radius": "rounded", "card_radius": "large", "image_radius": "medium"},
+        "effects": {"card_shadow": "soft", "button_style": "solid", "page_background_style": "flat"},
+    },
 }
 
 DEFAULT_PRESET = "calido"

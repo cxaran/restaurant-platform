@@ -54,3 +54,8 @@ passlib[bcrypt]==1.7.4
 # Web Push (VAPID) hacia los navegadores suscritos (services/push_service.py):
 # cifrado RFC 8291 + firma VAPID. Trae py-vapid y http-ece.
 pywebpush==2.3.0
+
+
+# Generación del ícono cuadrado de la PWA a partir del logo (services/pwa_icon_service.py):
+# centra y rellena el logo a un PNG cuadrado bajo demanda. Wheels autocontenidos.
+Pillow==12.3.0

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Alfa_Slab_One, Archivo } from "next/font/google";
 
 import { getPublicBusiness } from "@/core/restaurant-api/business";
-import { resolveSafeImagePath } from "@/core/restaurant-api/site-metadata";
+import { resolveSquareIconPath } from "@/core/restaurant-api/site-metadata";
 
 import "./globals.css";
 
@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const business = await getPublicBusiness();
   const name = business?.trade_name || "Restaurant Platform";
   const appleIcon =
-    (await resolveSafeImagePath(business?.logo_file_id)) ?? "/icons/icon-192.png";
+    (await resolveSquareIconPath(business?.logo_file_id, 180)) ?? "/icons/icon-192.png";
   return {
     title: name,
     description: business?.slogan || "Shell base reutilizable para productos Restaurant Platform",

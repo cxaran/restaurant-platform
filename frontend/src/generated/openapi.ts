@@ -2393,6 +2393,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/business/pwa-icon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Pwa Icon
+         * @description Ícono CUADRADO de la PWA derivado del logo del negocio, generado al vuelo.
+         *
+         *     Centra el logo (sin deformar) en un lienzo cuadrado con márgenes
+         *     transparentes (o el color ``bg``) y lo escala a ``size``. 404 si no hay logo
+         *     o no es una imagen legible → el manifest cae al ícono placeholder.
+         */
+        get: operations["read_pwa_icon_api_v1_public_business_pwa_icon_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/sales-by-hour": {
         parameters: {
             query?: never;
@@ -14098,6 +14122,39 @@ export interface operations {
             path: {
                 file_id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_pwa_icon_api_v1_public_business_pwa_icon_get: {
+        parameters: {
+            query?: {
+                size?: number;
+                bg?: string;
+                v?: string | null;
+            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

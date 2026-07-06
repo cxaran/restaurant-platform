@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { getPublicBusiness } from "@/core/restaurant-api/business";
-import { resolveSafeImagePath } from "@/core/restaurant-api/site-metadata";
+import { resolveSquareIconPath } from "@/core/restaurant-api/site-metadata";
 import { getPublicStorefrontSite } from "@/core/restaurant-api/storefront";
 import { FALLBACK_TOKENS } from "@/core/restaurant-api/view-models";
 
@@ -10,8 +10,9 @@ import { FALLBACK_TOKENS } from "@/core/restaurant-api/view-models";
 // la MARCA REAL del negocio al instalarlo: nombre + logo + colores del tema.
 //
 // - Nombre/descr.: del negocio configurado (`GET /public/business`).
-// - Íconos: el LOGO del negocio si es raster seguro (misma política que el
-//   favicon; SVG bloqueado por H8). Si no hay logo válido, cae a los íconos
+// - Íconos: el LOGO del negocio CUADRADO (centrado y con márgenes
+//   transparentes vía /public/business/pwa-icon; misma política raster que el
+//   favicon, SVG bloqueado por H8). Si no hay logo válido, cae a los íconos
 //   placeholder estáticos. El maskable siempre usa el placeholder (recorte
 //   circular seguro; un logo cualquiera se cortaría).
 // - Colores: del tema publicado (`GET /public/storefront/site` → theme_tokens):
@@ -28,14 +29,15 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const themeColor = colors.brand_primary ?? FALLBACK_TOKENS.colors.brand_primary;
   const backgroundColor = colors.surface ?? FALLBACK_TOKENS.colors.surface;
 
-  const logo = await resolveSafeImagePath(business?.logo_file_id);
-  // Si hay logo válido lo usamos como ícono principal (declarado en los tamaños
-  // que Android busca para el launcher/splash, aunque la imagen original no
-  // sea exactamente cuadrada); el maskable queda en el placeholder.
-  const icons: MetadataRoute.Manifest["icons"] = logo
+  // Íconos cuadrados generados del logo (192 y 512); el maskable queda en el
+  // placeholder (recorte circular seguro). Si no hay logo raster, todo cae al
+  // placeholder estático.
+  const icon192 = await resolveSquareIconPath(business?.logo_file_id, 192);
+  const icon512 = await resolveSquareIconPath(business?.logo_file_id, 512);
+  const icons: MetadataRoute.Manifest["icons"] = icon192 && icon512
     ? [
-        { src: logo, sizes: "192x192", purpose: "any" },
-        { src: logo, sizes: "512x512", purpose: "any" },
+        { src: icon192, sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: icon512, sizes: "512x512", type: "image/png", purpose: "any" },
         {
           src: "/icons/icon-512.png",
           sizes: "512x512",

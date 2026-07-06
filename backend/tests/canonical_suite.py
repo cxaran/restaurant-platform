@@ -51,6 +51,7 @@ BACKEND_CANONICAL_TEST_MODULES = (
     "backend.tests.test_storefront",
     "backend.tests.test_notifications",
     "backend.tests.test_push_notifications",
+    "backend.tests.test_pwa_icon",
     "backend.tests.test_profiles",
     "backend.tests.test_discounts",
     "backend.tests.test_operations",

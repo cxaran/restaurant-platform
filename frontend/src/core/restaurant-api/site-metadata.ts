@@ -48,6 +48,21 @@ export async function resolveSafeFaviconPath(
 }
 
 /**
+ * URL del ícono CUADRADO de la PWA (logo centrado + márgenes transparentes,
+ * generado al vuelo por el backend). Devuelve null si el logo no es un raster
+ * seguro (misma verificación que el favicon) → el llamador cae al placeholder.
+ * ``v`` = el propio file id, para refrescar la caché cuando cambie el logo.
+ */
+export async function resolveSquareIconPath(
+  fileId: string | null | undefined,
+  size: number,
+): Promise<string | null> {
+  const safe = await resolveSafeFaviconPath(fileId);
+  if (!safe) return null;
+  return `/api/v1/public/business/pwa-icon?size=${size}&v=${fileId}`;
+}
+
+/**
  * Favicon institucional para las secciones sin head propio (panel, admin, auth):
  * el LOGO del negocio, con la misma política raster segura. Cualquier fallo →
  * metadata vacía (queda el head estático del root layout).
@@ -56,9 +71,10 @@ export async function businessFaviconMetadata(): Promise<Metadata> {
   try {
     const business = await getPublicBusiness();
     const icon = await resolveSafeFaviconPath(business?.logo_file_id);
-    // `apple` = mismo logo: el apple-touch-icon de la PWA instalada en iOS (los
-    // layouts hijos sobrescriben `icons`, así que se declara en cada sección).
-    return icon ? { icons: { icon, apple: icon } } : {};
+    // apple-touch-icon de la PWA en iOS = ícono CUADRADO (logo centrado); los
+    // layouts hijos sobrescriben `icons`, así que se declara en cada sección.
+    const apple = await resolveSquareIconPath(business?.logo_file_id, 180);
+    return icon ? { icons: { icon, apple: apple ?? icon } } : {};
   } catch {
     return {};
   }
@@ -75,9 +91,10 @@ export async function buildStorefrontMetadata(
   const logo = await resolveSafeFaviconPath(business?.logo_file_id);
   const favicon =
     (await resolveSafeFaviconPath(site?.meta.favicon_file_id)) ?? logo;
-  // apple-touch-icon (PWA en iOS): preferimos el LOGO del negocio antes que el
-  // favicon del sitio (que puede ser diminuto); Apple recomienda 180x180.
-  const appleIcon = logo ?? favicon;
+  // apple-touch-icon (PWA en iOS): ícono CUADRADO del logo (centrado, 180x180
+  // como recomienda Apple), con el logo/favicon crudo como respaldo.
+  const appleIcon =
+    (await resolveSquareIconPath(business?.logo_file_id, 180)) ?? logo ?? favicon;
   const ogImage = site?.meta.social_image_file_id
     ? `/api/v1/public/files/${site.meta.social_image_file_id}`
     : undefined;

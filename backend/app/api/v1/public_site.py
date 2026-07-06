@@ -8,9 +8,10 @@ cuando el administrador edita la configuración.
 
 import uuid
 from datetime import datetime
+from typing import Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 from sqlmodel import select
 
 from backend.app.api.resource_actions import api_error, serialize_many
@@ -43,6 +44,7 @@ from backend.app.services.business_service import (
 from backend.app.services.catalog_service import build_public_menu
 from backend.app.services.discount_service import list_public_coupons
 from backend.app.services.file_service import get_active_file
+from backend.app.services.pwa_icon_service import IconRenderError, build_square_icon
 from backend.app.services.shipping_service import quote_shipping
 from backend.app.utils.utc_now import utc_now
 
@@ -268,6 +270,41 @@ def read_public_file(file_id: uuid.UUID, session: SessionDep, request: Request) 
                 f"filename*=UTF-8''{quote(stored.original_filename)}"
             ),
             "Cache-Control": "public, max-age=86400, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/business/pwa-icon")
+def read_pwa_icon(
+    session: SessionDep,
+    size: int = Query(default=512, ge=48, le=1024),
+    bg: str = Query(default="transparent", max_length=16),
+    v: Optional[str] = Query(default=None, max_length=64),  # cache-buster del manifest
+) -> Response:
+    """Ícono CUADRADO de la PWA derivado del logo del negocio, generado al vuelo.
+
+    Centra el logo (sin deformar) en un lienzo cuadrado con márgenes
+    transparentes (o el color ``bg``) y lo escala a ``size``. 404 si no hay logo
+    o no es una imagen legible → el manifest cae al ícono placeholder.
+    """
+    profile = get_business_profile(session)
+    if profile.logo_file_id is None:
+        api_error(status.HTTP_404_NOT_FOUND, "sin_logo", "El negocio no tiene logo.")
+    stored = get_active_file(session, profile.logo_file_id)
+    if stored is None or stored.kind not in _PUBLIC_FILE_KINDS:
+        api_error(status.HTTP_404_NOT_FOUND, "archivo_no_encontrado", "Logo no encontrado")
+    try:
+        png = build_square_icon(stored.file_content, size=size, background=bg)
+    except IconRenderError:
+        api_error(
+            status.HTTP_404_NOT_FOUND, "logo_no_renderizable", "El logo no es una imagen válida."
+        )
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=86400",
             "X-Content-Type-Options": "nosniff",
         },
     )

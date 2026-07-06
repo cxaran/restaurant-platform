@@ -2405,7 +2405,8 @@ export interface paths {
          * @description Ícono CUADRADO de la PWA derivado del logo del negocio, generado al vuelo.
          *
          *     Centra el logo (sin deformar) en un lienzo cuadrado con márgenes
-         *     transparentes (o el color ``bg``) y lo escala a ``size``. 404 si no hay logo
+         *     transparentes (o el color ``bg``) y lo escala a ``size``. ``padding`` reserva
+         *     la zona segura del ícono adaptable de Android (maskable). 404 si no hay logo
          *     o no es una imagen legible → el manifest cae al ícono placeholder.
          */
         get: operations["read_pwa_icon_api_v1_public_business_pwa_icon_get"];
@@ -14151,6 +14152,7 @@ export interface operations {
             query?: {
                 size?: number;
                 bg?: string;
+                padding?: number;
                 v?: string | null;
             };
             header?: never;

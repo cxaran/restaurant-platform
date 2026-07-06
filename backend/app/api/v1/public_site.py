@@ -280,12 +280,14 @@ def read_pwa_icon(
     session: SessionDep,
     size: int = Query(default=512, ge=48, le=1024),
     bg: str = Query(default="transparent", max_length=16),
+    padding: float = Query(default=0.0, ge=0.0, le=0.45),
     v: Optional[str] = Query(default=None, max_length=64),  # cache-buster del manifest
 ) -> Response:
     """Ícono CUADRADO de la PWA derivado del logo del negocio, generado al vuelo.
 
     Centra el logo (sin deformar) en un lienzo cuadrado con márgenes
-    transparentes (o el color ``bg``) y lo escala a ``size``. 404 si no hay logo
+    transparentes (o el color ``bg``) y lo escala a ``size``. ``padding`` reserva
+    la zona segura del ícono adaptable de Android (maskable). 404 si no hay logo
     o no es una imagen legible → el manifest cae al ícono placeholder.
     """
     profile = get_business_profile(session)
@@ -295,7 +297,9 @@ def read_pwa_icon(
     if stored is None or stored.kind not in _PUBLIC_FILE_KINDS:
         api_error(status.HTTP_404_NOT_FOUND, "archivo_no_encontrado", "Logo no encontrado")
     try:
-        png = build_square_icon(stored.file_content, size=size, background=bg)
+        png = build_square_icon(
+            stored.file_content, size=size, background=bg, padding=padding
+        )
     except IconRenderError:
         api_error(
             status.HTTP_404_NOT_FOUND, "logo_no_renderizable", "El logo no es una imagen válida."

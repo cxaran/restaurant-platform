@@ -56,10 +56,14 @@ export async function resolveSafeFaviconPath(
 export async function resolveSquareIconPath(
   fileId: string | null | undefined,
   size: number,
+  opts?: { bg?: string; padding?: number },
 ): Promise<string | null> {
   const safe = await resolveSafeFaviconPath(fileId);
   if (!safe) return null;
-  return `/api/v1/public/business/pwa-icon?size=${size}&v=${fileId}`;
+  const params = new URLSearchParams({ size: String(size), v: String(fileId) });
+  if (opts?.bg) params.set("bg", opts.bg);
+  if (opts?.padding != null) params.set("padding", String(opts.padding));
+  return `/api/v1/public/business/pwa-icon?${params.toString()}`;
 }
 
 /**

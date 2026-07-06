@@ -29,21 +29,22 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const themeColor = colors.brand_primary ?? FALLBACK_TOKENS.colors.brand_primary;
   const backgroundColor = colors.surface ?? FALLBACK_TOKENS.colors.surface;
 
-  // Íconos cuadrados generados del logo (192 y 512); el maskable queda en el
-  // placeholder (recorte circular seguro). Si no hay logo raster, todo cae al
-  // placeholder estático.
-  const icon192 = await resolveSquareIconPath(business?.logo_file_id, 192);
-  const icon512 = await resolveSquareIconPath(business?.logo_file_id, 512);
-  const icons: MetadataRoute.Manifest["icons"] = icon192 && icon512
+  // Íconos del logo: "any" (192/512) con márgenes TRANSPARENTES, y el maskable
+  // (ícono adaptable de Android) con el logo sobre fondo BLANCO y padding de
+  // zona segura para que la máscara circular no lo recorte. Si no hay logo
+  // raster, todo cae al placeholder estático.
+  const logoId = business?.logo_file_id;
+  const icon192 = await resolveSquareIconPath(logoId, 192);
+  const icon512 = await resolveSquareIconPath(logoId, 512);
+  const maskable = await resolveSquareIconPath(logoId, 512, {
+    bg: "ffffff",
+    padding: 0.14,
+  });
+  const icons: MetadataRoute.Manifest["icons"] = icon192 && icon512 && maskable
     ? [
         { src: icon192, sizes: "192x192", type: "image/png", purpose: "any" },
         { src: icon512, sizes: "512x512", type: "image/png", purpose: "any" },
-        {
-          src: "/icons/icon-512.png",
-          sizes: "512x512",
-          type: "image/png",
-          purpose: "maskable",
-        },
+        { src: maskable, sizes: "512x512", type: "image/png", purpose: "maskable" },
       ]
     : [
         { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

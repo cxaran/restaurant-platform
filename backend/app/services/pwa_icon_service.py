@@ -38,31 +38,43 @@ def _parse_background(background: Optional[str]) -> tuple[int, int, int, int]:
 
 
 def build_square_icon(
-    source: bytes, *, size: int, background: Optional[str] = None
+    source: bytes,
+    *,
+    size: int,
+    background: Optional[str] = None,
+    padding: float = 0.0,
 ) -> bytes:
     """Devuelve un PNG cuadrado ``size``×``size`` con el logo CENTRADO y su
     relación de aspecto intacta; márgenes transparentes (o el color dado).
+
+    ``padding`` (0..0.45) reserva un margen a cada lado como fracción del lado:
+    para el ícono ADAPTABLE de Android (maskable) el logo debe quedar dentro de
+    la zona segura (la máscara circular recorta el borde), así que se usa fondo
+    sólido + padding. Con padding 0 el logo llena el cuadro.
 
     Levanta ``IconRenderError`` si el origen no es una imagen legible.
     """
     from PIL import Image, UnidentifiedImageError
 
     side = max(MIN_ICON_SIZE, min(size, MAX_ICON_SIZE))
+    pad = min(max(padding, 0.0), 0.45)
     try:
         with Image.open(io.BytesIO(source)) as opened:
             logo = opened.convert("RGBA")
     except (UnidentifiedImageError, OSError, ValueError) as error:
         raise IconRenderError(str(error)) from error
 
-    # Lienzo cuadrado = el mayor de los dos lados (nunca recorta el logo).
-    canvas_side = max(logo.width, logo.height)
-    canvas = Image.new("RGBA", (canvas_side, canvas_side), _parse_background(background))
-    offset = ((canvas_side - logo.width) // 2, (canvas_side - logo.height) // 2)
-    # La propia imagen como máscara preserva su transparencia al pegar.
-    canvas.paste(logo, offset, logo)
+    # Caja de contenido tras el padding; el logo se escala para caber dentro sin
+    # deformarse (nunca recorta) y se centra en el lienzo.
+    content = max(1, round(side * (1.0 - 2.0 * pad)))
+    scale = min(content / logo.width, content / logo.height)
+    new_w = max(1, round(logo.width * scale))
+    new_h = max(1, round(logo.height * scale))
+    resized = logo.resize((new_w, new_h), Image.LANCZOS)
 
-    if canvas_side != side:
-        canvas = canvas.resize((side, side), Image.LANCZOS)
+    canvas = Image.new("RGBA", (side, side), _parse_background(background))
+    offset = ((side - new_w) // 2, (side - new_h) // 2)
+    canvas.paste(resized, offset, resized)  # su alfa preserva transparencia
 
     buffer = io.BytesIO()
     canvas.save(buffer, format="PNG", optimize=True)

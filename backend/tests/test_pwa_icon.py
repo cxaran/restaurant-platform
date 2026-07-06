@@ -54,6 +54,23 @@ class SquareIconTest(unittest.TestCase):
         with Image.open(io.BytesIO(small)) as img:
             self.assertEqual(img.size, (48, 48))  # MIN_ICON_SIZE
 
+    def test_padding_shrinks_and_centers(self) -> None:
+        # Con padding, un logo CUADRADO deja de tocar los bordes (zona segura).
+        out = build_square_icon(_png(300, 300), size=200, padding=0.2)
+        with Image.open(io.BytesIO(out)) as img:
+            img = img.convert("RGBA")
+            self.assertEqual(img.size, (200, 200))
+        self.assertEqual(img.getpixel((100, 2))[3], 0)  # borde superior transparente
+        self.assertEqual(img.getpixel((100, 100))[3], 255)  # centro opaco
+
+    def test_maskable_white_full_bleed(self) -> None:
+        # Ícono adaptable de Android: fondo blanco lleno + logo centrado con padding.
+        out = build_square_icon(_png(300, 300), size=512, background="#ffffff", padding=0.14)
+        with Image.open(io.BytesIO(out)) as img:
+            img = img.convert("RGBA")
+        self.assertEqual(img.getpixel((4, 4)), (255, 255, 255, 255))  # esquina blanca opaca
+        self.assertEqual(img.getpixel((256, 256))[3], 255)  # centro opaco (logo)
+
     def test_garbage_raises(self) -> None:
         with self.assertRaises(IconRenderError):
             build_square_icon(b"no soy una imagen", size=192)

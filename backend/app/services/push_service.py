@@ -173,6 +173,15 @@ def _notification_url(row: Notification) -> str:
     return notification_href(row.kind, row.order_id, row.link_url) or "/"
 
 
+def _vapid_from_pem(private_pem: str):
+    """Objeto Vapid para pywebpush. OJO: pywebpush NO acepta el PEM como string
+    (su ``Vapid.from_string`` lo trata como DER y falla con «ASN.1 parsing
+    error»); hay que pasar una instancia ``Vapid`` construida desde el PEM."""
+    from py_vapid import Vapid02
+
+    return Vapid02.from_pem(private_pem.encode("utf-8"))
+
+
 def _send_webpush(
     subscription: PushSubscription, payload: str, *, private_pem: str
 ) -> Optional[int]:
@@ -191,7 +200,7 @@ def _send_webpush(
                 "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
             },
             data=payload,
-            vapid_private_key=private_pem,
+            vapid_private_key=_vapid_from_pem(private_pem),
             vapid_claims={"sub": claims_sub},
             ttl=PUSH_TTL_SECONDS,
         )

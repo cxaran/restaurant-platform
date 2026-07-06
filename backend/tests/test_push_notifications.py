@@ -106,6 +106,21 @@ class VapidCredentialsTest(unittest.TestCase):
             self.assertNotIn("BEGIN", rows[0].private_key_encrypted)
 
 
+class VapidKeyFormatTest(unittest.TestCase):
+    def test_pem_loads_as_vapid_for_pywebpush(self) -> None:
+        # Regresión: pywebpush recibía el PEM como string y su Vapid.from_string
+        # lo trataba como DER → «ASN.1 parsing error» y NINGÚN push salía.
+        # _vapid_from_pem debe construir una instancia Vapid utilizable.
+        from backend.app.services.push_service import (
+            _generate_vapid_pair,
+            _vapid_from_pem,
+        )
+
+        _public, pem = _generate_vapid_pair()
+        vapid = _vapid_from_pem(pem)
+        self.assertIsNotNone(vapid.private_key)
+
+
 class SubscriptionServiceTest(unittest.TestCase):
     def test_upsert_by_endpoint_and_owner_change(self) -> None:
         engine = _engine()

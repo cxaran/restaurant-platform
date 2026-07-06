@@ -43,6 +43,8 @@ test("shouldShowBanner: sólo con pendientes y sin descarte", () => {
 });
 
 test("itemRoute enruta cada ítem a su sección (con fallback)", () => {
-  assert.equal(itemRoute("backups"), "/backups");
-  assert.equal(itemRoute("desconocido"), "/resources/system_settings");
+  assert.equal(itemRoute("backups"), "/admin/backups");
+  assert.equal(itemRoute("institution"), "/admin/sistema");
+  assert.equal(itemRoute("google_login"), "/admin/sistema");
+  assert.equal(itemRoute("desconocido"), "/admin/sistema");
 });

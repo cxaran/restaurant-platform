@@ -45,18 +45,21 @@ export function parseSetupChecklist(payload: unknown): SetupChecklist | null {
   };
 }
 
-/** Destino de "configurar" por ítem (rutas existentes de la app). */
+/** Destino de "configurar" por ítem. Los ítems de system_settings llevan a la
+ * página DEDICADA /admin/sistema (con explicaciones por campo), no a la tabla
+ * genérica de recursos; respaldos a su propio panel. */
 const ITEM_ROUTES: Record<string, string> = {
-  institution: "/resources/system_settings",
-  registration: "/resources/system_settings",
-  domain: "/resources/system_settings",
-  email: "/resources/system_settings",
-  login_verification: "/resources/system_settings",
-  backups: "/backups",
+  institution: "/admin/sistema",
+  registration: "/admin/sistema",
+  domain: "/admin/sistema",
+  email: "/admin/sistema",
+  login_verification: "/admin/sistema",
+  google_login: "/admin/sistema",
+  backups: "/admin/backups",
 };
 
 export function itemRoute(key: string): string {
-  return ITEM_ROUTES[key] ?? "/resources/system_settings";
+  return ITEM_ROUTES[key] ?? "/admin/sistema";
 }
 
 /** ¿Debe mostrarse el banner? Sólo con pendientes reales y sin descarte previo. */

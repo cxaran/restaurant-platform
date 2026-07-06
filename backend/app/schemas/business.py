@@ -226,6 +226,22 @@ class PublicDaySlot(ApiReadSchema):
     closes_at: time
 
 
+class PublicWeeklyDay(ApiReadSchema):
+    """Horario recurrente de un día de la semana (0=lunes … 6=domingo)."""
+
+    day_of_week: int
+    slots: list[PublicDaySlot]
+
+
+class PublicWeeklySchedule(ApiReadSchema):
+    """Horario de atención SEMANAL (recurrente) para el sitio público."""
+
+    timezone: str
+    today_weekday: int
+    is_open_now: bool
+    days: list[PublicWeeklyDay]
+
+
 class PublicBusinessRead(ApiReadSchema):
     """Lo que el sitio público necesita del negocio; nada interno."""
 

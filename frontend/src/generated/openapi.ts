@@ -2185,6 +2185,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/business/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Public Schedule
+         * @description Horario de atención SEMANAL (recurrente) para el sitio público: los 7 días
+         *     con sus franjas, más el día de hoy y si está abierto ahora (para resaltar).
+         */
+        get: operations["read_public_schedule_api_v1_public_business_schedule_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/legal/terms": {
         parameters: {
             query?: never;
@@ -7016,6 +7037,30 @@ export interface components {
             /** Heros */
             heros?: components["schemas"]["PublicHero"][];
             footer?: components["schemas"]["PublicFooter"];
+        };
+        /**
+         * PublicWeeklyDay
+         * @description Horario recurrente de un día de la semana (0=lunes … 6=domingo).
+         */
+        PublicWeeklyDay: {
+            /** Day Of Week */
+            day_of_week: number;
+            /** Slots */
+            slots: components["schemas"]["PublicDaySlot"][];
+        };
+        /**
+         * PublicWeeklySchedule
+         * @description Horario de atención SEMANAL (recurrente) para el sitio público.
+         */
+        PublicWeeklySchedule: {
+            /** Timezone */
+            timezone: string;
+            /** Today Weekday */
+            today_weekday: number;
+            /** Is Open Now */
+            is_open_now: boolean;
+            /** Days */
+            days: components["schemas"]["PublicWeeklyDay"][];
         };
         /** ReadinessRead */
         ReadinessRead: {
@@ -13688,6 +13733,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicBusinessRead"];
+                };
+            };
+        };
+    };
+    read_public_schedule_api_v1_public_business_schedule_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicWeeklySchedule"];
                 };
             };
         };

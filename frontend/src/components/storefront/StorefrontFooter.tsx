@@ -126,6 +126,7 @@ export function StorefrontFooter({
   const legal = (
     <div className="sf-ft-legal">
       <span>© {year} {name} · Todos los derechos reservados</span>
+      <Link href="/horario">Horario</Link>
       <Link href="/terminos">Términos y condiciones</Link>
       {/* Preferencia de cookies analíticas: solo aparece si la instalación
           gestiona consentimiento (analítica activa + consentimiento exigido). */}

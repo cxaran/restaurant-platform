@@ -157,6 +157,24 @@ def effective_schedule_for_date(session: Session, day: date) -> DaySchedule:
     return DaySchedule(source="none", slots=())
 
 
+def weekly_schedule_slots(session: Session) -> dict[int, list[tuple[time, time]]]:
+    """Horario semanal RECURRENTE: ``{day_of_week: [(opens, closes), …]}`` para los
+    7 días (0=lunes … 6=domingo). Días sin franjas activas quedan vacíos (cerrado).
+    No aplica fechas especiales: es el horario base de atención."""
+    rows = session.exec(
+        select(BusinessWeeklyHours)
+        .where(BusinessWeeklyHours.is_active == True)  # noqa: E712
+        .order_by(
+            BusinessWeeklyHours.day_of_week,  # pyright: ignore[reportArgumentType]
+            BusinessWeeklyHours.slot_number,  # pyright: ignore[reportArgumentType]
+        )
+    ).all()
+    by_day: dict[int, list[tuple[time, time]]] = {day: [] for day in range(7)}
+    for row in rows:
+        by_day[row.day_of_week].append((row.opens_at, row.closes_at))
+    return by_day
+
+
 def _slot_covers(opens: time, closes: time, t: time, *, overnight_tail: bool) -> bool:
     crosses_midnight = closes <= opens
     if overnight_tail:

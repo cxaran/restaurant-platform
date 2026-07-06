@@ -22,6 +22,8 @@ from backend.app.schemas.business import (
     PublicDaySlot,
     PublicLegalCoupon,
     PublicLegalTermsRead,
+    PublicWeeklyDay,
+    PublicWeeklySchedule,
 )
 from backend.app.schemas.catalog import PublicMenuCategory
 from backend.app.schemas.system_settings import PublicAnalyticsConfig
@@ -36,6 +38,7 @@ from backend.app.services.business_service import (
     get_business_profile,
     get_business_settings,
     is_open_at,
+    weekly_schedule_slots,
 )
 from backend.app.services.catalog_service import build_public_menu
 from backend.app.services.discount_service import list_public_coupons
@@ -90,6 +93,35 @@ def read_public_business(session: SessionDep, response: Response) -> PublicBusin
         credits_enabled=settings_row.credits_enabled,
         minimum_delivery_order_amount=settings_row.minimum_delivery_order_amount,
         free_shipping_global_from_amount=settings_row.free_shipping_global_from_amount,
+    )
+
+
+@router.get("/business/schedule", response_model=PublicWeeklySchedule)
+def read_public_schedule(
+    session: SessionDep, response: Response
+) -> PublicWeeklySchedule:
+    """Horario de atención SEMANAL (recurrente) para el sitio público: los 7 días
+    con sus franjas, más el día de hoy y si está abierto ahora (para resaltar)."""
+    profile = get_business_profile(session)
+    tz = business_timezone(profile)
+    now = datetime.now(tz)
+    by_day = weekly_schedule_slots(session)
+
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return PublicWeeklySchedule(
+        timezone=profile.timezone,
+        today_weekday=now.weekday(),
+        is_open_now=is_open_at(session, now),
+        days=[
+            PublicWeeklyDay(
+                day_of_week=day,
+                slots=[
+                    PublicDaySlot(opens_at=opens, closes_at=closes)
+                    for opens, closes in by_day[day]
+                ],
+            )
+            for day in range(7)
+        ],
     )
 
 

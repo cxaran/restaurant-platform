@@ -329,10 +329,26 @@ export default function CartPage() {
               <div
                 role="status"
                 className="sf-card"
-                style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700 }}
+                style={{
+                  padding: "12px 16px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
               >
-                🕐 {closedBannerText(openStatus)} Tu carrito se conserva para cuando
-                abramos.
+                <span>
+                  🕐 {closedBannerText(openStatus)} Tu carrito se conserva para
+                  cuando abramos.
+                </span>
+                <Link
+                  href="/horario"
+                  className="sf-chip"
+                  style={{ alignSelf: "flex-start", padding: "6px 14px", fontSize: 13, fontWeight: 700 }}
+                >
+                  Consultar horario
+                </Link>
               </div>
             ) : null}
             {closedBySchedule ? (

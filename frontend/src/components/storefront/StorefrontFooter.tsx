@@ -170,7 +170,9 @@ export function StorefrontFooter({
             <span className="sf-ft-h">Contacto</span>
             {phonesBlock}
             {footer?.address ? <span className="sf-ft-line">📍 {footer.address}</span> : null}
-            {schedule ? <span className="sf-ft-line">🕑 {schedule}</span> : null}
+            {schedule ? (
+              <Link href="/horario" className="sf-ft-line">🕑 {schedule}</Link>
+            ) : null}
           </div>
         </div>
         <div className="sf-container">{legal}</div>
@@ -188,7 +190,9 @@ export function StorefrontFooter({
           ) : null}
           <span className="sf-display sf-ft-name">{name}</span>
           {slogan ? <span className="sf-display sf-ft-slogan">{slogan}</span> : null}
-          {schedule ? <span className="sf-ft-line">{schedule}</span> : null}
+          {schedule ? (
+            <Link href="/horario" className="sf-ft-line">{schedule}</Link>
+          ) : null}
           {socialRow}
           {phones.length > 0 ? <div className="sf-ft-phonerow">{phonesBlock}</div> : null}
           {legal}

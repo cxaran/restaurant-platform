@@ -47,9 +47,18 @@ export function StorefrontHeader({
             Rastrear pedido
           </Link>
         </nav>
-        <span
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 }}
-          aria-live="polite"
+        <Link
+          href="/horario"
+          aria-label={`${isOpen ? "Abierto" : "Cerrado"} ahora — ver horario de atención`}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            color: "inherit",
+            textDecoration: "none",
+          }}
         >
           <span
             aria-hidden
@@ -62,7 +71,7 @@ export function StorefrontHeader({
             }}
           />
           <span className="sf-header-state">{isOpen ? "Abierto" : "Cerrado"}</span>
-        </span>
+        </Link>
         {session ? <NotificationsBell variant="sf" /> : null}
         {session ? (
           <Link

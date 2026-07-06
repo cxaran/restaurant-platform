@@ -47,9 +47,13 @@ export function StorefrontHeader({
             Rastrear pedido
           </Link>
         </nav>
-        <Link
-          href="/horario"
-          aria-label={`${isOpen ? "Abierto" : "Cerrado"} ahora — ver horario de atención`}
+        {/* Controles agrupados: en móvil se mantienen juntos en UNA fila
+            (flex-shrink:0) para que la marca encoja con elipsis y no aparezca
+            una tercera fila; la navegación baja sola a la segunda fila. */}
+        <div className="sf-header-actions">
+          <Link
+            href="/horario"
+            aria-label={`${isOpen ? "Abierto" : "Cerrado"} ahora — ver horario de atención`}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -120,7 +124,8 @@ export function StorefrontHeader({
           {count > 0 && mode === "money" ? (
             <span aria-hidden className="sf-cart-money">{formatMoney(subtotalHint)}</span>
           ) : null}
-        </Link>
+          </Link>
+        </div>
       </div>
     </header>
   );

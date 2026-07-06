@@ -40,8 +40,13 @@
 }
 
 .sf-header-brand {
+  display: flex;
+  align-items: center;
   flex: 1 1 auto;
   min-width: 0;
+  /* recorta para que el nombre trunque con elipsis en vez de desbordarse por
+     encima de los controles cuando el ancho aprieta (móvil). */
+  overflow: hidden;
 }
 
 .sf-header-nav {
@@ -51,11 +56,38 @@
   font-weight: 600;
 }
 
+/* Controles del header (estado, campana, cuenta, carrito) agrupados. No encoge
+   (`flex: 0 0 auto`): así la marca cede espacio y todo cabe en UNA fila en móvil,
+   evitando una tercera fila que dispara el alto de la barra. */
+.sf-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
 @media (max-width: 699px) {
+  .sf-header-row {
+    gap: 10px;
+  }
+
+  /* base 0: la marca deja de imponer su ancho de contenido, cabe junto a los
+     controles en la fila 1 y crece (con elipsis) solo en el espacio sobrante.
+     Sin esto, `flex-wrap` corta la línea por el ancho del contenido y baja los
+     controles a una tercera fila. */
+  .sf-header-brand {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
   .sf-header-nav {
     order: 10;
     width: 100%;
     padding-top: 2px;
+  }
+
+  .sf-header-actions {
+    gap: 10px;
   }
 
   .sf-header-state {

@@ -166,12 +166,11 @@ def remove_subscription(session: Session, *, user_id: uuid.UUID, endpoint: str) 
 # ---------------------------------------------------------------------------
 
 def _notification_url(row: Notification) -> str:
-    """A dónde lleva el clic en la notificación del sistema."""
-    if row.kind == "order_new":
-        return "/panel/pedidos"
-    if row.kind == "order_status" and row.order_id is not None:
-        return f"/pedidos/{row.order_id}"
-    return "/"
+    """A dónde lleva el clic en la notificación del sistema (misma fuente que la
+    campana: ``notification_href``). Fallback a la raíz si no hay destino."""
+    from backend.app.services.notification_service import notification_href
+
+    return notification_href(row.kind, row.order_id, row.link_url) or "/"
 
 
 def _send_webpush(

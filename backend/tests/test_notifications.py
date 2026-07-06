@@ -143,6 +143,18 @@ class OrderFlowNotificationsTest(unittest.TestCase):
             self.assertTrue(all(row.email_status == "pending" for row in rows))
             self.assertTrue(all(row.order_id == order.id for row in rows))
 
+    def test_notification_href_by_kind(self) -> None:
+        from backend.app.services.notification_service import notification_href
+
+        order_id = uuid.uuid4()
+        self.assertEqual(
+            notification_href("order_status", order_id, None), f"/pedidos/{order_id}"
+        )
+        self.assertEqual(notification_href("order_status", None, None), "/pedidos")
+        self.assertEqual(notification_href("order_new", order_id, None), "/panel/pedidos")
+        self.assertEqual(notification_href("promo", None, "/menu"), "/menu")
+        self.assertIsNone(notification_href("promo", None, None))
+
     def test_transition_notifies_customer_in_same_transaction(self) -> None:
         with Session(self.engine) as session:
             customer = _make_user(session, "cliente@example.com")
@@ -372,6 +384,25 @@ class NotificationRoutesTest(unittest.TestCase):
             json={"title": "Aviso", "body": "Nuevo horario", "audience": "all"},
         )
         self.assertEqual(everyone.json()["created"], 3)
+
+    def test_broadcast_link_sets_href_and_rejects_unsafe(self) -> None:
+        self._as("notifications:send")
+        ok = self.client.post(
+            "/api/v1/notifications/broadcast",
+            json={"title": "Promo", "body": "2x1", "audience": "all", "link_url": "/menu"},
+        )
+        self.assertEqual(ok.status_code, 201, ok.text)
+        items = self.client.get("/api/v1/notifications/me").json()["items"]
+        promo = next(item for item in items if item["title"] == "Promo")
+        self.assertEqual(promo["href"], "/menu")
+
+        # Enlaces peligrosos o no http(s) se rechazan (422).
+        for bad in ("javascript:alert(1)", "http://inseguro.com", "//evil.com"):
+            resp = self.client.post(
+                "/api/v1/notifications/broadcast",
+                json={"title": "x", "body": "y", "link_url": bad},
+            )
+            self.assertEqual(resp.status_code, 422, f"{bad} debió rechazarse")
 
     def test_openapi_exposes_notification_routes(self) -> None:
         paths = self.client.get("/api/openapi.json").json()["paths"]

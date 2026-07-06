@@ -67,6 +67,9 @@ class Notification(Base):
     order_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL"), nullable=True
     )
+    # Enlace OPCIONAL (destino al tocar): solo lo usa `promo`; order_status y
+    # order_new derivan el destino del tipo + order_id (ver notification_href).
+    link_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     email_status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")
     email_error: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)

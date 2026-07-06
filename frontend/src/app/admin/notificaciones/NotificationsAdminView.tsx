@@ -31,6 +31,7 @@ export function NotificationsAdminView() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [audience, setAudience] = useState<"all" | "customers" | "staff">("all");
+  const [linkUrl, setLinkUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,15 +41,20 @@ export function NotificationsAdminView() {
     setMessage(null);
     setError(null);
     try {
+      const link = linkUrl.trim();
       const result = await browserApi<{ created: number; audience: string }>(
         "/api/v1/notifications/broadcast",
-        { method: "POST", body: { title, body, audience } },
+        {
+          method: "POST",
+          body: { title, body, audience, ...(link ? { link_url: link } : {}) },
+        },
       );
       setMessage(
         `Enviada a ${result.created} usuario${result.created === 1 ? "" : "s"}: ya está en sus campanas y los correos van saliendo.`,
       );
       setTitle("");
       setBody("");
+      setLinkUrl("");
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.body.message : "No fue posible enviar.");
     } finally {
@@ -95,6 +101,21 @@ export function NotificationsAdminView() {
           />
           <span style={{ fontSize: 11, color: "var(--tx3)", fontWeight: 700 }}>
             {body.length}/500 · texto plano, sin HTML
+          </span>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label className="tt-label" htmlFor="ntf-link">Enlace al tocar (opcional)</label>
+          <input
+            id="ntf-link"
+            className="tt-input"
+            maxLength={500}
+            value={linkUrl}
+            placeholder="/menu  ·  /creditos  ·  https://…"
+            onChange={(event) => setLinkUrl(event.target.value)}
+          />
+          <span style={{ fontSize: 11, color: "var(--tx3)", fontWeight: 700 }}>
+            Ruta interna (empieza con «/») o URL https. Vacío = sin enlace.
           </span>
         </div>
 

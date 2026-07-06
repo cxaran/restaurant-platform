@@ -64,6 +64,24 @@ _STATUS_MESSAGES: dict[str, tuple[str, str]] = {
 }
 
 
+def notification_href(
+    kind: str, order_id: Optional[uuid.UUID], link_url: Optional[str]
+) -> Optional[str]:
+    """Destino al tocar la notificación (campana y Web Push comparten esto):
+
+    - ``order_status`` → detalle del pedido del cliente (``/pedidos/{id}``).
+    - ``order_new``    → bandeja de pedidos del panel (``/panel/pedidos``).
+    - ``promo``        → el enlace opcional que definió quien difundió (o None).
+    """
+    if kind == "order_status":
+        return f"/pedidos/{order_id}" if order_id else "/pedidos"
+    if kind == "order_new":
+        return "/panel/pedidos"
+    if kind == "promo":
+        return link_url or None
+    return None
+
+
 def create_notification(
     session: Session,
     *,
@@ -72,6 +90,7 @@ def create_notification(
     title: str,
     body: str,
     order_id: Optional[uuid.UUID] = None,
+    link_url: Optional[str] = None,
     email: bool = True,
     push: bool = True,
 ) -> Notification:
@@ -82,6 +101,7 @@ def create_notification(
         title=title[:140],
         body=body[:500],
         order_id=order_id,
+        link_url=(link_url or None),
         email_status="pending" if email else "skipped",
         push_status="pending" if push else "skipped",
     )
@@ -159,12 +179,14 @@ def broadcast(
     title: str,
     body: str,
     audience: Audience = "all",
+    link_url: Optional[str] = None,
 ) -> int:
     """Difusión del administrador (promoción/aviso) a la audiencia elegida.
 
     ``customers`` = usuarios activos SIN rol asignado (los clientes de la
     plataforma no tienen roles); ``staff`` = con algún rol. Crea UNA fila por
-    usuario (campana + correo). SIN commit: el router decide la transacción.
+    usuario (campana + correo). ``link_url`` opcional = destino al tocarla. SIN
+    commit: el router decide la transacción.
     """
     staff_ids = select(UserRole.user_id)
     stmt = select(User).where(User.is_active == True)  # noqa: E712
@@ -175,7 +197,8 @@ def broadcast(
     users = session.exec(stmt).all()
     for user in users:
         create_notification(
-            session, user_id=user.id, kind="promo", title=title, body=body
+            session, user_id=user.id, kind="promo", title=title, body=body,
+            link_url=link_url,
         )
     return len(users)
 

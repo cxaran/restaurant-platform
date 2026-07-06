@@ -9,6 +9,7 @@
 // pestañas abiertas para refrescar la campana al instante. En iOS el push
 // exige la PWA instalada — el panel lo explica cuando aplica (needs-install).
 
+import Link from "next/link";
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 
 import { browserApi } from "@/core/api/browser-client";
@@ -347,39 +348,74 @@ export function NotificationsBell({
             </p>
           ) : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {items.map((item: NotificationRead) => (
-                <li
-                  key={item.id}
-                  style={{
-                    display: "flex", gap: 10, padding: "10px 14px",
-                    borderBottom: `1px solid ${borderColor}`, fontSize: 13,
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: 15, flexShrink: 0 }}>
-                    {KIND_ICONS[item.kind] ?? "🔔"}
-                  </span>
-                  <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
-                    <b style={{ fontSize: 13 }}>{item.title}</b>
-                    <span style={{ fontSize: 12, color: mutedColor }}>{item.body}</span>
-                    <span style={{ fontSize: 10.5, color: mutedColor, fontWeight: 700 }}>
-                      {formatWhen(item.created_at)}
+              {items.map((item: NotificationRead) => {
+                const content = (
+                  <>
+                    <span aria-hidden style={{ fontSize: 15, flexShrink: 0 }}>
+                      {KIND_ICONS[item.kind] ?? "🔔"}
                     </span>
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Descartar notificación"
-                    title="Descartar"
-                    onClick={() => void dismiss(item.id)}
+                    <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                      <b style={{ fontSize: 13 }}>{item.title}</b>
+                      <span style={{ fontSize: 12, color: mutedColor }}>{item.body}</span>
+                      <span style={{ fontSize: 10.5, color: mutedColor, fontWeight: 700 }}>
+                        {formatWhen(item.created_at)}
+                      </span>
+                    </span>
+                  </>
+                );
+                const rowStyle: CSSProperties = {
+                  display: "flex", gap: 10, flex: 1, minWidth: 0,
+                  color: "inherit", textDecoration: "none",
+                };
+                // Al tocar el enlace: cerrar el panel y descartar (marcar leída).
+                const onNavigate = () => {
+                  setOpen(false);
+                  void dismiss(item.id);
+                };
+                const external = item.href?.startsWith("http");
+                return (
+                  <li
+                    key={item.id}
                     style={{
-                      border: "none", background: "transparent", color: mutedColor,
-                      fontSize: 16, lineHeight: 1, cursor: "pointer", flexShrink: 0,
-                      padding: "0 2px", alignSelf: "flex-start",
+                      display: "flex", gap: 10, padding: "10px 14px",
+                      borderBottom: `1px solid ${borderColor}`, fontSize: 13,
                     }}
                   >
-                    ✕
-                  </button>
-                </li>
-              ))}
+                    {item.href ? (
+                      external ? (
+                        <a
+                          href={item.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={onNavigate}
+                          style={rowStyle}
+                        >
+                          {content}
+                        </a>
+                      ) : (
+                        <Link href={item.href} onClick={onNavigate} style={rowStyle}>
+                          {content}
+                        </Link>
+                      )
+                    ) : (
+                      <div style={rowStyle}>{content}</div>
+                    )}
+                    <button
+                      type="button"
+                      aria-label="Descartar notificación"
+                      title="Descartar"
+                      onClick={() => void dismiss(item.id)}
+                      style={{
+                        border: "none", background: "transparent", color: mutedColor,
+                        fontSize: 16, lineHeight: 1, cursor: "pointer", flexShrink: 0,
+                        padding: "0 2px", alignSelf: "flex-start",
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

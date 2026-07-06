@@ -3744,6 +3744,8 @@ export interface components {
              * @enum {string}
              */
             audience: "all" | "customers" | "staff";
+            /** Link Url */
+            link_url?: string | null;
         };
         /** BusinessPhoneCreate */
         BusinessPhoneCreate: {
@@ -5509,6 +5511,8 @@ export interface components {
             body: string;
             /** Order Id */
             order_id?: string | null;
+            /** Href */
+            href?: string | null;
             /** Read At */
             read_at?: string | null;
             /** Created At */

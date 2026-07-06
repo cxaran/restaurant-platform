@@ -11,7 +11,7 @@ import uuid
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Header, Query, status
-from pydantic import Field
+from pydantic import Field, field_validator
 from sqlmodel import select
 
 from backend.app.api.resource_actions import api_error, commit_or_conflict
@@ -25,6 +25,7 @@ from backend.app.services.notification_service import (
     broadcast,
     kick_notification_dispatch,
     mark_all_read,
+    notification_href,
     unread_count,
 )
 from backend.app.utils.utc_now import utc_now
@@ -40,6 +41,9 @@ class NotificationRead(ApiReadSchema):
     title: str
     body: str
     order_id: Optional[uuid.UUID] = None
+    # Destino al tocar la notificación (derivado del tipo o el enlace de promo);
+    # None = sin destino. La campana lo usa para enlazar el ítem.
+    href: Optional[str] = None
     read_at: Optional[str] = None
     created_at: str
 
@@ -56,6 +60,7 @@ def _read(row: Notification) -> NotificationRead:
         title=row.title,
         body=row.body,
         order_id=row.order_id,
+        href=notification_href(row.kind, row.order_id, row.link_url),
         read_at=row.read_at.isoformat() if row.read_at else None,
         created_at=row.created_at.isoformat() if row.created_at else utc_now().isoformat(),
     )
@@ -203,6 +208,26 @@ class BroadcastRequest(ApiWriteSchema):
     title: str = Field(min_length=1, max_length=140)
     body: str = Field(min_length=1, max_length=500)
     audience: Literal["all", "customers", "staff"] = "all"
+    # Enlace OPCIONAL al tocar la promoción: ruta interna (/menu, /creditos…) o
+    # URL https absoluta. Se rechaza cualquier otra forma (evita javascript:,
+    # http sin cifrar, etc.).
+    link_url: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("link_url")
+    @classmethod
+    def _validar_enlace(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        candidate = value.strip()
+        if candidate == "":
+            return None
+        if candidate.startswith("/") and not candidate.startswith("//"):
+            return candidate
+        if candidate.startswith("https://") and len(candidate) > len("https://"):
+            return candidate
+        raise ValueError(
+            "El enlace debe ser una ruta interna (que empiece con «/») o una URL https."
+        )
 
 
 @router.post("/broadcast", status_code=status.HTTP_201_CREATED)
@@ -213,12 +238,13 @@ def send_broadcast(
     _: NotificationPermissions.SEND.requiere,
 ) -> dict:
     created = broadcast(
-        session, title=payload.title, body=payload.body, audience=payload.audience
+        session, title=payload.title, body=payload.body, audience=payload.audience,
+        link_url=payload.link_url,
     )
     record_config_change(
         session, actor_user_id=current_user.id, entity_type="notifications",
         entity_id=_BROADCAST_AUDIT_ID, action="broadcast",
-        changed_fields=["title", "body", "audience"],
+        changed_fields=["title", "body", "audience", "link_url"],
     )
     commit_or_conflict(session, "No fue posible enviar la difusión.")
     # Correos best-effort DESPUÉS del commit; el tick Taskiq es la red de seguridad.

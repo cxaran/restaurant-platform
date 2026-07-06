@@ -7,6 +7,7 @@ import { HighlightBanner } from "@/components/storefront/Highlights";
 import { AddressBook } from "./AddressBook";
 import { serverApi } from "@/core/api/server-client";
 import { getSession } from "@/core/auth/session";
+import type { ResourceCatalog } from "@/core/api/contracts";
 import { getPublicBusiness } from "@/core/restaurant-api/business";
 import { getPublicHighlights } from "@/core/restaurant-api/storefront";
 import type {
@@ -65,7 +66,7 @@ export default async function CuentaPage() {
   }
 
   const cookieHeader = (await cookies()).toString();
-  const [profile, orders, addresses, credits, movements, highlights, business] =
+  const [profile, orders, addresses, credits, movements, highlights, business, catalog] =
     await Promise.all([
       fetchOrNull(
         serverApi<CustomerProfileSelfRead>("/api/v1/profiles/me", { cookie: cookieHeader }),
@@ -84,7 +85,24 @@ export default async function CuentaPage() {
       ),
       getPublicHighlights("account"),
       getPublicBusiness(),
+      // Catálogo de recursos: MISMA fuente de verdad que las sidebars de panel
+      // y admin, ya proyectada por permisos en el backend. Un cliente normal lo
+      // recibe vacío; el personal ve sus módulos → enlazamos su espacio de
+      // trabajo desde la cuenta para navegar sin escribir la URL a mano.
+      fetchOrNull(serverApi<ResourceCatalog>("/api/v1/resources", { cookie: cookieHeader })),
     ]);
+
+  // «Puede entrar al panel» ≡ tiene algún módulo operativo (section "panel").
+  // «Puede entrar al admin» ≡ tiene algún módulo admin o algún recurso tabular
+  // visible (cada uno gated por su read_permission en el backend).
+  const canPanel = Boolean(
+    catalog?.navigation_modules.some((module_) => module_.section === "panel"),
+  );
+  const canAdmin = Boolean(
+    catalog &&
+      (catalog.resources.length > 0 ||
+        catalog.navigation_modules.some((module_) => module_.section === "admin")),
+  );
 
   // Programa de créditos apagado: la cuenta no muestra saldo ni movimientos (los
   // saldos se conservan en el backend; sólo se ocultan). null = mostrar.
@@ -119,6 +137,35 @@ export default async function CuentaPage() {
             Editar
           </Link>
         </section>
+
+        {/* Acceso rápido al espacio de trabajo: solo para el PERSONAL (quien
+            tiene módulos de panel/admin según sus permisos). Un cliente normal
+            no ve nada. La autorización real la aplica cada endpoint. */}
+        {canPanel || canAdmin ? (
+          <section className="sf-card" style={{ padding: "14px 18px" }}>
+            <SectionHeading label="Tu espacio de trabajo" />
+            <div className="sf-account-actions" style={{ marginTop: 4 }}>
+              {canPanel ? (
+                <Link
+                  className="sf-btn"
+                  href="/panel"
+                  title="Operación diaria: pedidos, mostrador, entregas y reparto"
+                >
+                  Panel de operación
+                </Link>
+              ) : null}
+              {canAdmin ? (
+                <Link
+                  className="sf-btn-outline"
+                  href="/admin"
+                  title="Administración: catálogo, sitio, finanzas y configuración"
+                >
+                  Administración
+                </Link>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         {/* Saldo de créditos destacado (3a): sólo con el programa activo. */}
         {creditsEnabled ? (

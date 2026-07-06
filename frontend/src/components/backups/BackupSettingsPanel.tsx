@@ -63,6 +63,7 @@ export function BackupSettingsPanel({
     retentionDaily: initial.retentionDaily,
     retentionMonthly: initial.retentionMonthly,
     retentionYearly: initial.retentionYearly,
+    explorerEnabled: initial.explorerEnabled,
     ageRecipient: initial.ageRecipient ?? "",
     clientId: initial.driveClientId ?? "",
     clientSecret: "",
@@ -399,6 +400,22 @@ export function BackupSettingsPanel({
             />
           </label>
         </div>
+        <label className="flex items-start gap-2 rounded-[10px] border border-[var(--border2)] bg-[var(--panel2)] p-3">
+          <input
+            type="checkbox"
+            checked={form.explorerEnabled}
+            onChange={(event) => setForm({ ...form, explorerEnabled: event.target.checked })}
+            className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+          />
+          <span className="flex flex-col gap-1">
+            <span className="text-sm font-semibold text-[var(--tx)]">Artefacto de exploración (SQLite)</span>
+            <span className="text-xs text-[var(--tx2)]">
+              Genera junto a cada respaldo un SQLite legible del mismo snapshot (con las
+              columnas sensibles excluidas) y habilita el botón «Explorar» para abrirlo en
+              el navegador sin restaurar. Se cifra con la misma clave que el respaldo.
+            </span>
+          </span>
+        </label>
         <div>
           <button type="submit" disabled={busy !== null} className={primaryButton}>
             {busy === "save" ? "Guardando…" : "Guardar configuración"}

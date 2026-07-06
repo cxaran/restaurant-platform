@@ -86,6 +86,13 @@ legible** del mismo snapshot exacto (columnas sensibles excluidas), pensado
 para explorar históricos desde `/backups/explore` sin restaurar nada. Un
 explorador fallido jamás invalida un restore correcto.
 
+**Apagado por defecto.** Se activa con la casilla **«Artefacto de exploración
+(SQLite)»** en la configuración de **/backups** (permiso `backups:configure`);
+a partir del siguiente respaldo aparece el botón **«Explorar»** junto al archivo
+en la lista de Drive. Si el respaldo va cifrado, el explorador se cifra con la
+**misma** clave age, así que para abrirlo necesitas la clave privada (igual que
+para restaurar); el descifrado ocurre **local** en el navegador.
+
 ## Restauración (manual)
 
 ```bash

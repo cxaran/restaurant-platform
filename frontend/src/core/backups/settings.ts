@@ -13,6 +13,8 @@ export interface BackupSettings {
   retentionDaily: number;
   retentionMonthly: number;
   retentionYearly: number;
+  // Genera el SQLite legible junto a cada respaldo (habilita el botón «Explorar»).
+  explorerEnabled: boolean;
   ageRecipient: string | null;
   ageFingerprint: string | null;
   driveStatus: DriveStatus;
@@ -51,6 +53,7 @@ export function parseBackupSettings(payload: unknown): BackupSettings | null {
     retentionDaily: Number(payload.retention_daily_count ?? 7),
     retentionMonthly: Number(payload.retention_monthly_count ?? 12),
     retentionYearly: Number(payload.retention_yearly_count ?? 5),
+    explorerEnabled: payload.explorer_enabled === true,
     ageRecipient: optionalString(payload.age_recipient),
     ageFingerprint: optionalString(payload.age_recipient_fingerprint),
     driveStatus:
@@ -84,6 +87,7 @@ export function buildSettingsPatch(
     retentionDaily: number;
     retentionMonthly: number;
     retentionYearly: number;
+    explorerEnabled: boolean;
     ageRecipient: string;
     clientId: string;
     clientSecret: string;
@@ -97,6 +101,7 @@ export function buildSettingsPatch(
     retention_daily_count: form.retentionDaily,
     retention_monthly_count: form.retentionMonthly,
     retention_yearly_count: form.retentionYearly,
+    explorer_enabled: form.explorerEnabled,
   };
   const recipient = form.ageRecipient.trim();
   if (recipient !== "") {

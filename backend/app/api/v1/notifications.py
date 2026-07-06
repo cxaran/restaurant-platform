@@ -66,11 +66,16 @@ def my_notifications(
     session: SessionDep,
     current_user: CurrentUser,
     limit: int = Query(default=30, ge=1, le=100),
+    unread_only: bool = Query(default=False),
 ) -> MyNotifications:
+    # La campana pide unread_only=true: descartar (marcar leída) una notificación
+    # la saca de la lista, así el panel no crece sin límite. El histórico completo
+    # sigue en la base (cola de correo/push); simplemente no se muestra.
+    stmt = select(Notification).where(Notification.user_id == current_user.id)
+    if unread_only:
+        stmt = stmt.where(Notification.read_at.is_(None))  # pyright: ignore[reportAttributeAccessIssue]
     rows = session.exec(
-        select(Notification)
-        .where(Notification.user_id == current_user.id)
-        .order_by(Notification.created_at.desc())  # pyright: ignore[reportAttributeAccessIssue]
+        stmt.order_by(Notification.created_at.desc())  # pyright: ignore[reportAttributeAccessIssue]
         .limit(limit)
     ).all()
     return MyNotifications(

@@ -68,11 +68,39 @@ export function NotificationsBell({
 
   const load = useCallback(async () => {
     try {
-      setData(await browserApi<MyNotifications>("/api/v1/notifications/me?limit=30"));
+      // Solo NO leídas: descartar una la marca leída y desaparece, así el panel
+      // nunca acumula miles de avisos. El histórico sigue en la base.
+      setData(
+        await browserApi<MyNotifications>(
+          "/api/v1/notifications/me?limit=30&unread_only=true",
+        ),
+      );
     } catch {
       // Silencio deliberado: la campana jamás rompe la página que la aloja.
     }
   }, []);
+
+  // Descartar UNA notificación: quitado optimista (fuera de la lista y −1 en el
+  // badge) y luego se marca leída en el backend; si falla, se recarga la verdad.
+  const dismiss = useCallback(
+    async (id: string) => {
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              unread_count: Math.max(0, current.unread_count - 1),
+              items: (current.items ?? []).filter((item) => item.id !== id),
+            }
+          : current,
+      );
+      try {
+        await browserApi(`/api/v1/notifications/${id}/read`, { method: "POST" });
+      } catch {
+        void load();
+      }
+    },
+    [load],
+  );
 
   useEffect(() => {
     // Primera carga diferida (callback): sin setState síncrono en el efecto.
@@ -258,7 +286,7 @@ export function NotificationsBell({
                   textDecoration: "underline", padding: 0,
                 }}
               >
-                Marcar leídas
+                Descartar todas
               </button>
             ) : null}
           </div>
@@ -315,7 +343,7 @@ export function NotificationsBell({
 
           {items.length === 0 ? (
             <p style={{ margin: 0, padding: "16px 14px", fontSize: 13, color: mutedColor }}>
-              Sin notificaciones todavía.
+              No tienes notificaciones nuevas.
             </p>
           ) : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
@@ -325,28 +353,31 @@ export function NotificationsBell({
                   style={{
                     display: "flex", gap: 10, padding: "10px 14px",
                     borderBottom: `1px solid ${borderColor}`, fontSize: 13,
-                    opacity: item.read_at ? 0.62 : 1,
                   }}
                 >
                   <span aria-hidden style={{ fontSize: 15, flexShrink: 0 }}>
                     {KIND_ICONS[item.kind] ?? "🔔"}
                   </span>
-                  <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                  <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
                     <b style={{ fontSize: 13 }}>{item.title}</b>
                     <span style={{ fontSize: 12, color: mutedColor }}>{item.body}</span>
                     <span style={{ fontSize: 10.5, color: mutedColor, fontWeight: 700 }}>
                       {formatWhen(item.created_at)}
                     </span>
                   </span>
-                  {!item.read_at ? (
-                    <span
-                      aria-label="No leída"
-                      style={{
-                        width: 8, height: 8, borderRadius: 999, background: badgeBg,
-                        flexShrink: 0, marginTop: 5, marginLeft: "auto",
-                      }}
-                    />
-                  ) : null}
+                  <button
+                    type="button"
+                    aria-label="Descartar notificación"
+                    title="Descartar"
+                    onClick={() => void dismiss(item.id)}
+                    style={{
+                      border: "none", background: "transparent", color: mutedColor,
+                      fontSize: 16, lineHeight: 1, cursor: "pointer", flexShrink: 0,
+                      padding: "0 2px", alignSelf: "flex-start",
+                    }}
+                  >
+                    ✕
+                  </button>
                 </li>
               ))}
             </ul>

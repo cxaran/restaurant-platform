@@ -312,6 +312,23 @@ class NotificationRoutesTest(unittest.TestCase):
             self.client.get("/api/v1/notifications/me").json()["unread_count"], 0
         )
 
+    def test_unread_only_hides_dismissed(self) -> None:
+        # La campana pide unread_only=true: descartar (marcar leída) una saca la
+        # notificación de la lista, aunque el histórico siga en la base.
+        self._as()
+        before = self.client.get("/api/v1/notifications/me?unread_only=true").json()
+        self.assertEqual(len(before["items"]), 2)
+        target = before["items"][0]["id"]
+
+        self.client.post(f"/api/v1/notifications/{target}/read")
+        after = self.client.get("/api/v1/notifications/me?unread_only=true").json()
+        self.assertEqual(len(after["items"]), 1)
+        self.assertTrue(all(item["id"] != target for item in after["items"]))
+        self.assertEqual(after["unread_count"], 1)
+        # Sin el filtro, la descartada sigue presente (histórico intacto).
+        full = self.client.get("/api/v1/notifications/me").json()
+        self.assertEqual(len(full["items"]), 2)
+
     def test_read_single_is_own_only(self) -> None:
         self._as()
         mine = self.client.get("/api/v1/notifications/me").json()["items"][0]

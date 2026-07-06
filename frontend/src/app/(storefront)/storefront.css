@@ -73,6 +73,74 @@
   }
 }
 
+/* Botón de carrito del header. Escritorio: pill «Carrito [n] $precio» (el ícono
+   va oculto). Móvil (≤560px): ícono de bolsa compacto con el número en un badge
+   circular de esquina; se ocultan la palabra y el precio para que nunca se
+   desborde en pantallas angostas. */
+.sf-cart-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--sf-brand);
+  color: var(--sf-text-inverse);
+  border-radius: var(--sf-radius-button);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sf-cart-ico {
+  display: none;
+}
+
+.sf-cart-count {
+  background: color-mix(in srgb, black 22%, transparent);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .sf-cart-btn {
+    padding: 9px;
+    border-radius: 14px;
+  }
+
+  .sf-cart-ico {
+    display: inline-flex;
+  }
+
+  .sf-cart-txt,
+  .sf-cart-money {
+    display: none;
+  }
+
+  .sf-cart-count {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sf-text-inverse);
+    color: var(--sf-brand);
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 0 0 2px var(--sf-brand);
+  }
+
+  .sf-cart-count[data-empty="1"] {
+    display: none;
+  }
+}
+
 .sf-btn {
   display: inline-flex;
   align-items: center;

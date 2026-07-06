@@ -89,32 +89,37 @@ export function StorefrontHeader({
             Iniciar sesión
           </Link>
         )}
+        {/* Escritorio: pill «Carrito [n] $precio». Móvil: ícono de bolsa con el
+            número en badge de esquina (sin texto ni precio) — ver storefront.css. */}
         <Link
           href="/carrito"
           aria-label={`Carrito, ${count} productos`}
-          style={{
-            background: "var(--sf-brand)",
-            color: "var(--sf-text-inverse)",
-            borderRadius: "var(--sf-radius-button)",
-            padding: "10px 16px",
-            fontSize: 14,
-            fontWeight: 700,
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            whiteSpace: "nowrap",
-          }}
+          className="sf-cart-btn"
         >
-          Carrito
-          <span
+          <svg
+            className="sf-cart-ico"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
             aria-hidden
-            style={{ background: "color-mix(in srgb, black 22%, transparent)", borderRadius: 999, padding: "1px 8px", fontSize: 12 }}
           >
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+            <path d="M3 6h18" />
+            <path d="M16 10a4 4 0 0 1-8 0" />
+          </svg>
+          <span className="sf-cart-txt">Carrito</span>
+          <span aria-hidden className="sf-cart-count" data-empty={count === 0 ? "1" : "0"}>
             {count}
           </span>
           {/* En modo canje el hint monetario no aplica: los precios van en créditos. */}
-          {count > 0 && mode === "money" ? <span aria-hidden>{formatMoney(subtotalHint)}</span> : null}
+          {count > 0 && mode === "money" ? (
+            <span aria-hidden className="sf-cart-money">{formatMoney(subtotalHint)}</span>
+          ) : null}
         </Link>
       </div>
     </header>

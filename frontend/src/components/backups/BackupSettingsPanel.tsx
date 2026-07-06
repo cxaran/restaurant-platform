@@ -69,11 +69,20 @@ export function BackupSettingsPanel({
   }));
   const [copied, setCopied] = useState(false);
 
-  // Conectar Drive lanza el OAuth con las credenciales GUARDADAS; sin ellas el backend
-  // responde 409. Se exige que estén persistidas (no basta con tenerlas en el form).
+  // Conectar Drive lanza el OAuth con las credenciales GUARDADAS y un redirect URI
+  // DERIVADO del dominio verificado (debe coincidir con Google Cloud). Sin cualquiera
+  // de los dos el backend falla; se exige que estén persistidos (no basta el form).
   const credentialsReady = Boolean(
     settings.driveClientId && settings.driveClientSecretConfigured,
   );
+  const domainReady = Boolean(settings.driveRedirectUri);
+  const canConnect = credentialsReady && domainReady;
+  // Motivo concreto por el que aún no se puede conectar (para el hint del botón).
+  const connectBlockedReason = !credentialsReady
+    ? "Guarda primero el Client ID y el secret de Google Drive (abajo)."
+    : !domainReady
+      ? "Verifica el dominio de la instalación en Sistema → Dominio para obtener el redirect URI."
+      : undefined;
 
   async function copyRedirectUri(): Promise<void> {
     if (!settings.driveRedirectUri) return;
@@ -192,12 +201,8 @@ export function BackupSettingsPanel({
             <button
               type="button"
               onClick={connect}
-              disabled={busy !== null || !credentialsReady}
-              title={
-                credentialsReady
-                  ? undefined
-                  : "Guarda primero el Client ID y el secret de Google Drive (abajo)."
-              }
+              disabled={busy !== null || !canConnect}
+              title={connectBlockedReason}
               className={primaryButton}
             >
               {settings.driveStatus === "needs_reauth" ? "Reconectar Google Drive" : "Conectar Google Drive"}

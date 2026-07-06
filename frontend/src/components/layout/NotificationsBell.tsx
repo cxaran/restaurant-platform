@@ -7,7 +7,7 @@
 // cualquier navegador de PC/Mac/Android/iOS sin permisos del sistema (la
 // garantía multiplataforma es campana + correo; push nativo sería mejora).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 
 import { browserApi } from "@/core/api/browser-client";
 import type { components } from "@/generated/openapi";
@@ -36,7 +36,17 @@ export function NotificationsBell({
 }: Readonly<{ variant?: "tt" | "sf" }>) {
   const [data, setData] = useState<MyNotifications | null>(null);
   const [open, setOpen] = useState(false);
+  // Posición vertical del panel en móvil (fixed): borde inferior del botón.
+  const [panelTop, setPanelTop] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // El contenedor solo mide lo que ocupa el botón (el panel va fuera de flujo),
+  // así que su borde inferior es el punto donde debe empezar el panel.
+  const measurePanelTop = useCallback(() => {
+    if (rootRef.current) {
+      setPanelTop(rootRef.current.getBoundingClientRect().bottom + 8);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -67,13 +77,20 @@ export function NotificationsBell({
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
+    // Recalcular al rotar/redimensionar (cambia el alto del header y la posición
+    // del botón, y con ello dónde debe anclarse el panel fijo en móvil).
+    function onResize() {
+      measurePanelTop();
+    }
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", onResize);
     };
-  }, [open]);
+  }, [open, measurePanelTop]);
 
   const unread = data?.unread_count ?? 0;
   const items = data?.items ?? [];
@@ -97,8 +114,12 @@ export function NotificationsBell({
         aria-expanded={open}
         title="Notificaciones"
         onClick={() => {
-          setOpen((value) => !value);
-          if (!open) void load();
+          const next = !open;
+          if (next) {
+            measurePanelTop();
+            void load();
+          }
+          setOpen(next);
         }}
         style={{
           position: "relative", display: "inline-flex", alignItems: "center",
@@ -128,14 +149,18 @@ export function NotificationsBell({
         <div
           role="dialog"
           aria-label="Notificaciones"
+          className="notif-panel"
           style={{
-            position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 60,
-            width: "min(360px, 88vw)", maxHeight: "min(420px, 70vh)",
-            overflowY: "auto", background: panelBg, color: "inherit",
-            border: `1px solid ${borderColor}`, borderRadius: 14,
+            zIndex: 60,
+            background: panelBg,
+            color: "inherit",
+            border: `1px solid ${borderColor}`,
+            borderRadius: 14,
             boxShadow: "0 14px 34px -12px rgba(0,0,0,0.35)",
-            display: "flex", flexDirection: "column",
-          }}
+            display: "flex",
+            flexDirection: "column",
+            ...(panelTop != null ? { "--notif-top": `${panelTop}px` } : {}),
+          } as CSSProperties}
         >
           <div
             style={{

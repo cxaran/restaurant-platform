@@ -1,9 +1,11 @@
-"""Notificaciones persistentes por usuario (campana in-app + correo).
+"""Notificaciones persistentes por usuario (campana in-app + correo + push).
 
-Cada fila es UNA notificación para UN usuario y llega por AMBOS medios: la
-campana del sitio/panel (lectura por ``read_at``) y un correo (cola por
-``email_status``, despachada best-effort por hilo post-commit y por el tick
-Taskiq como red de seguridad). Tipos:
+Cada fila es UNA notificación para UN usuario y llega por TRES medios: la
+campana del sitio/panel (lectura por ``read_at``), un correo (cola por
+``email_status``) y un Web Push a los dispositivos suscritos (cola por
+``push_status``, misma máquina de estados). Ambas colas se despachan
+best-effort por hilo post-commit y por el tick Taskiq como red de seguridad.
+Tipos:
 
 - ``order_status``  → cliente: su pedido cambió de estado.
 - ``order_new``     → personal/administradores con ``notifications:order_alerts``:
@@ -30,6 +32,7 @@ from .base import Base
 
 NOTIFICATION_KINDS = ("order_status", "order_new", "promo")
 EMAIL_STATUSES = ("pending", "sent", "failed", "skipped")
+PUSH_STATUSES = EMAIL_STATUSES
 
 
 def _in_clause(column: str, values: tuple[str, ...]) -> str:
@@ -44,8 +47,12 @@ class Notification(Base):
         CheckConstraint(
             _in_clause("email_status", EMAIL_STATUSES), name="notifications_email_status"
         ),
+        CheckConstraint(
+            _in_clause("push_status", PUSH_STATUSES), name="notifications_push_status"
+        ),
         Index("ix_notifications_user_read", "user_id", "read_at"),
         Index("ix_notifications_email_pending", "email_status", "created_at"),
+        Index("ix_notifications_push_pending", "push_status", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -63,6 +70,8 @@ class Notification(Base):
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     email_status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")
     email_error: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    push_status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")
+    push_error: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -128,13 +128,18 @@ page is a FIXED composition hero-carousel → highlight strip → live menu → 
 Pydantic contracts in `app/storefront/templates.py`, saving publishes instantly — the only
 gate is `is_active`; public payload at `GET /public/storefront/site` + `/highlights?surface=`),
 profiles (customer/staff, `can_deliver`), discount codes (fixed-amount, web-only),
-notifications (persistent per-user rows = in-app bell + email queue on the SAME row
-(`email_status` pending→sent/failed/skipped); rows are created INSIDE the triggering
-transaction — web-order created → users whose role grants `notifications:order_alerts`;
-status transition → customer, hooked centrally in `transition_order`; admin broadcast via
-`notifications:send` at `/admin/notificaciones` — emails dispatched by a post-commit
+notifications (persistent per-user rows = in-app bell + email queue + Web Push queue on
+the SAME row (`email_status` / `push_status` pending→sent/failed/skipped); rows are
+created INSIDE the triggering transaction — web-order created → users whose role grants
+`notifications:order_alerts`; status transition → customer, hooked centrally in
+`transition_order` (counter sales never notify the customer); admin broadcast via
+`notifications:send` at `/admin/notificaciones` — both queues dispatched by a post-commit
 best-effort thread plus the `notifications.tick` Taskiq cron as safety net with
-`FOR UPDATE SKIP LOCKED`).
+`FOR UPDATE SKIP LOCKED`. Web Push: `push_subscriptions` per browser/device, VAPID keys
+auto-generated into `web_push_credentials` (private key Fernet-encrypted), pywebpush;
+dead subscriptions (404/410) hard-deleted. Frontend is an installable PWA
+(`src/app/manifest.ts` + `public/sw.js`); iOS only gets push from the installed PWA —
+the bell offers install/enable per platform capability (`src/core/push/`)).
 
 Non-negotiable domain invariants (enforced backend + DB, never frontend-only):
 

@@ -50,3 +50,7 @@ PyJWT[crypto]==2.13.0
 
 # Mantener solo mientras existan hashes bcrypt heredados:
 passlib[bcrypt]==1.7.4
+
+# Web Push (VAPID) hacia los navegadores suscritos (services/push_service.py):
+# cifrado RFC 8291 + firma VAPID. Trae py-vapid y http-ece.
+pywebpush==2.3.0

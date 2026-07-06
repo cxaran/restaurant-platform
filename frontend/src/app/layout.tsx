@@ -16,6 +16,16 @@ const slab = Alfa_Slab_One({
 export const metadata: Metadata = {
   title: "Restaurant Platform",
   description: "Shell base reutilizable para productos Restaurant Platform",
+  // PWA: manifest + metadatos de Apple (iOS solo recibe Web Push desde la app
+  // instalada en la pantalla de inicio; ver docs/producto/notificaciones-y-roles.md).
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+  },
+  icons: {
+    apple: "/icons/icon-192.png",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

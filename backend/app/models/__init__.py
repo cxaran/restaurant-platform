@@ -29,6 +29,7 @@ from .finances import (
     OrderLineRefundAllocation,
 )
 from .notification import Notification
+from .push import PushSubscription, WebPushCredential
 from .orders import (
     Order,
     OrderAdjustment,
@@ -106,6 +107,7 @@ __all__ = [
     "ProductImage",
     "ProductInclusion",
     "ProductModifierGroup",
+    "PushSubscription",
     "Role",
     "RoleAccess",
     "ShippingRateRule",
@@ -121,4 +123,5 @@ __all__ = [
     "UserAddress",
     "UserIdentity",
     "UserRole",
+    "WebPushCredential",
 ]

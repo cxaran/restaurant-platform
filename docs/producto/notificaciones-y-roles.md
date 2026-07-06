@@ -1,10 +1,12 @@
 # Notificaciones y roles
 
-## Notificaciones: campana + correo, siempre ambos
+## Notificaciones: campana + correo + aviso del dispositivo
 
-Cada notificación es **una sola pieza que llega por dos medios**: la campana 🔔
-(sitio, panel y admin) y un correo al usuario. Los correos salen en segundos
-tras el evento y el sistema reintenta los pendientes cada minuto.
+Cada notificación es **una sola pieza que llega por tres medios**: la campana 🔔
+(sitio, panel y admin), un correo al usuario y — si el dispositivo lo activó —
+una **notificación del sistema** (Web Push) que llega aunque la página esté
+cerrada. Correos y pushes salen en segundos tras el evento y el sistema
+reintenta los pendientes cada minuto.
 
 | Quién | Recibe | Cuándo |
 |---|---|---|
@@ -12,9 +14,29 @@ tras el evento y el sistema reintenta los pendientes cada minuto.
 | **Personal** con `notifications:order_alerts` | «Pedido web nuevo» | Al crearse un pedido desde el sitio |
 | **Cualquier audiencia** | Promoción/aviso | Cuando el administrador difunde |
 
+Las ventas de **mostrador** no notifican al cliente (está presente y se lleva
+su ticket), aunque la venta quede asociada a su cuenta.
+
 La alerta de pedido nuevo se asigna **por rol**: dale
 `notifications:order_alerts` al rol de quien deba enterarse (cocina, gerente,
 tú). Quien no tenga el permiso, no recibe ruido.
+
+### Avisos del dispositivo (Web Push) por plataforma
+
+Se activan desde el panel de la campana 🔔 → **«Activar avisos en este
+dispositivo»** (el navegador pide permiso). Cada dispositivo/navegador se
+suscribe por separado bajo la sesión activa.
+
+| Plataforma | Cómo |
+|---|---|
+| **PC / Mac** (Chrome, Edge, Firefox, Safari 16+) | Botón + aceptar permiso |
+| **Android** (Chrome/Firefox) | Botón + aceptar permiso; llega con el navegador cerrado |
+| **iPhone / iPad** (iOS 16.4+) | Primero **añadir la app a la pantalla de inicio** (Compartir → «Añadir a pantalla de inicio»); dentro de la app instalada, activar los avisos. La campana muestra la instrucción cuando aplica |
+
+Para el personal (cocina/caja/reparto) esto convierte la alerta de pedido
+nuevo en un aviso **instantáneo del sistema**, sin necesidad de tener el panel
+abierto. Las claves técnicas (VAPID) se generan solas en el primer uso; no hay
+nada que configurar.
 
 ## Difusión (`/admin/notificaciones`, permiso `notifications:send`)
 

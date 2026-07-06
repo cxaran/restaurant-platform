@@ -1638,6 +1638,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/push/public-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Push Public Key
+         * @description Genera las credenciales VAPID en el primer uso y entrega la pública.
+         */
+        get: operations["push_public_key_api_v1_notifications_push_public_key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/push/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Push Subscription
+         * @description Alta/refresco de la suscripción de ESTE navegador (upsert por endpoint).
+         */
+        put: operations["save_push_subscription_api_v1_notifications_push_subscription_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/push/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Push Subscription
+         * @description Baja de la suscripción PROPIA (la de otro usuario 'no existe').
+         */
+        post: operations["remove_push_subscription_api_v1_notifications_push_unsubscribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notifications/broadcast": {
         parameters: {
             query?: never;
@@ -7062,6 +7122,48 @@ export interface components {
             /** Days */
             days: components["schemas"]["PublicWeeklyDay"][];
         };
+        /**
+         * PushPublicKeyRead
+         * @description Clave pública VAPID del despliegue (``applicationServerKey``).
+         */
+        PushPublicKeyRead: {
+            /** Public Key */
+            public_key: string;
+        };
+        /**
+         * PushSubscribeRequest
+         * @description Suscripción tal como la entrega ``PushSubscription.toJSON()``.
+         */
+        PushSubscribeRequest: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["PushSubscriptionKeys"];
+        };
+        /** PushSubscribeResult */
+        PushSubscribeResult: {
+            /** Saved */
+            saved: boolean;
+        };
+        /**
+         * PushSubscriptionKeys
+         * @description Claves de cifrado que genera el navegador (RFC 8291).
+         */
+        PushSubscriptionKeys: {
+            /** P256Dh */
+            p256dh: string;
+            /** Auth */
+            auth: string;
+        };
+        /** PushUnsubscribeRequest */
+        PushUnsubscribeRequest: {
+            /** Endpoint */
+            endpoint: string;
+        };
+        /** PushUnsubscribeResult */
+        PushUnsubscribeResult: {
+            /** Removed */
+            removed: boolean;
+        };
         /** ReadinessRead */
         ReadinessRead: {
             /**
@@ -12475,6 +12577,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_public_key_api_v1_notifications_push_public_key_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushPublicKeyRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_push_subscription_api_v1_notifications_push_subscription_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "user-agent"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscribeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSubscribeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_push_subscription_api_v1_notifications_push_unsubscribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushUnsubscribeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushUnsubscribeResult"];
                 };
             };
             /** @description Validation Error */

@@ -555,7 +555,7 @@ def checkout(
     # todo usuario cuyo rol otorga notifications:order_alerts.
     from backend.app.services.notification_service import (
         create_notification,
-        kick_email_dispatch,
+        kick_notification_dispatch,
         notify_new_web_order,
     )
 
@@ -576,7 +576,7 @@ def checkout(
     commit_or_conflict(session, "No fue posible registrar el pedido.")
     session.refresh(order)
     # Correos best-effort DESPUÉS del commit — jamás afectan la transacción.
-    kick_email_dispatch()
+    kick_notification_dispatch()
     return _my_order_read(session, order)
 
 
@@ -955,10 +955,10 @@ def transition(
     session.refresh(order)
     # La campana del cliente ya viajó en la transacción (transition_order);
     # aquí solo se despachan correos (best-effort) y la alerta G al negocio.
-    from backend.app.services.notification_service import kick_email_dispatch
+    from backend.app.services.notification_service import kick_notification_dispatch
     from backend.app.services.order_notifications import notify_admin_unresolved_refund
 
-    kick_email_dispatch()
+    kick_notification_dispatch()
     if payload.new_status == "cancelled":
         notify_admin_unresolved_refund(session, order)
     return _order_read(session, order)

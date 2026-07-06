@@ -188,6 +188,38 @@ class OrderFlowNotificationsTest(unittest.TestCase):
             session.commit()
             self.assertEqual(session.exec(select(Notification)).all(), [])
 
+    def test_counter_sale_with_customer_notifies_nobody(self) -> None:
+        # Venta de mostrador CON cliente registrado: el cliente está presente y
+        # se lleva su ticket; ninguna transición (aprobado/entregado) le genera
+        # campana ni correo. El corte es central en notify_order_status.
+        with Session(self.engine) as session:
+            cashier = _make_user(session, "cajero2-pos@example.com")
+            customer = _make_user(session, "cliente-mostrador@example.com")
+            category = ProductCategory(name="Cat")
+            session.add(category)
+            session.flush()
+            product = Product(
+                category_id=category.id, name="Dip", money_price_amount=Decimal("15"),
+            )
+            session.add(product)
+            session.flush()
+            priced = price_cart(
+                session,
+                [CartLineInput(product_id=product.id, quantity=1, purchase_mode="money")],
+            )
+            order = create_order(
+                session, priced,
+                OrderIdentity(
+                    source="counter", fulfillment_type="counter",
+                    customer_user_id=customer.id, created_by=cashier.id,
+                ),
+            )
+            transition_order(session, order, "pending_approval", actor_id=None)
+            transition_order(session, order, "approved", actor_id=None)
+            transition_order(session, order, "completed", actor_id=None)
+            session.commit()
+            self.assertEqual(session.exec(select(Notification)).all(), [])
+
 
 class EmailDispatchTest(unittest.TestCase):
     def setUp(self) -> None:

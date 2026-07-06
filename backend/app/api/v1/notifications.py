@@ -1,14 +1,16 @@
-"""Notificaciones: campana propia (/me) y difusión del administrador.
+"""Notificaciones: campana propia (/me), Web Push y difusión del administrador.
 
 Las propias son recurso PROPIO: cualquier usuario autenticado lee y marca las
-suyas — jamás las de otro. La difusión exige ``notifications:send`` y queda
-auditada con NOMBRES de campos (nunca el contenido).
+suyas — jamás las de otro. Las suscripciones push también: cada navegador
+registra/da de baja SU endpoint bajo la sesión activa. La difusión exige
+``notifications:send`` y queda auditada con NOMBRES de campos (nunca el
+contenido).
 """
 
 import uuid
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Header, Query, status
 from pydantic import Field
 from sqlmodel import select
 
@@ -21,7 +23,7 @@ from backend.app.security.groups.notifications import NotificationPermissions
 from backend.app.services.config_audit import record_config_change
 from backend.app.services.notification_service import (
     broadcast,
-    kick_email_dispatch,
+    kick_notification_dispatch,
     mark_all_read,
     unread_count,
 )
@@ -103,6 +105,95 @@ def read_notification(
     return _read(row)
 
 
+# ---------------------------------------------------------------------------
+# Web Push: clave pública VAPID + suscripción del navegador (recurso propio)
+# ---------------------------------------------------------------------------
+
+class PushPublicKeyRead(ApiReadSchema):
+    """Clave pública VAPID del despliegue (``applicationServerKey``)."""
+
+    public_key: str
+
+
+class PushSubscriptionKeys(ApiWriteSchema):
+    """Claves de cifrado que genera el navegador (RFC 8291)."""
+
+    p256dh: str = Field(min_length=1, max_length=255)
+    auth: str = Field(min_length=1, max_length=255)
+
+
+class PushSubscribeRequest(ApiWriteSchema):
+    """Suscripción tal como la entrega ``PushSubscription.toJSON()``."""
+
+    endpoint: str = Field(min_length=1, max_length=2048)
+    keys: PushSubscriptionKeys
+
+
+class PushUnsubscribeRequest(ApiWriteSchema):
+    endpoint: str = Field(min_length=1, max_length=2048)
+
+
+class PushSubscribeResult(ApiReadSchema):
+    saved: bool
+
+
+class PushUnsubscribeResult(ApiReadSchema):
+    removed: bool
+
+
+@router.get("/push/public-key", response_model=PushPublicKeyRead)
+def push_public_key(
+    session: SessionDep, _current_user: CurrentUser
+) -> PushPublicKeyRead:
+    """Genera las credenciales VAPID en el primer uso y entrega la pública."""
+    from backend.app.services.push_service import PushConfigError, get_vapid_public_key
+
+    try:
+        public_key = get_vapid_public_key(session)
+    except PushConfigError as exc:
+        api_error(status.HTTP_503_SERVICE_UNAVAILABLE, exc.code, exc.summary)
+    commit_or_conflict(session, "No fue posible preparar las credenciales push.")
+    return PushPublicKeyRead(public_key=public_key)
+
+
+@router.put("/push/subscription", response_model=PushSubscribeResult)
+def save_push_subscription(
+    payload: PushSubscribeRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+    user_agent: Optional[str] = Header(default=None),
+) -> PushSubscribeResult:
+    """Alta/refresco de la suscripción de ESTE navegador (upsert por endpoint)."""
+    from backend.app.services.push_service import save_subscription
+
+    save_subscription(
+        session,
+        user_id=current_user.id,
+        endpoint=payload.endpoint,
+        p256dh=payload.keys.p256dh,
+        auth=payload.keys.auth,
+        user_agent=user_agent,
+    )
+    commit_or_conflict(session, "No fue posible guardar la suscripción push.")
+    return PushSubscribeResult(saved=True)
+
+
+@router.post("/push/unsubscribe", response_model=PushUnsubscribeResult)
+def remove_push_subscription(
+    payload: PushUnsubscribeRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> PushUnsubscribeResult:
+    """Baja de la suscripción PROPIA (la de otro usuario 'no existe')."""
+    from backend.app.services.push_service import remove_subscription
+
+    removed = remove_subscription(
+        session, user_id=current_user.id, endpoint=payload.endpoint
+    )
+    commit_or_conflict(session, "No fue posible retirar la suscripción push.")
+    return PushUnsubscribeResult(removed=removed)
+
+
 class BroadcastRequest(ApiWriteSchema):
     title: str = Field(min_length=1, max_length=140)
     body: str = Field(min_length=1, max_length=500)
@@ -126,5 +217,5 @@ def send_broadcast(
     )
     commit_or_conflict(session, "No fue posible enviar la difusión.")
     # Correos best-effort DESPUÉS del commit; el tick Taskiq es la red de seguridad.
-    kick_email_dispatch()
+    kick_notification_dispatch()
     return {"created": created, "audience": payload.audience}

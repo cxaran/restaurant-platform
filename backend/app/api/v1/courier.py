@@ -212,9 +212,9 @@ def start(
     session.refresh(assignment)
     # La campana «en camino» ya viajó con la transición (transition_order);
     # aquí solo se despachan los correos pendientes, best-effort tras commit.
-    from backend.app.services.notification_service import kick_email_dispatch
+    from backend.app.services.notification_service import kick_notification_dispatch
 
-    kick_email_dispatch()
+    kick_notification_dispatch()
     return _assignment_read(assignment)
 
 
@@ -258,6 +258,12 @@ def complete(
         _raise(exc)
     commit_or_conflict(session, "No fue posible completar la entrega.")
     session.refresh(assignment)
+    # La campana «entregado» viajó con la transición; despachar correo + push
+    # pendientes best-effort tras el commit (antes esta ruta dependía SOLO del
+    # tick Taskiq y el aviso salía hasta un minuto tarde).
+    from backend.app.services.notification_service import kick_notification_dispatch
+
+    kick_notification_dispatch()
     return _assignment_read(assignment)
 
 

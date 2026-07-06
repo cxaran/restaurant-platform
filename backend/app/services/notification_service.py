@@ -1,17 +1,20 @@
-"""Notificaciones persistentes: campana in-app + correo, siempre AMBOS medios.
+"""Notificaciones persistentes: campana in-app + correo + Web Push.
 
 Las filas se crean DENTRO de la transacción del evento que las dispara (pedido
 web nuevo, transición de estado, difusión del admin): o se persiste todo o
-nada. El correo es una COLA sobre la misma fila (``email_status='pending'``):
+nada. El correo y el push son COLAS sobre la misma fila (``email_status`` /
+``push_status`` = 'pending'):
 
-- ``kick_email_dispatch()`` — hilo best-effort post-commit (patrón de
-  ``order_notifications``): en despliegues sin worker Taskiq los correos salen
+- ``kick_notification_dispatch()`` — hilo best-effort post-commit (patrón de
+  ``order_notifications``): en despliegues sin worker Taskiq los avisos salen
   igual, sin bloquear el request.
 - ``notifications.tick`` (Taskiq, por minuto) — red de seguridad que despacha
   lo que un hilo dejó pendiente. ``FOR UPDATE SKIP LOCKED`` evita dobles.
 
-El transporte real es ``send_system_email`` (environment/SMTP/Resend desde
-system_settings); un fallo marca ``failed`` con resumen SEGURO y jamás revienta.
+El transporte real del correo es ``send_system_email`` (environment/SMTP/Resend
+desde system_settings) y el del push ``push_service.dispatch_pending_pushes``
+(pywebpush + VAPID); un fallo marca ``failed`` con resumen SEGURO y jamás
+revienta.
 """
 
 import asyncio
@@ -70,6 +73,7 @@ def create_notification(
     body: str,
     order_id: Optional[uuid.UUID] = None,
     email: bool = True,
+    push: bool = True,
 ) -> Notification:
     """Crea la fila (SIN commit): viaja en la transacción del evento."""
     row = Notification(
@@ -79,6 +83,7 @@ def create_notification(
         body=body[:500],
         order_id=order_id,
         email_status="pending" if email else "skipped",
+        push_status="pending" if push else "skipped",
     )
     session.add(row)
     return row
@@ -87,6 +92,14 @@ def create_notification(
 def notify_order_status(session: Session, order: Order, new_status: str) -> None:
     """Cliente: cambio de estado de SU pedido (campana + correo)."""
     if order.customer_user_id is None:
+        return
+    # Venta de MOSTRADOR: el cliente está presente y se lleva su ticket en el
+    # acto. No tiene sentido inundarlo de campana + correo por cada transición
+    # (confirmado/entregado); esas notificaciones son para pedidos remotos
+    # (web/teléfono a domicilio o recoger). Se corta aquí, de forma central,
+    # para TODA ruta que transicione una venta de mostrador (POS, verificación
+    # H10, panel), aunque la venta tenga un cliente registrado asociado.
+    if order.fulfillment_type == "counter":
         return
     message = _STATUS_MESSAGES.get(new_status)
     if message is None:
@@ -214,20 +227,23 @@ async def dispatch_pending_emails(session: Session, *, limit: int = EMAIL_BATCH_
     return sent
 
 
-def kick_email_dispatch() -> None:
-    """Hilo best-effort post-commit (jamás afecta la transacción del evento)."""
+def kick_notification_dispatch() -> None:
+    """Hilo best-effort post-commit: correos + pushes pendientes (jamás afecta
+    la transacción del evento)."""
 
     def _runner() -> None:
         try:
             from backend.app.core.database import engine
+            from backend.app.services.push_service import dispatch_pending_pushes
 
             with Session(engine) as session:
                 asyncio.run(dispatch_pending_emails(session))
+                dispatch_pending_pushes(session)
                 session.commit()
         except Exception:  # noqa: BLE001 — best-effort explícito
-            logger.warning("notification_email_dispatch_failed")
+            logger.warning("notification_dispatch_failed")
 
-    threading.Thread(target=_runner, name="notification-emails", daemon=True).start()
+    threading.Thread(target=_runner, name="notification-dispatch", daemon=True).start()
 
 
 def unread_count(session: Session, user_id: uuid.UUID) -> int:

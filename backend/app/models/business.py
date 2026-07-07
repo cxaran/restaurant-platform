@@ -119,6 +119,10 @@ class BusinessSettings(Base):
     __tablename__ = "business_settings"
     __table_args__ = (
         CheckConstraint("id = 1", name="business_settings_singleton"),
+        CheckConstraint(
+            "ticket_paper_size in ('thermal_58', 'thermal_80')",
+            name="business_settings_ticket_paper_size",
+        ),
     )
 
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, default=SINGLETON_ID)
@@ -182,6 +186,12 @@ class BusinessSettings(Base):
         ),
     )
     ticket_footer_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Tamaño de hoja del ticket PDF que se envía por correo al completar el pedido
+    # (recibo térmico): ancho de rollo 58 mm o 80 mm. No afecta la impresión del
+    # frontend (58 mm), que es independiente.
+    ticket_paper_size: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="thermal_80", server_default="thermal_80"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -3922,6 +3922,11 @@ export interface components {
             free_shipping_global_from_amount?: string | null;
             /** Ticket Footer Text */
             ticket_footer_text?: string | null;
+            /**
+             * Ticket Paper Size
+             * @default thermal_80
+             */
+            ticket_paper_size: string;
             /** Updated At */
             updated_at?: string | null;
         };
@@ -3951,6 +3956,8 @@ export interface components {
             free_shipping_global_from_amount?: number | string | null;
             /** Ticket Footer Text */
             ticket_footer_text?: string | null;
+            /** Ticket Paper Size */
+            ticket_paper_size?: ("thermal_58" | "thermal_80") | null;
         };
         /**
          * BusinessSummaryRead
@@ -5794,6 +5801,8 @@ export interface components {
             payment_status: string;
             /** Customer Name Snapshot */
             customer_name_snapshot?: string | null;
+            /** Customer Email Snapshot */
+            customer_email_snapshot?: string | null;
             /** Items Subtotal Amount */
             items_subtotal_amount: string;
             /** Shipping Total Amount */
@@ -5861,6 +5870,8 @@ export interface components {
             customer_name_snapshot?: string | null;
             /** Customer Phone Snapshot */
             customer_phone_snapshot?: string | null;
+            /** Customer Email Snapshot */
+            customer_email_snapshot?: string | null;
             /** Items Subtotal Amount */
             items_subtotal_amount: string;
             /** Discount Total Amount */
@@ -8323,6 +8334,8 @@ export interface components {
             name?: string | null;
             /** Phone */
             phone?: string | null;
+            /** Email */
+            email?: string | null;
         };
         /** TicketDelivery */
         TicketDelivery: {

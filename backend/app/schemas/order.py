@@ -230,6 +230,7 @@ class OrderRead(ApiReadSchema):
     collection_label: Optional[str] = None
     customer_name_snapshot: Optional[str] = None
     customer_phone_snapshot: Optional[str] = None
+    customer_email_snapshot: Optional[str] = None
     items_subtotal_amount: Decimal
     discount_total_amount: Decimal
     shipping_total_amount: Optional[Decimal] = None
@@ -266,6 +267,7 @@ class OrderListItem(ApiReadSchema):
     status: str
     payment_status: str
     customer_name_snapshot: Optional[str] = None
+    customer_email_snapshot: Optional[str] = None
     items_subtotal_amount: Decimal
     shipping_total_amount: Optional[Decimal] = None
     total_money_amount: Optional[Decimal] = None

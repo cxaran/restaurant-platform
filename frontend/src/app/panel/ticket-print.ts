@@ -122,10 +122,11 @@ export function buildTicketHtml(
     `<div>Tipo: ${esc(FULFILLMENT_LABELS[ticket.fulfillment_type] ?? ticket.fulfillment_type)}</div>` +
     (ticket.attended_by ? `<div>Atendió: ${esc(ticket.attended_by)}</div>` : "") +
     `<div>Estado: ${esc(ticket.status_label)}</div>` +
-    (customer.name || customer.phone || delivery
+    (customer.name || customer.phone || customer.email || delivery
       ? `<hr />` +
         (customer.name ? `<div>Cliente: ${esc(customer.name)}</div>` : "") +
         (customer.phone ? `<div>Tel: ${esc(customer.phone)}</div>` : "") +
+        (customer.email ? `<div>Correo: ${esc(customer.email)}</div>` : "") +
         (delivery
           ? `<div>${esc(delivery.street)}${delivery.external_number ? ` ${esc(delivery.external_number)}` : ""}${delivery.internal_number ? ` int. ${esc(delivery.internal_number)}` : ""}</div>` +
             (delivery.neighborhood || delivery.city

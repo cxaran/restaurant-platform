@@ -269,6 +269,7 @@ class TicketBusiness(ApiReadSchema):
 class TicketCustomer(ApiReadSchema):
     name: Optional[str] = None
     phone: Optional[str] = None
+    email: Optional[str] = None
 
 
 class TicketDelivery(ApiReadSchema):

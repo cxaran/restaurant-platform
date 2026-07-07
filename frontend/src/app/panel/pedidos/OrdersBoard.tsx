@@ -194,6 +194,11 @@ function OrderCard({
         {" · "}
         {FULFILLMENT_LABELS[order.fulfillment_type] ?? order.fulfillment_type}
       </span>
+      {order.customer_email_snapshot ? (
+        <span style={{ fontSize: 12, color: "var(--tx3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {order.customer_email_snapshot}
+        </span>
+      ) : null}
       <span
         style={{
           display: "flex", justifyContent: "space-between", alignItems: "baseline",
@@ -495,7 +500,7 @@ export function OrdersBoard({ permissions }: Readonly<{ permissions: string[] }>
           className="tt-input"
           value={qInput}
           onChange={(event) => setQInput(event.target.value)}
-          placeholder="Buscar por folio, cliente, quien recibe o dirección…"
+          placeholder="Buscar por folio, cliente, correo, quien recibe o dirección…"
           aria-label="Buscar pedidos"
           style={{ flex: "1 1 260px", maxWidth: 380, padding: "8px 12px", fontSize: 13 }}
         />

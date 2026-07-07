@@ -161,6 +161,13 @@ def transition_order(
 
         for payment in pending_cash_payments(session, order):
             mark_paid(session, order, payment, actor_id=actor_id)
+        # Ticket PDF al cliente (best-effort, POST-COMMIT): si hay correo
+        # capturado (registrado o de POS) se envía al confirmarse la transacción.
+        from backend.app.services.order_notifications import (
+            schedule_completed_order_ticket,
+        )
+
+        schedule_completed_order_ticket(session, order)
     elif new_status == "cancelled":
         # H5 (§1.6): cancelar NO reembolsa. Con dinero cobrado, quien cancela
         # elige una resolución explícita: reembolso ahora, reembolso pendiente

@@ -98,6 +98,9 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
   const [minimumDelivery, setMinimumDelivery] = useState("");
   const [freeShippingFrom, setFreeShippingFrom] = useState("");
   const [ticketFooter, setTicketFooter] = useState("");
+  const [ticketPaperSize, setTicketPaperSize] = useState<"thermal_58" | "thermal_80">(
+    "thermal_80",
+  );
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
@@ -120,6 +123,7 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
     setMinimumDelivery(data.minimum_delivery_order_amount ?? "");
     setFreeShippingFrom(data.free_shipping_global_from_amount ?? "");
     setTicketFooter(data.ticket_footer_text ?? "");
+    setTicketPaperSize(data.ticket_paper_size === "thermal_58" ? "thermal_58" : "thermal_80");
   }
 
   useEffect(() => {
@@ -151,6 +155,7 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
         minimum_delivery_order_amount: minimumDelivery.trim() || null,
         free_shipping_global_from_amount: freeShippingFrom.trim() || null,
         ticket_footer_text: ticketFooter.trim() || null,
+        ticket_paper_size: ticketPaperSize,
       };
       applySettings(await updateBusinessSettings(body));
       setNotice("Política de pedidos guardada.");
@@ -262,6 +267,28 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
               aria-describedby={fieldErrors.ticket_footer_text ? "bs-ticket-footer-error" : undefined}
             />
             <FieldError id="bs-ticket-footer-error" message={fieldErrors.ticket_footer_text} />
+          </div>
+
+          <div>
+            <label className={labelClass} htmlFor="bs-ticket-paper">
+              Tamaño de hoja del ticket
+            </label>
+            <select
+              id="bs-ticket-paper"
+              disabled={!canEdit}
+              value={ticketPaperSize}
+              onChange={(event) =>
+                setTicketPaperSize(event.target.value as "thermal_58" | "thermal_80")
+              }
+              className="w-full rounded-[11px] border border-[var(--border2)] bg-[var(--bg2)] px-3 py-2.5 text-sm text-[var(--tx)] outline-none transition focus:border-[var(--accent-bd)] focus:shadow-[var(--glow)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="thermal_80">Rollo térmico 80 mm</option>
+              <option value="thermal_58">Rollo térmico 58 mm</option>
+            </select>
+            <p className="mt-1 text-xs text-[var(--tx3)]">
+              Formato del ticket PDF que se envía por correo al cliente al completar
+              el pedido.
+            </p>
           </div>
 
           {canEdit ? (

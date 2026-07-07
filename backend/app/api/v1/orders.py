@@ -700,6 +700,7 @@ def _apply_order_list_filters(
                 Order.public_code.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
                 Order.customer_name_snapshot.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
                 Order.customer_phone_snapshot.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
+                Order.customer_email_snapshot.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
                 OrderDelivery.recipient_name.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
                 OrderDelivery.recipient_phone.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
                 OrderDelivery.street.ilike(term),  # pyright: ignore[reportAttributeAccessIssue]
@@ -736,6 +737,7 @@ def _order_list_items(session: SessionDep, orders: list[Order]) -> list[OrderLis
             status=order.status,
             payment_status=order.payment_status,
             customer_name_snapshot=order.customer_name_snapshot,
+            customer_email_snapshot=order.customer_email_snapshot,
             items_subtotal_amount=order.items_subtotal_amount,
             shipping_total_amount=order.shipping_total_amount,
             total_money_amount=order.total_money_amount,

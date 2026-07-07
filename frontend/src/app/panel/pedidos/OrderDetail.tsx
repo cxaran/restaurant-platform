@@ -439,6 +439,7 @@ export function OrderDetail({
     SOURCE_LABELS[detail.source] ?? detail.source,
     detail.customer_name_snapshot,
     detail.customer_phone_snapshot,
+    detail.customer_email_snapshot,
   ]
     .filter(Boolean)
     .join(" · ");

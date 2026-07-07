@@ -20,6 +20,9 @@ from typing import Optional
 
 from sqlmodel import Session
 
+# Un adjunto es (nombre_archivo, contenido_bytes, mime_type).
+EmailAttachment = tuple[str, bytes, str]
+
 from backend.app.core.settings import settings
 from backend.app.models.system_settings import SystemSettings
 from backend.app.services.secret_cipher import decrypt_secret
@@ -113,8 +116,34 @@ def action_email_html(*, message: str, action_url: str, action_label: str) -> st
     )
 
 
+def _fastapi_mail_attachments(attachments: Optional[list[EmailAttachment]]) -> list:
+    """Envuelve cada adjunto en un ``UploadFile`` en memoria (fastapi-mail lo lee)."""
+    if not attachments:
+        return []
+    from io import BytesIO
+
+    from starlette.datastructures import Headers, UploadFile
+
+    wrapped = []
+    for filename, content, mime_type in attachments:
+        wrapped.append(
+            UploadFile(
+                filename=filename,
+                file=BytesIO(content),
+                headers=Headers({"content-type": mime_type}),
+            )
+        )
+    return wrapped
+
+
 async def _send_via_fastapi_mail(
-    *, subject: str, email_to: str, message: str, connection_config, html: Optional[str] = None
+    *,
+    subject: str,
+    email_to: str,
+    message: str,
+    connection_config,
+    html: Optional[str] = None,
+    attachments: Optional[list[EmailAttachment]] = None,
 ) -> None:
     from fastapi_mail import FastMail, MessageSchema, MessageType
     from pydantic import NameEmail
@@ -124,6 +153,7 @@ async def _send_via_fastapi_mail(
         recipients=[NameEmail(name=email_to, email=email_to)],
         body=html if html is not None else message,
         subtype=MessageType.html if html is not None else MessageType.plain,
+        attachments=_fastapi_mail_attachments(attachments),
     )
     await FastMail(connection_config).send_message(email)
 
@@ -152,8 +182,16 @@ def _smtp_connection_config(config: SystemSettings):
 
 
 async def _send_via_resend(
-    *, subject: str, email_to: str, message: str, config: SystemSettings, html: Optional[str] = None
+    *,
+    subject: str,
+    email_to: str,
+    message: str,
+    config: SystemSettings,
+    html: Optional[str] = None,
+    attachments: Optional[list[EmailAttachment]] = None,
 ) -> None:
+    import base64
+
     import httpx
 
     api_key = (
@@ -174,6 +212,11 @@ async def _send_via_resend(
     }
     if html is not None:
         payload["html"] = html
+    if attachments:
+        payload["attachments"] = [
+            {"filename": filename, "content": base64.b64encode(content).decode("ascii")}
+            for filename, content, _mime in attachments
+        ]
     async with httpx.AsyncClient(timeout=httpx.Timeout(_RESEND_TIMEOUT_SECONDS)) as client:
         response = await client.post(
             _RESEND_ENDPOINT,
@@ -192,11 +235,14 @@ async def send_system_email(
     email_to: str,
     message: str,
     html: Optional[str] = None,
+    attachments: Optional[list[EmailAttachment]] = None,
 ) -> EmailOutcome:
     """Envía con el transporte configurado. Best-effort: NUNCA lanza.
 
     ``html`` es opcional (p. ej. botón de acción); ``message`` sigue siendo el
-    texto plano — con Resend viajan ambos, con SMTP se prefiere el HTML."""
+    texto plano — con Resend viajan ambos, con SMTP se prefiere el HTML.
+    ``attachments`` es una lista de ``(nombre, bytes, mime)`` — p. ej. el ticket
+    PDF que se adjunta al completar un pedido."""
     from backend.app.services.system_settings_service import get_system_settings
 
     config = get_system_settings(session)
@@ -208,7 +254,8 @@ async def send_system_email(
     try:
         if config.email_mode == "resend":
             await _send_via_resend(
-                subject=subject, email_to=email_to, message=message, config=config, html=html
+                subject=subject, email_to=email_to, message=message, config=config,
+                html=html, attachments=attachments,
             )
         elif config.email_mode == "smtp":
             await _send_via_fastapi_mail(
@@ -217,6 +264,7 @@ async def send_system_email(
                 message=message,
                 connection_config=_smtp_connection_config(config),
                 html=html,
+                attachments=attachments,
             )
         else:
             await _send_via_fastapi_mail(
@@ -225,6 +273,7 @@ async def send_system_email(
                 message=message,
                 connection_config=settings.mail_config,
                 html=html,
+                attachments=attachments,
             )
     except Exception as error:
         # Resumen SEGURO: clase del error / código propio, jamás credenciales.

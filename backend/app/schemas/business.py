@@ -7,7 +7,7 @@ envío gratis); los datos internos nunca se proyectan ahí.
 
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -89,6 +89,7 @@ class BusinessSettingsRead(ApiReadSchema):
     minimum_delivery_order_amount: Optional[Decimal] = None
     free_shipping_global_from_amount: Optional[Decimal] = None
     ticket_footer_text: Optional[str] = None
+    ticket_paper_size: str = "thermal_80"
     updated_at: Optional[datetime] = None
 
 
@@ -105,6 +106,7 @@ class BusinessSettingsUpdate(ApiPatchSchema):
     minimum_delivery_order_amount: Optional[Decimal] = Field(default=None, ge=0)
     free_shipping_global_from_amount: Optional[Decimal] = Field(default=None, ge=0)
     ticket_footer_text: Optional[str] = None
+    ticket_paper_size: Optional[Literal["thermal_58", "thermal_80"]] = None
 
 
 # ---------------------------------------------------------------------------

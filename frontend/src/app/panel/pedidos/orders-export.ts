@@ -48,6 +48,7 @@ const COLUMNS: readonly Column[] = [
     value: (order) => (order.purchase_mode === "credits" ? "Créditos" : "Dinero"),
   },
   { label: "Cliente", value: (order) => order.customer_name_snapshot ?? "" },
+  { label: "Correo", value: (order) => order.customer_email_snapshot ?? "" },
   { label: "Subtotal", value: (order) => money(order.items_subtotal_amount) },
   { label: "Envío", value: (order) => money(order.shipping_total_amount) },
   { label: "Total", value: (order) => money(order.total_money_amount) },

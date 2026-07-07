@@ -72,6 +72,7 @@ def build_ticket_payload(session: Session, order: Order) -> dict:
         "customer": {
             "name": order.customer_name_snapshot,
             "phone": order.customer_phone_snapshot,
+            "email": order.customer_email_snapshot,
         },
         "delivery": (
             {

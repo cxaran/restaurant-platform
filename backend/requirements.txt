@@ -59,3 +59,8 @@ pywebpush==2.3.0
 # Generación del ícono cuadrado de la PWA a partir del logo (services/pwa_icon_service.py):
 # centra y rellena el logo a un PNG cuadrado bajo demanda. Wheels autocontenidos.
 Pillow==12.3.0
+
+# Ticket PDF del pedido al completarse (services/ticket_pdf_service.py): recibo
+# térmico (58/80 mm) compuesto desde los snapshots. Pure-python, wheels
+# autocontenidos (sin dependencias del sistema en la imagen Docker).
+reportlab==4.2.5

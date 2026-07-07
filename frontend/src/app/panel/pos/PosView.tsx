@@ -86,6 +86,7 @@ export function PosView({
 
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [source, setSource] = useState<Source>("counter");
   const [fulfillment, setFulfillment] = useState<Fulfillment>("counter");
   const [address, setAddress] = useState({ ...EMPTY_ADDRESS });
@@ -441,6 +442,7 @@ export function PosView({
     setLines([]);
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerEmail("");
     setAddress({ ...EMPTY_ADDRESS });
     setDeliveryPoint(null);
     setPinSuggestion(null);
@@ -556,6 +558,7 @@ export function PosView({
           lines: toOrderLineInputs(lines),
           ...(customerName.trim() ? { customer_name: customerName.trim() } : {}),
           ...(customerPhone.trim() ? { customer_phone: customerPhone.trim() } : {}),
+          ...(customerEmail.trim() ? { customer_email: customerEmail.trim() } : {}),
           ...(internalNote.trim() ? { internal_note: internalNote.trim() } : {}),
           ...(fulfillment === "delivery"
             ? {
@@ -780,6 +783,16 @@ export function PosView({
                 }
                 inputMode="tel"
                 aria-label="Teléfono del cliente"
+              />
+              <input
+                className="tt-input"
+                type="email"
+                value={customerEmail}
+                onChange={(event) => setCustomerEmail(event.target.value)}
+                placeholder="Correo del cliente (opcional)"
+                inputMode="email"
+                autoComplete="off"
+                aria-label="Correo del cliente"
               />
               {fulfillment === "delivery" ? (
                 <>

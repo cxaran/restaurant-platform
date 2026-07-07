@@ -643,7 +643,7 @@ export function PosView({
   const resultOrderId = saleResult?.order.id ?? captureResult?.id ?? null;
 
   return (
-    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_430px]">
+    <div className="pos-split">
       {/* ── Izquierda: chips de categoría + grid de productos ─────────── */}
       <section className="flex min-w-0 flex-col gap-4" aria-label="Menú de productos">
         <div className="flex flex-wrap gap-2">

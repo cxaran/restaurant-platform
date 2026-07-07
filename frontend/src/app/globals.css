@@ -534,6 +534,36 @@ input::placeholder {
 }
 
 /*
+ * Colapsar la barra lateral en ESCRITORIO (>=881px): el mismo boton ☰ del header
+ * la oculta para ganar ancho (p. ej. el POS en tablet). El estado vive en
+ * [data-nav-collapsed="1"] sobre el contenedor del shell y persiste en
+ * localStorage. En movil (<=880px) el boton sigue abriendo el drawer.
+ */
+@media (min-width: 881px) {
+  .mc-menu-btn { display: flex; }
+  [data-nav-collapsed="1"] .mc-sidebar { display: none; }
+}
+
+/*
+ * POS a mostrador: productos | carrito (430px). Con la barra lateral VISIBLE el
+ * layout de dos columnas necesita ~1280px de viewport; con la barra OCULTA
+ * bastan ~1040px porque se recuperan los ~230px de la barra — asi el iPad en
+ * horizontal arma las columnas al colapsar el menu.
+ */
+.pos-split {
+  display: grid;
+  align-items: start;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1280px) {
+  .pos-split { grid-template-columns: minmax(0, 1fr) 430px; }
+}
+@media (min-width: 1040px) {
+  [data-nav-collapsed="1"] .pos-split { grid-template-columns: minmax(0, 1fr) 430px; }
+}
+
+/*
  * ====================================================================
  * Tabla de recursos (tanda 0) — acciones de fila flotantes.
  * La celda de acciones es sticky al borde derecho del viewport de scroll:

@@ -1,10 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 
 import { AccountMenu } from "@/components/layout/AccountMenu";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+
+// Colapso de la barra en escritorio, persistido en localStorage y compartido vía
+// useSyncExternalStore (SSR-safe: el servidor asume «visible»). El mismo store
+// sirve a cualquier shell montado (panel + admin usan TTShell).
+const NAV_COLLAPSED_KEY = "tt-nav-collapsed";
+const NAV_COLLAPSED_EVENT = "tt-nav-collapsed-change";
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(NAV_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeCollapsed(next: boolean): void {
+  try {
+    localStorage.setItem(NAV_COLLAPSED_KEY, next ? "1" : "0");
+  } catch {
+    /* sin persistencia: el colapso dura la sesión */
+  }
+  window.dispatchEvent(new Event(NAV_COLLAPSED_EVENT));
+}
+
+function subscribeCollapsed(callback: () => void): () => void {
+  window.addEventListener(NAV_COLLAPSED_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(NAV_COLLAPSED_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+/** True en el breakpoint móvil, donde el botón ☰ abre el drawer en vez de colapsar. */
+function isMobileViewport(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 880px)").matches
+  );
+}
 
 export type TTShellNavItem = {
   key: string;
@@ -49,11 +89,22 @@ export function TTShell({
 }>) {
   const [navOpen, setNavOpen] = useState(false);
   const closeNav = () => setNavOpen(false);
+  // Colapso de la barra en escritorio (persistido): gana ancho para el POS en
+  // tablet. En móvil el mismo botón abre el drawer.
+  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
+  const handleMenuButton = () => {
+    if (isMobileViewport()) {
+      setNavOpen((open) => !open);
+      return;
+    }
+    writeCollapsed(!collapsed);
+  };
 
   return (
     <div
       className="flex h-dvh overflow-hidden bg-[var(--bg)] text-[var(--tx)]"
       data-nav-open={navOpen ? "1" : "0"}
+      data-nav-collapsed={collapsed ? "1" : "0"}
     >
       <button
         type="button"
@@ -132,8 +183,9 @@ export function TTShell({
           <button
             type="button"
             className="mc-menu-btn h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--border2)] text-[var(--tx2)]"
-            aria-label="Abrir navegación"
-            onClick={() => setNavOpen((open) => !open)}
+            aria-label={collapsed ? "Mostrar menú" : "Ocultar menú"}
+            aria-pressed={collapsed}
+            onClick={handleMenuButton}
           >
             ☰
           </button>

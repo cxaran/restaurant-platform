@@ -60,6 +60,12 @@ class UserAddress(Base):
         nullable=True,
         comment="Referencias de entrega: «casa azul frente a la tienda».",
     )
+    contact_phone: Mapped[Optional[str]] = mapped_column(
+        String(30),
+        nullable=True,
+        comment="Teléfono de contacto guardado con la dirección: prellena el "
+        "checkout para no volver a pedirlo.",
+    )
     location: Mapped[Optional[Any]] = mapped_column(
         PointGeometry(),
         nullable=True,

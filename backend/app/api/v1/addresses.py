@@ -41,6 +41,7 @@ def _to_read(address: UserAddress) -> UserAddressRead:
         city=address.city,
         postal_code=address.postal_code,
         references=address.references,
+        contact_phone=address.contact_phone,
         location=GeoPoint(coordinates=lonlat) if lonlat is not None else None,
         is_default=address.is_default,
         is_active=address.is_active,

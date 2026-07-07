@@ -8537,6 +8537,8 @@ export interface components {
             postal_code?: string | null;
             /** References */
             references?: string | null;
+            /** Contact Phone */
+            contact_phone?: string | null;
             location?: components["schemas"]["GeoPoint"] | null;
             /**
              * Is Default
@@ -8567,6 +8569,8 @@ export interface components {
             postal_code?: string | null;
             /** References */
             references?: string | null;
+            /** Contact Phone */
+            contact_phone?: string | null;
             location?: components["schemas"]["GeoPoint"] | null;
             /** Is Default */
             is_default: boolean;
@@ -8596,6 +8600,8 @@ export interface components {
             postal_code?: string | null;
             /** References */
             references?: string | null;
+            /** Contact Phone */
+            contact_phone?: string | null;
             location?: components["schemas"]["GeoPoint"] | null;
             /** Is Default */
             is_default?: boolean | null;

@@ -37,6 +37,7 @@ class UserAddressCreate(ApiWriteSchema):
     city: Optional[str] = Field(default=None, max_length=120)
     postal_code: Optional[str] = Field(default=None, max_length=20)
     references: Optional[str] = None
+    contact_phone: Optional[str] = Field(default=None, max_length=30)
     location: Optional[GeoPoint] = None
     is_default: bool = False
 
@@ -50,6 +51,7 @@ class UserAddressUpdate(ApiPatchSchema):
     city: Optional[str] = Field(default=None, max_length=120)
     postal_code: Optional[str] = Field(default=None, max_length=20)
     references: Optional[str] = None
+    contact_phone: Optional[str] = Field(default=None, max_length=30)
     # Enviar null borra el punto (vuelve a revisión manual de envío).
     location: Optional[GeoPoint] = None
     is_default: Optional[bool] = None
@@ -65,6 +67,7 @@ class UserAddressRead(ApiReadSchema):
     city: Optional[str] = None
     postal_code: Optional[str] = None
     references: Optional[str] = None
+    contact_phone: Optional[str] = None
     location: Optional[GeoPoint] = None
     is_default: bool
     is_active: bool

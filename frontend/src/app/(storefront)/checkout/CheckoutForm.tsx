@@ -26,6 +26,7 @@ import type {
   MyOrderRead,
   UserAddressCreate,
   UserAddressRead,
+  UserAddressUpdate,
 } from "@/core/restaurant-api/contracts";
 import { submitCheckout } from "@/core/restaurant-api/orders";
 import { formatMoney } from "@/core/restaurant-api/theme";
@@ -175,6 +176,9 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
     setExternalNumber(address.external_number ?? "");
     setNeighborhood(address.neighborhood ?? "");
     setReferences(address.references ?? "");
+    // Teléfono guardado con la dirección: prellena el contacto para no volver a
+    // pedirlo. Si la dirección no lo tiene, se conserva lo ya tecleado.
+    if (address.contact_phone) setPhone(address.contact_phone);
     setPoint(
       address.location
         ? {
@@ -384,6 +388,9 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
                 external_number: externalNumber.trim() || null,
                 neighborhood: neighborhood.trim() || null,
                 references: references.trim() || null,
+                // Se guarda el teléfono CON la dirección para prellenarlo la
+                // próxima vez (no volver a pedirlo en el checkout).
+                contact_phone: phone.trim() || null,
                 location:
                   point !== null
                     ? {
@@ -396,6 +403,21 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
               } satisfies UserAddressCreate,
             });
             rememberAddressId(saved.id);
+          } catch {
+            // Silencioso: el pedido ya está confirmado.
+          }
+        }
+      }
+      // Dirección GUARDADA reutilizada: si aún no tenía teléfono (o cambió), se
+      // guarda en ella para no volver a pedirlo. Best-effort, jamás bloquea.
+      if (effectiveFulfillment === "delivery" && addressId !== null && phone.trim() !== "") {
+        const selected = addresses.find((item) => item.id === addressId);
+        if (selected && (selected.contact_phone ?? "") !== phone.trim()) {
+          try {
+            await browserApi(`/api/v1/users/me/addresses/${encodeURIComponent(addressId)}`, {
+              method: "PATCH",
+              body: { contact_phone: phone.trim() } satisfies UserAddressUpdate,
+            });
           } catch {
             // Silencioso: el pedido ya está confirmado.
           }

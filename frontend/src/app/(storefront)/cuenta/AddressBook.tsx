@@ -37,6 +37,7 @@ type FormState = {
   city: string;
   postal_code: string;
   references: string;
+  contact_phone: string;
   is_default: boolean;
   point: PickedPoint | null;
 };
@@ -50,6 +51,7 @@ const EMPTY_FORM: FormState = {
   city: "",
   postal_code: "",
   references: "",
+  contact_phone: "",
   is_default: false,
   point: null,
 };
@@ -64,6 +66,7 @@ function addressToForm(address: UserAddressRead): FormState {
     city: address.city ?? "",
     postal_code: address.postal_code ?? "",
     references: address.references ?? "",
+    contact_phone: address.contact_phone ?? "",
     is_default: address.is_default ?? false,
     point: address.location
       ? {
@@ -259,6 +262,7 @@ export function AddressBook({ initial }: Readonly<{ initial: UserAddressRead[] }
           city: toNull(form.city),
           postal_code: toNull(form.postal_code),
           references: toNull(form.references),
+          contact_phone: toNull(form.contact_phone),
           location,
           is_default: form.is_default,
         };
@@ -276,6 +280,7 @@ export function AddressBook({ initial }: Readonly<{ initial: UserAddressRead[] }
           city: toNull(form.city),
           postal_code: toNull(form.postal_code),
           references: toNull(form.references),
+          contact_phone: toNull(form.contact_phone),
           location,
           is_default: form.is_default,
         };
@@ -467,6 +472,8 @@ export function AddressBook({ initial }: Readonly<{ initial: UserAddressRead[] }
           </div>
           {field("ad-ref", "Referencias", editing.form.references, (v) =>
             setEditing({ ...editing, form: { ...editing.form, references: v } }))}
+          {field("ad-phone", "Teléfono de contacto (opcional)", editing.form.contact_phone, (v) =>
+            setEditing({ ...editing, form: { ...editing.form, contact_phone: v } }), 30)}
 
           <div>
             <span className="sf-label">Ubicación (opcional pero recomendada)</span>

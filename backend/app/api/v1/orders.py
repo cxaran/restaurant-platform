@@ -39,6 +39,7 @@ from backend.app.schemas.order import (
     CaptureRequest,
     CheckoutRequest,
     DeliveryInput,
+    MyActiveOrdersRead,
     MyOrderRead,
     OrderAdjustmentCreate,
     OrderAdjustmentRead,
@@ -65,6 +66,7 @@ from backend.app.services.business_service import (
 from backend.app.services.order_service import (
     OrderIdentity,
     OrderRuleError,
+    count_active_orders_for_customer,
     create_order,
     public_status,
     transition_order,
@@ -491,6 +493,20 @@ def checkout(
     if payload.fulfillment_type == "pickup" and not settings_row.allow_pickup:
         api_error(status.HTTP_409_CONFLICT, "recoleccion_deshabilitada", "Recoger en tienda está deshabilitado.")
 
+    # Tope anti-abuso de pedidos ACTIVOS simultáneos por cliente (NULL = sin
+    # límite). Se bloquea el nuevo checkout AL ALCANZAR el tope; el POS/panel no
+    # cuentan como canal de abuso pero sí suman a los pedidos en curso del cliente.
+    if settings_row.max_active_orders_per_user is not None:
+        active_orders = count_active_orders_for_customer(session, current_user.id)
+        if active_orders >= settings_row.max_active_orders_per_user:
+            api_error(
+                status.HTTP_409_CONFLICT,
+                "limite_pedidos_activos",
+                f"Tienes {active_orders} pedidos en curso, el máximo permitido es "
+                f"{settings_row.max_active_orders_per_user}. Espera a que se completen "
+                "o cancela alguno para hacer un pedido nuevo.",
+            )
+
     _require_uniform_mode(payload.purchase_mode, payload.lines)
     # Etapa 5 RC: un código de descuento JAMÁS aplica a un pedido de créditos.
     if payload.discount_code and payload.purchase_mode == "credits":
@@ -516,6 +532,18 @@ def checkout(
         )
 
     priced = _priced_or_422(session, payload.lines)
+    # Tope anti-abuso de UNIDADES por pedido (NULL = sin límite): suma de las
+    # cantidades de todas las líneas. El sitio ya avisa al alcanzarlo; esta es la
+    # defensa autoritativa (evita bromas/pedidos gigantes por API).
+    if settings_row.max_products_per_order is not None:
+        total_units = sum(line.quantity for line in priced.lines)
+        if total_units > settings_row.max_products_per_order:
+            api_error(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "limite_productos",
+                f"Un pedido admite como máximo {settings_row.max_products_per_order} "
+                f"productos; tu carrito tiene {total_units}. Quita algunos para continuar.",
+            )
     if (
         payload.fulfillment_type == "delivery"
         and settings_row.minimum_delivery_order_amount is not None
@@ -593,6 +621,21 @@ def list_my_orders(
         .limit(limit)
     ).all()
     return [_my_order_read(session, order) for order in orders]
+
+
+# NOTA de orden de rutas: debe declararse ANTES de «/mine/{order_id}», si no el
+# parámetro UUID captura «active-count» y responde 422.
+@router.get("/mine/active-count", response_model=MyActiveOrdersRead)
+def my_active_orders_count(
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> MyActiveOrdersRead:
+    """Cupo de pedidos activos del cliente: el checkout avisa al alcanzarlo."""
+    settings_row = get_business_settings(session)
+    return MyActiveOrdersRead(
+        active=count_active_orders_for_customer(session, current_user.id),
+        limit=settings_row.max_active_orders_per_user,
+    )
 
 
 @router.get("/mine/{order_id}", response_model=MyOrderRead)

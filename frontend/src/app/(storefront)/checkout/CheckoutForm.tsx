@@ -49,12 +49,27 @@ import {
   closedBannerText,
   useBusinessOpenStatus,
 } from "@/core/storefront/useBusinessOpenStatus";
+import { useMaxProductsPerOrder } from "@/core/storefront/useMaxProductsPerOrder";
+import type { MyActiveOrders } from "@/core/restaurant-api/contracts";
 
 export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
   const router = useRouter();
-  const { lines, mode, subtotalHint, clear } = useCart();
+  const { lines, mode, count, subtotalHint, clear } = useCart();
   const openStatus = useBusinessOpenStatus();
   const closedBySchedule = openStatus?.blockedBySchedule === true;
+  // Topes anti-abuso (solo se AVISA al alcanzarlos, nunca antes). El backend
+  // revalida ambos al confirmar; esto es UX para no dejar enviar en balde.
+  const maxProducts = useMaxProductsPerOrder();
+  const atProductLimit = maxProducts !== null && count >= maxProducts;
+  const overProductLimit = maxProducts !== null && count > maxProducts;
+  // Cupo de pedidos activos: se consulta al montar; si ya está en el tope, se
+  // bloquea el envío con el mensaje correspondiente.
+  const [ordersLimit, setOrdersLimit] = useState<MyActiveOrders | null>(null);
+  const atOrdersLimit =
+    ordersLimit !== null &&
+    ordersLimit.limit !== null &&
+    ordersLimit.limit !== undefined &&
+    ordersLimit.active >= ordersLimit.limit;
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup");
   const [name, setName] = useState(`${session.name} ${session.last_name ?? ""}`.trim());
   const [phone, setPhone] = useState("");
@@ -142,6 +157,22 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
       })
       .catch(() => {
         // Sin direcciones (o error): la captura manual sigue disponible.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Cupo de pedidos activos del cliente: se lee al montar. Silencioso ante
+  // error (en duda no se bloquea; el backend es la autoridad al confirmar).
+  useEffect(() => {
+    let active = true;
+    browserApi<MyActiveOrders>("/api/v1/orders/mine/active-count")
+      .then((data) => {
+        if (active) setOrdersLimit(data);
+      })
+      .catch(() => {
+        if (active) setOrdersLimit(null);
       });
     return () => {
       active = false;
@@ -326,6 +357,7 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
     event.preventDefault();
     if (missingLocation) return; // la entrega exige un punto de ubicación
     if (closedBySchedule) return; // cerrado por horario: el backend rechazaría igual
+    if (overProductLimit || atOrdersLimit) return; // topes anti-abuso alcanzados
     if (!acceptedTerms) return; // debe aceptar términos y aviso de privacidad
     setError(null);
     setSubmitting(true);
@@ -438,8 +470,14 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
       router.push(`/pedidos/${order.id}`);
     } catch (err) {
       // §J (H6): sin reintentos automáticos de operaciones económicas; un
-      // conflicto de concurrencia se explica y el cliente decide reintentar.
-      if (err instanceof ApiRequestError && err.status === 409) {
+      // conflicto de concurrencia REAL (resource_conflict) se explica y el
+      // cliente decide reintentar. Otros 409 son reglas de dominio (p. ej.
+      // limite_pedidos_activos, negocio_cerrado): se muestra su mensaje tal cual.
+      if (
+        err instanceof ApiRequestError &&
+        err.status === 409 &&
+        err.body.code === "resource_conflict"
+      ) {
         setError(
           "No se pudo confirmar por una actualización simultánea. Revisa el pedido y vuelve a intentarlo.",
         );
@@ -760,6 +798,27 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
           tu carrito se conserva.
         </div>
       ) : null}
+
+      {/* Tope de productos: SOLO al alcanzarlo/superarlo. */}
+      {atProductLimit && maxProducts !== null ? (
+        <div
+          role={overProductLimit ? "alert" : "status"}
+          className={overProductLimit ? "sf-error" : "sf-card"}
+          style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700 }}
+        >
+          {overProductLimit
+            ? `Tu pedido tiene ${count} productos y el máximo por pedido es ${maxProducts}. Quita algunos para continuar.`
+            : `Alcanzaste el máximo de ${maxProducts} productos por pedido.`}
+        </div>
+      ) : null}
+
+      {/* Cupo de pedidos activos alcanzado. */}
+      {atOrdersLimit && ordersLimit ? (
+        <div role="alert" className="sf-error" style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700 }}>
+          Ya tienes {ordersLimit.active} pedidos en curso (el máximo es {ordersLimit.limit}).
+          Espera a que se completen o cancela alguno para hacer un pedido nuevo.
+        </div>
+      ) : null}
       <label
         style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, marginBottom: 12 }}
       >
@@ -786,7 +845,14 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
       <button
         className="sf-btn"
         type="submit"
-        disabled={submitting || missingLocation || closedBySchedule || !acceptedTerms}
+        disabled={
+          submitting ||
+          missingLocation ||
+          closedBySchedule ||
+          overProductLimit ||
+          atOrdersLimit ||
+          !acceptedTerms
+        }
         style={{ width: "100%", padding: "15px 18px", justifyContent: "space-between" }}
       >
         {submitting ? (

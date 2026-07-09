@@ -95,6 +95,8 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
     order_approval_required: false,
     online_orders_require_open_hours: false,
   });
+  const [maxProducts, setMaxProducts] = useState("");
+  const [maxActiveOrders, setMaxActiveOrders] = useState("");
   const [minimumDelivery, setMinimumDelivery] = useState("");
   const [freeShippingFrom, setFreeShippingFrom] = useState("");
   const [ticketFooter, setTicketFooter] = useState("");
@@ -120,6 +122,10 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
       order_approval_required: data.order_approval_required,
       online_orders_require_open_hours: data.online_orders_require_open_hours,
     });
+    setMaxProducts(data.max_products_per_order != null ? String(data.max_products_per_order) : "");
+    setMaxActiveOrders(
+      data.max_active_orders_per_user != null ? String(data.max_active_orders_per_user) : "",
+    );
     setMinimumDelivery(data.minimum_delivery_order_amount ?? "");
     setFreeShippingFrom(data.free_shipping_global_from_amount ?? "");
     setTicketFooter(data.ticket_footer_text ?? "");
@@ -152,6 +158,8 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
     try {
       const body: BusinessSettingsUpdate = {
         ...toggles,
+        max_products_per_order: maxProducts.trim() ? Number(maxProducts.trim()) : null,
+        max_active_orders_per_user: maxActiveOrders.trim() ? Number(maxActiveOrders.trim()) : null,
         minimum_delivery_order_amount: minimumDelivery.trim() || null,
         free_shipping_global_from_amount: freeShippingFrom.trim() || null,
         ticket_footer_text: ticketFooter.trim() || null,
@@ -206,6 +214,57 @@ export function SettingsForm({ canEdit }: Readonly<{ canEdit: boolean }>) {
                 />
               </div>
             ))}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass} htmlFor="bs-max-products">
+                Máximo de productos por pedido (vacío = sin límite)
+              </label>
+              <Input
+                id="bs-max-products"
+                type="number"
+                min="1"
+                step="1"
+                disabled={!canEdit}
+                value={maxProducts}
+                onChange={(event) => setMaxProducts(event.target.value)}
+                aria-describedby={
+                  fieldErrors.max_products_per_order
+                    ? "bs-max-products-error"
+                    : "bs-max-products-help"
+                }
+              />
+              <p id="bs-max-products-help" className="mt-1 text-xs text-[var(--tx3)]">
+                Total de unidades (suma de cantidades). Evita pedidos absurdos por
+                broma. El sitio solo avisa al alcanzarlo.
+              </p>
+              <FieldError id="bs-max-products-error" message={fieldErrors.max_products_per_order} />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="bs-max-active">
+                Máximo de pedidos activos por cliente (vacío = sin límite)
+              </label>
+              <Input
+                id="bs-max-active"
+                type="number"
+                min="1"
+                step="1"
+                disabled={!canEdit}
+                value={maxActiveOrders}
+                onChange={(event) => setMaxActiveOrders(event.target.value)}
+                aria-describedby={
+                  fieldErrors.max_active_orders_per_user
+                    ? "bs-max-active-error"
+                    : "bs-max-active-help"
+                }
+              />
+              <p id="bs-max-active-help" className="mt-1 text-xs text-[var(--tx3)]">
+                Pedidos en curso (no completados ni cancelados) que un mismo cliente
+                puede tener a la vez.
+              </p>
+              <FieldError id="bs-max-active-error" message={fieldErrors.max_active_orders_per_user} />
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

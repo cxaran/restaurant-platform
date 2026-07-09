@@ -19,6 +19,7 @@ export type OrderLineInput = components["schemas"]["OrderLineInput"];
 export type OrderModifierInput = components["schemas"]["OrderModifierInput"];
 export type DeliveryInput = components["schemas"]["DeliveryInput"];
 export type MyOrderRead = components["schemas"]["MyOrderRead"];
+export type MyActiveOrders = components["schemas"]["MyActiveOrdersRead"];
 export type PublicCourierInfo = components["schemas"]["PublicCourierInfo"];
 
 // Códigos de descuento: cotización pública (checkout web con dinero) y

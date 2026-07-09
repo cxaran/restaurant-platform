@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional
 
+from sqlalchemy import func as sa_func
 from sqlalchemy import text as sa_text
 from sqlmodel import Session, select
 
@@ -99,6 +100,30 @@ ORDER_TRANSITIONS: dict[str, tuple[str, ...]] = {
     "completed": (),
     "cancelled": (),
 }
+
+
+# Estados TERMINALES (sin transiciones salientes): en ellos el pedido ya no
+# está «activo». Se derivan de la tabla para no duplicar la verdad del dominio.
+TERMINAL_ORDER_STATUSES: tuple[str, ...] = tuple(
+    status for status, destinations in ORDER_TRANSITIONS.items() if not destinations
+)
+
+
+def count_active_orders_for_customer(
+    session: Session, customer_user_id: uuid.UUID
+) -> int:
+    """Pedidos NO terminales del cliente (tope anti-abuso del checkout web).
+
+    Cuenta cualquier canal: es el número de pedidos del propio usuario en curso
+    (todo lo que no está ``completed`` ni ``cancelled``).
+    """
+    statement = (
+        select(sa_func.count())
+        .select_from(Order)
+        .where(Order.customer_user_id == customer_user_id)
+        .where(Order.status.notin_(TERMINAL_ORDER_STATUSES))  # pyright: ignore[reportAttributeAccessIssue]
+    )
+    return int(session.exec(statement).one())
 
 
 def transition_order(

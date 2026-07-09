@@ -86,6 +86,8 @@ class BusinessSettingsRead(ApiReadSchema):
     require_registered_user_for_checkout: bool
     order_approval_required: bool
     online_orders_require_open_hours: bool
+    max_products_per_order: Optional[int] = None
+    max_active_orders_per_user: Optional[int] = None
     minimum_delivery_order_amount: Optional[Decimal] = None
     free_shipping_global_from_amount: Optional[Decimal] = None
     ticket_footer_text: Optional[str] = None
@@ -103,6 +105,10 @@ class BusinessSettingsUpdate(ApiPatchSchema):
     require_registered_user_for_checkout: Optional[bool] = None
     order_approval_required: Optional[bool] = None
     online_orders_require_open_hours: Optional[bool] = None
+    # Topes anti-abuso (NULL/omitido = sin límite; mínimo 1 cuando se define).
+    # Enviar 0 o vacío desde el formulario se traduce a NULL en el router.
+    max_products_per_order: Optional[int] = Field(default=None, ge=1, le=100_000)
+    max_active_orders_per_user: Optional[int] = Field(default=None, ge=1, le=10_000)
     minimum_delivery_order_amount: Optional[Decimal] = Field(default=None, ge=0)
     free_shipping_global_from_amount: Optional[Decimal] = Field(default=None, ge=0)
     ticket_footer_text: Optional[str] = None
@@ -257,6 +263,9 @@ class PublicBusinessRead(ApiReadSchema):
     # Con el switch encendido, «cerrado» BLOQUEA el checkout web (no es solo
     # informativo): el carrito lo usa para avisar y deshabilitar el pago.
     online_orders_require_open_hours: bool
+    # Tope de unidades por pedido (NULL = sin límite): el carrito solo AVISA al
+    # alcanzarlo, nunca antes. El backend revalida en el checkout.
+    max_products_per_order: Optional[int] = None
     today_slots: list[PublicDaySlot]
     phones: list[PublicBusinessPhone]
     allow_online_orders: bool

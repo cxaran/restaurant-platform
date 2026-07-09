@@ -328,3 +328,14 @@ class MyOrderRead(ApiReadSchema):
     courier: Optional[PublicCourierInfo] = None
     # Aclaraciones del restaurante hacia el cliente (§15.4: bitácora).
     visible_notes: list[OrderVisibleNoteRead] = Field(default_factory=list)
+
+
+class MyActiveOrdersRead(ApiReadSchema):
+    """Cupo de pedidos activos del cliente para el pre-chequeo del checkout.
+
+    El sitio solo AVISA al alcanzar el tope (``active >= limit``), nunca antes;
+    ``limit`` NULL = sin límite. El backend revalida al confirmar el pedido.
+    """
+
+    active: int
+    limit: Optional[int] = None

@@ -34,6 +34,7 @@ import {
   useBusinessOpenStatus,
 } from "@/core/storefront/useBusinessOpenStatus";
 import { useCreditsEnabled } from "@/core/storefront/useCreditsEnabled";
+import { useMaxProductsPerOrder } from "@/core/storefront/useMaxProductsPerOrder";
 import { useMyCredits } from "@/core/storefront/useMyCredits";
 
 export default function CartPage() {
@@ -43,6 +44,11 @@ export default function CartPage() {
   const closedBySchedule = openStatus?.blockedBySchedule === true;
   const myCredits = useMyCredits();
   const creditsEnabled = useCreditsEnabled();
+  const maxProducts = useMaxProductsPerOrder();
+  // Tope de unidades: se AVISA al alcanzarlo (count === max) y se BLOQUEA el CTA
+  // al superarlo (count > max). Antes del tope no se muestra nada (regla de UX).
+  const atProductLimit = maxProducts !== null && count >= maxProducts;
+  const overProductLimit = maxProducts !== null && count > maxProducts;
   const [catalog, setCatalog] = useState<Map<string, PublicProduct> | null>(null);
   const [editing, setEditing] = useState<CartLine | null>(null);
   const credits = mode === "credits";
@@ -351,7 +357,24 @@ export default function CartPage() {
                 </Link>
               </div>
             ) : null}
-            {closedBySchedule ? (
+            {/* Aviso de tope de productos: SOLO al alcanzarlo/superarlo. */}
+            {atProductLimit && maxProducts !== null ? (
+              <div
+                role={overProductLimit ? "alert" : "status"}
+                className="sf-card"
+                style={{
+                  padding: "12px 16px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  ...(overProductLimit ? { borderLeft: "4px solid var(--danger, #d94848)" } : {}),
+                }}
+              >
+                {overProductLimit
+                  ? `Tu pedido tiene ${count} productos y el máximo por pedido es ${maxProducts}. Quita algunos para continuar.`
+                  : `Alcanzaste el máximo de ${maxProducts} productos por pedido.`}
+              </div>
+            ) : null}
+            {closedBySchedule || overProductLimit ? (
               <button
                 type="button"
                 className="sf-btn"
@@ -359,12 +382,15 @@ export default function CartPage() {
                 aria-disabled="true"
                 style={{ width: "100%", padding: "15px 18px", opacity: 0.55, cursor: "not-allowed" }}
               >
-                Cerrado por ahora ·{" "}
-                {credits
-                  ? totalLabel
-                  : totalWithShipping !== null
-                    ? formatMoney(totalWithShipping)
-                    : `${totalLabel} + envío`}
+                {overProductLimit
+                  ? "Quita productos para continuar"
+                  : `Cerrado por ahora · ${
+                      credits
+                        ? totalLabel
+                        : totalWithShipping !== null
+                          ? formatMoney(totalWithShipping)
+                          : `${totalLabel} + envío`
+                    }`}
               </button>
             ) : (
               <Link

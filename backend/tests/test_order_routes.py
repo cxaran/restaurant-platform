@@ -203,6 +203,61 @@ class OrderRoutesTest(unittest.TestCase):
             open_again = self.client.post("/api/v1/orders", json=self._checkout_payload())
         self.assertEqual(open_again.status_code, 201, open_again.text)
 
+    def test_max_products_per_order_limit(self) -> None:
+        """Tope de UNIDADES por pedido: supera ⇒ 422 limite_productos; en el
+        tope exacto o por debajo procede. NULL (default) = sin límite."""
+        with Session(self.engine) as session:
+            row = session.get(BusinessSettings, 1)
+            assert row is not None
+            row.max_products_per_order = 3
+            session.commit()
+
+        # 4 unidades (> 3) ⇒ rechazo con el código estable.
+        over = self._checkout_payload(
+            lines=[{"product_id": str(self.product_id), "quantity": 4}]
+        )
+        with _As(CUSTOMER_ID):
+            rejected = self.client.post("/api/v1/orders", json=over)
+        self.assertEqual(rejected.status_code, 422, rejected.text)
+        self.assertEqual(rejected.json()["code"], "limite_productos")
+
+        # 3 unidades (== tope) procede.
+        at_limit = self._checkout_payload(
+            lines=[{"product_id": str(self.product_id), "quantity": 3}]
+        )
+        with _As(CUSTOMER_ID):
+            ok = self.client.post("/api/v1/orders", json=at_limit)
+        self.assertEqual(ok.status_code, 201, ok.text)
+
+    def test_max_active_orders_per_user_limit(self) -> None:
+        """Tope de pedidos ACTIVOS por cliente: al alcanzarlo, un nuevo checkout
+        se rechaza con 409 limite_pedidos_activos. El endpoint de cupo lo refleja."""
+        with Session(self.engine) as session:
+            row = session.get(BusinessSettings, 1)
+            assert row is not None
+            row.max_active_orders_per_user = 1
+            session.commit()
+
+        with _As(CUSTOMER_ID):
+            first = self.client.post("/api/v1/orders", json=self._checkout_payload())
+        self.assertEqual(first.status_code, 201, first.text)
+
+        # Segundo pedido con uno activo ⇒ bloqueado.
+        with _As(CUSTOMER_ID):
+            blocked = self.client.post("/api/v1/orders", json=self._checkout_payload())
+        self.assertEqual(blocked.status_code, 409, blocked.text)
+        self.assertEqual(blocked.json()["code"], "limite_pedidos_activos")
+
+        # El cupo del cliente refleja 1 activo con límite 1.
+        with _As(CUSTOMER_ID):
+            summary = self.client.get("/api/v1/orders/mine/active-count").json()
+        self.assertEqual(summary, {"active": 1, "limit": 1})
+
+        # Otro cliente distinto no se ve afectado por los activos ajenos.
+        with _As(uuid.uuid4()):
+            other = self.client.post("/api/v1/orders", json=self._checkout_payload())
+        self.assertEqual(other.status_code, 201, other.text)
+
     def test_internal_list_paginates_searches_and_counts(self) -> None:
         """Tablero interno: envelope paginado, búsqueda (folio/cliente/dirección
         vía entrega) y conteos por estado con los mismos filtros."""

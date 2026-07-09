@@ -85,6 +85,7 @@ def read_public_business(session: SessionDep, response: Response) -> PublicBusin
         is_accepting_orders=profile.is_accepting_orders,
         is_open_now=is_open_at(session, now),
         online_orders_require_open_hours=settings_row.online_orders_require_open_hours,
+        max_products_per_order=settings_row.max_products_per_order,
         today_slots=[
             PublicDaySlot(opens_at=opens, closes_at=closes) for opens, closes in today.slots
         ],

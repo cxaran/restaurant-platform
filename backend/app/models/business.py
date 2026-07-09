@@ -174,6 +174,25 @@ class BusinessSettings(Base):
             "quedan exentos; el switch «Aceptando pedidos» manda por encima."
         ),
     )
+    max_products_per_order: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment=(
+            "Tope anti-abuso de UNIDADES por pedido web (suma de cantidades de "
+            "todas las líneas). NULL = sin límite. Solo aplica al checkout web; "
+            "el POS y la captura del panel quedan exentos. El sitio solo avisa al "
+            "ALCANZAR el tope, nunca antes (no hay contador previo)."
+        ),
+    )
+    max_active_orders_per_user: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment=(
+            "Tope anti-abuso de pedidos ACTIVOS simultáneos por cliente (estados "
+            "no terminales: ni completed ni cancelled). NULL = sin límite. Bloquea "
+            "un nuevo checkout web al alcanzar el tope; no afecta POS/panel."
+        ),
+    )
     minimum_delivery_order_amount: Mapped[Optional[Decimal]] = mapped_column(
         Numeric(12, 2), nullable=True
     )

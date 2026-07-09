@@ -1755,6 +1755,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/mine/active-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Active Orders Count
+         * @description Cupo de pedidos activos del cliente: el checkout avisa al alcanzarlo.
+         */
+        get: operations["my_active_orders_count_api_v1_orders_mine_active_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/orders/mine/{order_id}": {
         parameters: {
             query?: never;
@@ -3916,6 +3936,10 @@ export interface components {
             order_approval_required: boolean;
             /** Online Orders Require Open Hours */
             online_orders_require_open_hours: boolean;
+            /** Max Products Per Order */
+            max_products_per_order?: number | null;
+            /** Max Active Orders Per User */
+            max_active_orders_per_user?: number | null;
             /** Minimum Delivery Order Amount */
             minimum_delivery_order_amount?: string | null;
             /** Free Shipping Global From Amount */
@@ -3950,6 +3974,10 @@ export interface components {
             order_approval_required?: boolean | null;
             /** Online Orders Require Open Hours */
             online_orders_require_open_hours?: boolean | null;
+            /** Max Products Per Order */
+            max_products_per_order?: number | null;
+            /** Max Active Orders Per User */
+            max_active_orders_per_user?: number | null;
             /** Minimum Delivery Order Amount */
             minimum_delivery_order_amount?: number | string | null;
             /** Free Shipping Global From Amount */
@@ -5439,6 +5467,19 @@ export interface components {
             /** Assignment Status */
             assignment_status: string;
         };
+        /**
+         * MyActiveOrdersRead
+         * @description Cupo de pedidos activos del cliente para el pre-chequeo del checkout.
+         *
+         *     El sitio solo AVISA al alcanzar el tope (``active >= limit``), nunca antes;
+         *     ``limit`` NULL = sin límite. El backend revalida al confirmar el pedido.
+         */
+        MyActiveOrdersRead: {
+            /** Active */
+            active: number;
+            /** Limit */
+            limit?: number | null;
+        };
         /** MyNotifications */
         MyNotifications: {
             /** Unread Count */
@@ -6663,6 +6704,8 @@ export interface components {
             is_open_now: boolean;
             /** Online Orders Require Open Hours */
             online_orders_require_open_hours: boolean;
+            /** Max Products Per Order */
+            max_products_per_order?: number | null;
             /** Today Slots */
             today_slots: components["schemas"]["PublicDaySlot"][];
             /** Phones */
@@ -12878,6 +12921,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyOrderRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_active_orders_count_api_v1_orders_mine_active_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                session_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyActiveOrdersRead"];
                 };
             };
             /** @description Validation Error */

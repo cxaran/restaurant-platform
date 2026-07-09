@@ -10,6 +10,7 @@ import { CookiePreferencesLink } from "@/components/analytics/CookiePreferencesL
 import { FooterPhoneLink } from "@/components/storefront/FooterPhoneLink";
 import type { PublicBusiness } from "@/core/restaurant-api/contracts";
 import type { FooterVM } from "@/core/restaurant-api/view-models";
+import { formatTime12h } from "@/core/storefront/schedule-format";
 
 const NETWORK_LABEL: Record<string, string> = {
   facebook: "Facebook",
@@ -70,7 +71,7 @@ function scheduleText(footer: FooterVM): string | null {
   const slots = footer.schedule.today_slots;
   if (slots.length === 0) return "Hoy no hay servicio";
   return `Hoy · ${slots
-    .map((slot) => `${(slot.opens_at ?? "").slice(0, 5)} – ${(slot.closes_at ?? "").slice(0, 5)}`)
+    .map((slot) => `${formatTime12h(slot.opens_at ?? "")} – ${formatTime12h(slot.closes_at ?? "")}`)
     .join(" y ")}`;
 }
 

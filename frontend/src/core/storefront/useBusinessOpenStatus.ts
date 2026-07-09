@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 
 import { browserApi } from "@/core/api/browser-client";
 import type { PublicBusiness } from "@/core/restaurant-api/contracts";
+import { formatTime12h } from "@/core/storefront/schedule-format";
 
 export type BusinessOpenStatus = {
   /** El checkout web está bloqueado por horario en este momento. */
@@ -21,8 +22,9 @@ export type BusinessOpenStatus = {
 function slotLabel(business: PublicBusiness): string | null {
   const slots = business.today_slots ?? [];
   if (slots.length === 0) return null;
-  const fmt = (value: string) => value.slice(0, 5);
-  return slots.map((slot) => `${fmt(slot.opens_at)}–${fmt(slot.closes_at)}`).join(" y ");
+  return slots
+    .map((slot) => `${formatTime12h(slot.opens_at)} – ${formatTime12h(slot.closes_at)}`)
+    .join(" y ");
 }
 
 /** null mientras carga o si el endpoint falla (en duda NO se bloquea nada). */
@@ -56,6 +58,6 @@ export function useBusinessOpenStatus(): BusinessOpenStatus | null {
 /** Banner reutilizable de «cerrado por horario» para carrito y checkout. */
 export function closedBannerText(status: BusinessOpenStatus): string {
   return status.todayLabel
-    ? `Estamos cerrados en este momento. Horario de hoy: ${status.todayLabel} h.`
+    ? `Estamos cerrados en este momento. Horario de hoy: ${status.todayLabel}.`
     : "Estamos cerrados en este momento. Consulta nuestro horario de atención.";
 }

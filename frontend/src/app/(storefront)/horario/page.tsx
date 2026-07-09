@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { getPublicBusiness, getPublicSchedule } from "@/core/restaurant-api/business";
+import { formatTime12h } from "@/core/storefront/schedule-format";
 
 // Página de HORARIO de atención: la semana completa (7 días) derivada del horario
 // semanal recurrente del negocio. Enlazada desde el footer y desde el carrito
@@ -20,11 +21,6 @@ const DAY_NAMES = [
   "Sábado",
   "Domingo",
 ];
-
-/** "HH:MM:SS" → "HH:MM". */
-function hm(value: string): string {
-  return value.slice(0, 5);
-}
 
 export default async function SchedulePage() {
   const [schedule, business] = await Promise.all([
@@ -101,7 +97,7 @@ export default async function SchedulePage() {
                   {day.slots.length === 0
                     ? "Cerrado"
                     : day.slots
-                        .map((slot) => `${hm(slot.opens_at)} – ${hm(slot.closes_at)}`)
+                        .map((slot) => `${formatTime12h(slot.opens_at)} – ${formatTime12h(slot.closes_at)}`)
                         .join(" y ")}
                 </span>
               </li>

@@ -140,6 +140,38 @@ export default async function TerminosPage() {
         </p>
       </Section>
 
+      {terms.max_products_per_order != null || terms.max_active_orders_per_user != null ? (
+        <Section title="Límites de los pedidos">
+          <p style={{ margin: 0 }}>
+            Para proteger la calidad del servicio y evitar usos indebidos o pedidos
+            hechos por broma, {name} aplica límites a los pedidos en línea. Así
+            garantizamos que la cocina pueda preparar y cumplir cada pedido de forma
+            responsable y en un tiempo razonable.
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
+            {terms.max_products_per_order != null ? (
+              <li>
+                Cada pedido admite un máximo de{" "}
+                <strong>{terms.max_products_per_order} productos</strong> (la suma de
+                las cantidades de todos los artículos del pedido).
+              </li>
+            ) : null}
+            {terms.max_active_orders_per_user != null ? (
+              <li>
+                Cada cliente puede tener hasta{" "}
+                <strong>
+                  {terms.max_active_orders_per_user}{" "}
+                  {terms.max_active_orders_per_user === 1 ? "pedido" : "pedidos"} en curso
+                </strong>{" "}
+                al mismo tiempo (pedidos que aún no se han completado ni cancelado). Para
+                hacer uno nuevo, espera a que se complete o se cancele alguno de los
+                anteriores.
+              </li>
+            ) : null}
+          </ul>
+        </Section>
+      ) : null}
+
       <Section title="Entregas y recolección">
         <p style={{ margin: 0 }}>
           {deliveryModalities}
@@ -189,21 +221,24 @@ export default async function TerminosPage() {
         </Section>
       ) : null}
 
-      <Section title="Cupones y códigos de descuento vigentes">
+      <Section title="Cupones y códigos de descuento">
+        <p style={{ margin: 0 }}>
+          Los códigos de descuento aplican <strong>solo en pedidos en línea pagados
+          con dinero</strong> y por clientes con cuenta. Cada código descuenta un monto
+          fijo cuando el subtotal de productos y modificadores alcanza o supera el
+          mínimo indicado; el envío no cuenta para ese mínimo. Se permite{" "}
+          <strong>un uso por cliente</strong> y un solo código por pedido; no son
+          acumulables, no aplican a pedidos con créditos ni son canjeables por dinero.
+          Un código puede tener fecha de vigencia y {name} puede suspenderlo o
+          modificarlo en cualquier momento.
+        </p>
         {coupons.length === 0 ? (
           <p className="sf-muted" style={{ margin: 0 }}>
-            Actualmente no hay cupones de descuento vigentes.
+            Actualmente no hay códigos de descuento vigentes.
           </p>
         ) : (
           <>
-            <p style={{ margin: 0 }}>
-              Los siguientes códigos aplican <strong>solo en pedidos en línea pagados
-              con dinero</strong>. Cada código descuenta un monto fijo cuando el
-              subtotal de productos y modificadores alcanza o supera el mínimo
-              indicado; el envío no cuenta para ese mínimo. Se permite{" "}
-              <strong>un uso por cliente</strong> y un solo código por pedido; no son
-              acumulables ni aplican a pedidos con créditos.
-            </p>
+            <p style={{ margin: 0 }}>Códigos vigentes:</p>
             <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 10 }}>
               {coupons.map((coupon) => (
                 <li key={coupon.code}>

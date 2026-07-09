@@ -311,6 +311,10 @@ class PublicLegalTermsRead(ApiReadSchema):
     minimum_delivery_order_amount: Optional[Decimal] = None
     free_shipping_global_from_amount: Optional[Decimal] = None
     credits_enabled: bool = True
+    # Topes anti-abuso para redactar la cláusula de límites del pedido
+    # (NULL = sin límite, no se menciona).
+    max_products_per_order: Optional[int] = None
+    max_active_orders_per_user: Optional[int] = None
     # Cláusulas opcionales que el administrador edita en el perfil del negocio.
     terms_extra: Optional[str] = None
     privacy_extra: Optional[str] = None

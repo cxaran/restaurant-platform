@@ -7023,6 +7023,10 @@ export interface components {
              * @default true
              */
             credits_enabled: boolean;
+            /** Max Products Per Order */
+            max_products_per_order?: number | null;
+            /** Max Active Orders Per User */
+            max_active_orders_per_user?: number | null;
             /** Terms Extra */
             terms_extra?: string | null;
             /** Privacy Extra */

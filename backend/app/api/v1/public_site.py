@@ -180,6 +180,8 @@ def read_public_legal_terms(
         minimum_delivery_order_amount=settings_row.minimum_delivery_order_amount,
         free_shipping_global_from_amount=settings_row.free_shipping_global_from_amount,
         credits_enabled=settings_row.credits_enabled,
+        max_products_per_order=settings_row.max_products_per_order,
+        max_active_orders_per_user=settings_row.max_active_orders_per_user,
         terms_extra=profile.terms_extra,
         privacy_extra=profile.privacy_extra,
         generated_at=utc_now(),

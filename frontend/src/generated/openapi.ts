@@ -7000,6 +7000,8 @@ export interface components {
             email?: string | null;
             /** Currency Code */
             currency_code: string;
+            /** Timezone */
+            timezone: string;
             /** Phones */
             phones?: components["schemas"]["PublicBusinessPhone"][];
             /** Coupons */

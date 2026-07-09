@@ -24,9 +24,22 @@ function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
-function couponValidity(coupon: PublicLegalCoupon): string {
-  const from = coupon.valid_from ? formatDate(coupon.valid_from) : null;
-  const until = coupon.valid_until ? formatDate(coupon.valid_until) : null;
+// Fecha CON hora (12 h a.m./p.m.), en la zona horaria del negocio: la vigencia
+// de los cupones se muestra con su hora local, no la del navegador del visitante.
+function formatDateTime(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone,
+  }).format(new Date(iso));
+}
+
+function couponValidity(coupon: PublicLegalCoupon, timeZone: string): string {
+  const from = coupon.valid_from ? formatDateTime(coupon.valid_from, timeZone) : null;
+  const until = coupon.valid_until ? formatDateTime(coupon.valid_until, timeZone) : null;
   if (from && until) return `Válido del ${from} al ${until}.`;
   if (until) return `Válido hasta el ${until}.`;
   if (from) return `Válido a partir del ${from}.`;
@@ -244,7 +257,7 @@ export default async function TerminosPage() {
                 <li key={coupon.code}>
                   <strong>{coupon.code.toUpperCase()}</strong> — {coupon.name}:{" "}
                   {formatMoney(coupon.discount_amount)} de descuento en compras desde{" "}
-                  {formatMoney(coupon.minimum_order_amount)}. {couponValidity(coupon)}
+                  {formatMoney(coupon.minimum_order_amount)}. {couponValidity(coupon, terms.timezone)}
                   {coupon.description ? ` ${coupon.description}` : ""}
                 </li>
               ))}

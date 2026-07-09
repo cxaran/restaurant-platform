@@ -302,6 +302,9 @@ class PublicLegalTermsRead(ApiReadSchema):
     main_address: Optional[str] = None
     email: Optional[str] = None
     currency_code: str
+    # Zona horaria del negocio (IANA): las vigencias de los cupones se muestran
+    # con su hora local, no la del navegador del visitante.
+    timezone: str
     phones: list[PublicBusinessPhone] = Field(default_factory=list)
     coupons: list[PublicLegalCoupon] = Field(default_factory=list)
     # Política operativa vigente, para autogenerar cláusulas fieles de entrega,

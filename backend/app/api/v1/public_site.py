@@ -173,6 +173,7 @@ def read_public_legal_terms(
         main_address=profile.main_address,
         email=profile.email,
         currency_code=profile.currency_code,
+        timezone=profile.timezone,
         phones=serialize_many(PublicBusinessPhone, phones),
         coupons=coupons,
         allow_delivery=settings_row.allow_delivery,

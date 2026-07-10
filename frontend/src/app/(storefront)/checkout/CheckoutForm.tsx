@@ -70,7 +70,7 @@ export function CheckoutForm({ session }: Readonly<{ session: SessionUser }>) {
     ordersLimit.limit !== null &&
     ordersLimit.limit !== undefined &&
     ordersLimit.active >= ordersLimit.limit;
-  const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup");
+  const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("delivery");
   const [name, setName] = useState(`${session.name} ${session.last_name ?? ""}`.trim());
   const [phone, setPhone] = useState("");
   const [street, setStreet] = useState("");

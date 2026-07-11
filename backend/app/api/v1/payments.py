@@ -271,16 +271,50 @@ def record_order_payment(
     if method is None:
         api_error(status.HTTP_404_NOT_FOUND, "metodo_no_encontrado", "Método de pago no encontrado")
 
+    # Un pago pendiente sin resolver bloquea registrar otro: primero confírmalo o
+    # recházalo (evita dos pagos «pendientes» ambiguos).
+    existing = session.exec(select(Payment).where(Payment.order_id == order.id)).all()
+    if any(p.status in ("pending", "pending_verification") for p in existing):
+        api_error(
+            status.HTTP_409_CONFLICT,
+            "pago_pendiente_existente",
+            "Ya hay un pago pendiente; confírmalo o recházalo antes de registrar otro.",
+        )
+    # Solo se cobra el SALDO restante (total − lo ya cobrado). Un pedido cubierto
+    # no admite más pagos (para corregir montos existe el reembolso). Esto habilita
+    # un segundo pago por el faltante: parte en efectivo, el resto por otro método.
+    paid_total = sum(
+        (p.received_amount for p in existing if p.status == "paid"), Decimal("0")
+    )
+    outstanding = _default_expected(order) - paid_total
+    if outstanding <= 0:
+        api_error(
+            status.HTTP_409_CONFLICT,
+            "pedido_ya_cubierto",
+            "El pedido ya está totalmente pagado.",
+        )
+    expected = (
+        payload.expected_amount if payload.expected_amount is not None else outstanding
+    )
+    if expected <= 0:
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "monto_invalido",
+            "El monto del pago debe ser mayor a cero.",
+        )
+    if expected > outstanding:
+        api_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "monto_excede_saldo",
+            f"El monto excede el saldo pendiente (${outstanding}).",
+        )
+
     try:
         payment = create_payment(
             session,
             order,
             method,
-            expected_amount=(
-                payload.expected_amount
-                if payload.expected_amount is not None
-                else _default_expected(order)
-            ),
+            expected_amount=expected,
             change_requested_for_amount=payload.change_requested_for_amount,
             transaction_reference=payload.transaction_reference,
             bank_name=payload.bank_name,

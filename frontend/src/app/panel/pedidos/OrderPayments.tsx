@@ -25,9 +25,6 @@ type PaymentRead = components["schemas"]["PaymentRead"];
 type PaymentCreate = components["schemas"]["PaymentCreate"];
 type PaymentVerifyRequest = components["schemas"]["PaymentVerifyRequest"];
 
-// Un pago "vigente" bloquea registrar otro (el rechazado/anulado no cuenta).
-const ACTIVE_PAYMENT_STATUSES = ["pending", "pending_verification", "paid"];
-
 function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiRequestError ? err.body.message : fallback;
 }
@@ -46,6 +43,12 @@ function PaymentRow({
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
   const pendingVerification = payment.status === "pending_verification";
+  // Un pago directo (efectivo, sin verificación manual) nace en "pending". El
+  // mismo endpoint /verify lo confirma (mark_paid acepta "pending"): reusamos
+  // el flujo aprobar/rechazar, solo cambia la etiqueta del botón. Útil cuando
+  // el pedido se completó ANTES de registrar el pago (el auto-cobro ya pasó).
+  const pendingDirect = payment.status === "pending";
+  const actionable = pendingVerification || pendingDirect;
 
   const facts = [
     `Esperado ${formatMoney(payment.expected_amount)}`,
@@ -80,7 +83,7 @@ function PaymentRow({
         <div style={{ fontSize: 13, color: "var(--muted-btn-tx)" }}>«{payment.notes}»</div>
       ) : null}
 
-      {canVerify && pendingVerification ? (
+      {canVerify && actionable ? (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {rejecting ? (
             <>
@@ -120,7 +123,7 @@ function PaymentRow({
                 onClick={() => onVerify(true)}
                 style={{ padding: "8px 16px", fontSize: 13 }}
               >
-                Aprobar
+                {pendingDirect ? "Confirmar pago" : "Aprobar"}
               </button>
               <button
                 type="button"
@@ -141,11 +144,13 @@ function PaymentRow({
 
 function RecordPaymentForm({
   orderId,
+  outstanding,
   onDone,
-}: Readonly<{ orderId: string; onDone: () => void }>) {
+}: Readonly<{ orderId: string; outstanding: number; onDone: () => void }>) {
   const [methods, setMethods] = useState<PaymentMethodPublic[]>([]);
   const [open, setOpen] = useState(false);
   const [methodCode, setMethodCode] = useState<string | null>(null);
+  const [amount, setAmount] = useState(outstanding > 0 ? outstanding.toFixed(2) : "");
   const [billAmount, setBillAmount] = useState("");
   const [reference, setReference] = useState("");
   const [bankName, setBankName] = useState("");
@@ -173,25 +178,37 @@ function RecordPaymentForm({
 
   const method = methods.find((item) => item.code === methodCode) ?? null;
   const invalidCard = cardLastFour.trim() !== "" && !/^\d{4}$/.test(cardLastFour.trim());
+  const amountValue = Number(amount);
+  const invalidAmount =
+    amount.trim() === "" || !Number.isFinite(amountValue) || amountValue <= 0;
+  // Tolerancia de centavo para no bloquear por redondeo del saldo mostrado.
+  const exceedsOutstanding = Number.isFinite(amountValue) && amountValue > outstanding + 0.005;
   const blocked =
     method === null
       ? "No hay métodos de pago disponibles."
-      : method.requires_transaction_reference && !reference.trim()
-        ? "Este método requiere la referencia de la transacción."
-        : method.requires_bank_name && !bankName.trim()
-          ? "Este método requiere el banco emisor."
-          : invalidCard
-            ? "Los últimos 4 dígitos deben ser exactamente 4 números."
-            : null;
+      : invalidAmount
+        ? "Ingresa el monto de este pago."
+        : exceedsOutstanding
+          ? `El monto no puede exceder el saldo pendiente (${formatMoney(outstanding)}).`
+          : method.requires_transaction_reference && !reference.trim()
+            ? "Este método requiere la referencia de la transacción."
+            : method.requires_bank_name && !bankName.trim()
+              ? "Este método requiere el banco emisor."
+              : invalidCard
+                ? "Los últimos 4 dígitos deben ser exactamente 4 números."
+                : null;
 
   async function submit() {
     if (method === null || blocked !== null || busy) return;
     setBusy(true);
     setError(null);
     try {
-      // El monto esperado lo deriva el backend (se omite expected_amount).
+      // Monto de ESTE pago (el saldo restante por defecto; editable para cubrir
+      // solo una parte y registrar el resto por otro método). El backend valida
+      // que no exceda el saldo pendiente.
       const body: PaymentCreate = {
         method_code: method.code,
+        expected_amount: amount.trim(),
         ...(method.allows_cash_change && billAmount.trim()
           ? { change_requested_for_amount: billAmount.trim() }
           : {}),
@@ -220,7 +237,11 @@ function RecordPaymentForm({
       <button
         type="button"
         className="tt-btn tt-btn-outline"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // Al abrir, el monto arranca en el saldo pendiente vigente.
+          setAmount(outstanding > 0 ? outstanding.toFixed(2) : "");
+          setOpen(true);
+        }}
         style={{ alignSelf: "flex-start", padding: "8px 16px", fontSize: 13 }}
       >
         Registrar pago
@@ -248,6 +269,23 @@ function RecordPaymentForm({
       {method?.instructions ? (
         <p style={{ margin: 0, fontSize: 12, color: "var(--tx3)" }}>{method.instructions}</p>
       ) : null}
+      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <span className="tt-label">Monto de este pago</span>
+        <input
+          className="tt-input"
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+          aria-label="Monto de este pago"
+          style={{ padding: "8px 12px", fontSize: 13 }}
+        />
+        <span style={{ fontSize: 12, color: "var(--tx3)" }}>
+          Saldo pendiente: {formatMoney(outstanding)}
+        </span>
+      </label>
       {method?.allows_cash_change ? (
         <input
           className="tt-input"
@@ -389,14 +427,28 @@ export function OrderPayments({
   }
 
   const list = payments ?? [];
-  const hasActivePayment = list.some((payment) => ACTIVE_PAYMENT_STATUSES.includes(payment.status));
+  // Saldo pendiente = total del pedido − lo ya cobrado (pagos 'paid'). Permite
+  // registrar un segundo pago por el faltante; se bloquea cuando ya está saldado.
+  const target = Number(order.total_money_amount ?? order.items_subtotal_amount) || 0;
+  const paidTotal = list
+    .filter((payment) => payment.status === "paid")
+    .reduce((acc, payment) => acc + (Number(payment.received_amount) || 0), 0);
+  const outstanding = Math.max(0, target - paidTotal);
+  // Un pago pendiente sin resolver bloquea registrar otro (confírmalo/recházalo
+  // primero); un pedido ya saldado o reembolsado tampoco admite más pagos.
+  const hasPendingPayment = list.some(
+    (payment) => payment.status === "pending" || payment.status === "pending_verification",
+  );
+  const settled = ["paid", "refunded", "partially_refunded"].includes(order.payment_status);
   // Los pedidos por créditos jamás llevan pagos monetarios (invariante §15).
   const canRecord =
     perms.has("payments:record") &&
     payments !== null &&
-    !hasActivePayment &&
     order.purchase_mode !== "credits" &&
-    order.status !== "cancelled";
+    order.status !== "cancelled" &&
+    !hasPendingPayment &&
+    !settled &&
+    outstanding > 0;
 
   return (
     <div
@@ -440,7 +492,7 @@ export function OrderPayments({
       {perms.has("payments:refund") ? (
         <CreditRefundControl order={order} onDone={onChanged} />
       ) : null}
-      {canRecord ? <RecordPaymentForm key={orderId} orderId={orderId} onDone={() => {
+      {canRecord ? <RecordPaymentForm key={orderId} orderId={orderId} outstanding={outstanding} onDone={() => {
         setTick((value) => value + 1);
         onChanged();
       }} /> : null}

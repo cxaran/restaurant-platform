@@ -247,6 +247,62 @@ class PaymentsRoutesTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.json()["code"], "billete_insuficiente")
 
+    def test_record_payment_rejected_when_order_already_paid(self) -> None:
+        # Venta de mostrador en efectivo: queda completada y pagada al 100 %.
+        with _As("orders:capture", "payments:record"):
+            sale = self.client.post("/api/v1/pos/sales", json=self._pos_payload())
+        self.assertEqual(sale.status_code, 201, sale.text)
+        order_id = sale.json()["order"]["id"]
+        # Registrar otro pago sobre un pedido ya cubierto se rechaza (409).
+        with _As("payments:record"):
+            resp = self.client.post(
+                f"/api/v1/orders/{order_id}/payments",
+                json={"method_code": "cash_counter"},
+            )
+        self.assertEqual(resp.status_code, 409, resp.text)
+        self.assertEqual(resp.json()["code"], "pedido_ya_cubierto")
+
+    def test_partial_payment_then_remainder_by_other_method(self) -> None:
+        # Total 200. La transferencia se verifica por SOLO 150 → el pedido sigue
+        # debiendo 50; el faltante se cobra por otro método (parte y parte).
+        payload = self._pos_payload(
+            method_code="bank_transfer", transaction_reference="A1", bank_name="BBVA",
+        )
+        with _As("orders:capture", "payments:record"):
+            sale = self.client.post("/api/v1/pos/sales", json=payload)
+        self.assertEqual(sale.status_code, 201, sale.text)
+        body = sale.json()
+        order_id = body["order"]["id"]
+        with _As("payments:verify"):
+            self.client.post(
+                f"/api/v1/payments/{body['payment']['id']}/verify",
+                json={"approve": True, "received_amount": "150"},
+            )
+        # Exceder el saldo pendiente (50) se rechaza.
+        with _As("payments:record"):
+            over = self.client.post(
+                f"/api/v1/orders/{order_id}/payments",
+                json={"method_code": "cash_counter", "expected_amount": "999"},
+            )
+        self.assertEqual(over.status_code, 422, over.text)
+        self.assertEqual(over.json()["code"], "monto_excede_saldo")
+        # Registrar el faltante correcto (50) en efectivo y confirmarlo.
+        with _As("payments:record"):
+            extra = self.client.post(
+                f"/api/v1/orders/{order_id}/payments",
+                json={"method_code": "cash_counter", "expected_amount": "50"},
+            )
+        self.assertEqual(extra.status_code, 201, extra.text)
+        with _As("payments:verify"):
+            confirmed = self.client.post(
+                f"/api/v1/payments/{extra.json()['id']}/verify",
+                json={"approve": True},
+            )
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+        with _As("orders:read"):
+            order_after = self.client.get(f"/api/v1/orders/{order_id}").json()
+        self.assertEqual(order_after["payment_status"], "paid")
+
     def test_ticket_payload_and_print_log(self) -> None:
         with _As("orders:capture", "payments:record"):
             sale = self.client.post("/api/v1/pos/sales", json=self._pos_payload()).json()
